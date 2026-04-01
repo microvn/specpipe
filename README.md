@@ -269,24 +269,40 @@ This removes hooks, commands, settings, and build-test.sh. It preserves `CLAUDE.
 
 **Usage:**
 ```
-/plan docs/specs/auth.md        # Mode A: from existing spec
-/plan "user authentication with OAuth2"  # Mode B: from description
+/plan docs/specs/auth.md                    # Mode A: from existing spec
+/plan "user authentication with OAuth2"     # Mode B: from description
+/plan docs/specs/auth.md (after spec edit)  # Mode C: update existing plan
 ```
 
-**Mode A** reads an existing spec and generates a test plan.
-**Mode B** drafts a spec, asks for your confirmation, then generates the test plan.
+**Modes:**
+- **Mode A** — Reads an existing spec, generates a test plan.
+- **Mode B** — Drafts a spec from your description, asks for confirmation, then generates the test plan.
+- **Mode C** — Updates an existing spec + test plan when requirements change.
 
-**Output:**
-- Spec (Mode B only): `docs/specs/<feature>.md`
-- Test plan: `docs/test-plans/<feature>.md`
+**How it works:**
 
-The test plan uses a fixed table format:
+1. **Phase 0: Codebase Awareness** — Scans existing code, `docs/specs/`, `docs/test-plans/`, and project patterns before planning. Prevents plans that conflict with existing implementations.
+2. **Phase 1: Write/Update Spec** — Generates a structured spec with sections: Overview, Data Model, Use Cases, State Machine, Constraints & Invariants, Error Handling, Security Considerations. Depth is proportional to complexity — simple CRUD gets 1 paragraph + 3 use cases, complex auth gets the full template.
+3. **Phase 2: Clarify Ambiguities** — Systematically finds gaps across behavioral, data, auth, non-functional, integration, and concurrency dimensions. Asks 3-5 targeted questions with 2-4 options each before proceeding. If the spec is clear and complete, 0 questions is valid.
+4. **Phase 3: Generate Test Plan** — Derives test cases from the spec (never from code).
+
+**Traceability IDs:** Every requirement gets a traceable ID:
+- `UC-NNN` — Use Cases
+- `FR-NNN` — Functional Requirements
+- `SC-NNN` — Security Constraints
+- `TC-NNN` — Test Cases (each must reference at least one FR or SC)
+
+**Test plan table format:**
 
 | ID | Priority | Type | UC | FR/SC | Description | Expected |
 |----|----------|------|----|-------|-------------|----------|
 | TC-001 | P0 | unit | UC-001 | FR-001 | ... | ... |
 
 Priorities: **P0** (must have), **P1** (should have), **P2** (nice to have).
+
+**Output:**
+- Spec: `docs/specs/<feature>.md`
+- Test plan: `docs/test-plans/<feature>.md`
 
 ### /test — Write + Run Tests
 
@@ -297,13 +313,22 @@ Priorities: **P0** (must have), **P1** (should have), **P2** (nice to have).
 /test "user authentication"        # test specific feature
 ```
 
-**What it does:**
-1. Detects changed files vs base branch
-2. Finds matching test plan in `docs/test-plans/`
-3. Writes or updates tests
-4. Compiles/typechecks first, then runs tests
-5. Fixes test code up to 3 times if tests fail
-6. Never changes production code — asks you first
+**How it works:**
+
+1. **Phase 0: Build Context** — Finds changed files vs base branch, reads matching test plan/spec, reads existing tests for patterns, fixtures, and naming conventions. Doesn't duplicate what already exists.
+2. **Phase 1: Write Tests** — Creates or updates tests based on the test plan. Each test covers one concept, is independent, deterministic (no random, no time-dependent, no external calls), and has a clear name.
+3. **Phase 2: Compile First** — Runs typecheck/compile before executing tests. Catches syntax errors early.
+4. **Phase 3: Run Tests** — Executes the test suite.
+5. **Phase 4: Fix Loop** — If tests fail, fixes **test code only** (max 3 attempts, then hard stop and report). If tests expect X but code does Y, asks you whether to fix production code or adjust the test.
+6. **Phase 5: Report** — Summary with test counts, results, coverage, and files touched.
+
+**Rules:**
+- Never changes production code without asking first
+- Never deletes or weakens existing tests
+- Never adds `skip`/`xit`/`@disabled` to hide failures
+- Max 3 fix attempts — then stops and reports the issue
+
+**What NOT to test:** Private/internal methods, framework behavior, trivial getters/setters, implementation details.
 
 ### /fix — Test-First Bug Fix
 
@@ -312,12 +337,16 @@ Priorities: **P0** (must have), **P1** (should have), **P2** (nice to have).
 /fix "description of the bug"
 ```
 
-**What it does:**
-1. Writes a test that reproduces the bug (must fail)
-2. Confirms the test fails
-3. Fixes production code (minimal change)
-4. Confirms the test passes
-5. Runs the full test suite for regressions
+**How it works:**
+
+1. **Phase 0: Investigate** — Parses the bug report, locates relevant code, checks git history (`git log` + `git blame`), forms a hypothesis with evidence: *"I believe the bug is caused by [X] in [file:function] because [evidence]."* If the bug is in a dependency/config/data (not our code), reports that before proceeding.
+2. **Phase 1: Write Failing Test** — Creates a regression test that reproduces the bug. Test includes a comment: `// Regression: <bug description> — <expected> vs <actual>`.
+3. **Phase 2: Confirm Failure** — Runs the test to verify it fails for the right reason.
+4. **Phase 3: Fix** — Minimal change to production code. If other tests break, the fix is wrong — never weakens existing tests.
+5. **Phase 4: Root Cause Analysis** — Documents: Symptom, Root cause, Gap (why wasn't this caught earlier?), Prevention (suggests one: type constraint, validation, lint rule, spec update, or test plan update). Non-optional for serious bugs; for trivial bugs, the fix summary is enough.
+6. **Phase 5: Full Suite** — Runs all tests to catch regressions.
+
+**Multiple bugs:** Triages by severity, fixes one at a time, commits each separately.
 
 ### /review — Pre-Merge Quality Gate
 
@@ -327,14 +356,31 @@ Priorities: **P0** (must have), **P1** (should have), **P2** (nice to have).
 /review src/auth/                  # review specific directory
 ```
 
-**Checks:**
-- Security (injection, auth, secrets, error exposure)
-- Correctness (logic, edge cases, error handling)
-- Type safety (unsafe casts, implicit any)
-- Spec-test alignment (code changed → spec/tests also changed?)
-- Code quality (dead code, duplication, naming)
+**How it works:**
 
-**Output:** Structured report with severity tiers (Critical/High/Medium/Low) and a verdict (APPROVE / REQUEST CHANGES).
+1. **Phase 0: Understand Intent** — Reads commit messages and checks for related spec/test plan. Understands *why* the change was made before reviewing *how*.
+2. **Phase 1: Smart Focus** — Auto-detects what to focus on based on the diff:
+
+   | Diff contains | Focus on |
+   |---------------|----------|
+   | Auth/session code | Security, token handling, permission checks |
+   | SQL/queries | Injection, parameterization, N+1 queries |
+   | API endpoints | Input validation, error responses, rate limiting |
+   | `.env`/config | Secrets exposure, environment handling |
+   | Tests only | Test quality, coverage gaps, flaky patterns |
+   | Payment/billing | Financial accuracy, idempotency, audit trails |
+
+3. **Phase 2: Review** — Checks security, correctness, null safety, spec-test alignment, and code quality. Spends 60% of analysis on the primary focus area. Looks for specific patterns: `${var}` in queries, `.innerHTML`, template literals in SQL, optionals without guards.
+4. **Phase 3: Report** — Structured report with severity tiers (Critical/High/Medium/Low).
+
+**Proportional review:** A 5-line doc change gets a light review. A 500-line auth rewrite gets file-by-file deep analysis. Diffs >500 lines get a note suggesting to split the commit.
+
+**Verdicts:** APPROVE / REQUEST CHANGES / NEEDS DISCUSSION (three options, not binary).
+
+**Rules:**
+- At least 1 positive note — reinforces good patterns, not just problems
+- Never auto-fixes code — report only
+- Checks spec-test alignment: code changed → spec/tests also changed? Vague requirements without metrics ("fast", "secure") get flagged with a suggestion to add concrete numbers
 
 ### /commit — Smart Git Commit
 
@@ -343,34 +389,64 @@ Priorities: **P0** (must have), **P1** (should have), **P2** (nice to have).
 /commit
 ```
 
-**What it does:**
-1. Stages files (specific files, not `git add -A`)
-2. Scans for secrets — blocks if found
-3. Generates conventional commit message
-4. Commits (does NOT push — safe default)
+**How it works:**
 
-To push: ask Claude explicitly ("push to remote").
+1. **Analyze** — Scans `git status`, diff stats, and file contents in one pass.
+2. **Scan for secrets** — Matches patterns: `api_key`, `token`, `password`, `secret`, `private_key`, `credential`, `auth_token`. **Hard block** — stops immediately if found, non-negotiable.
+3. **Scan for debug code** — Matches: `console.log`, `debugger`, `print()`, `TODO:remove`, `HACK:`, `FIXME:temp`, `binding.pry`, `var_dump`. **Soft warn** — proceeds if you confirm.
+4. **Stage files** — Stages specific files by name. Never uses `git add -A`.
+5. **Generate message** — Conventional format: `type(scope): description`. Imperative tense ("add" not "added"), no period, WHAT+WHY not HOW.
+6. **Commit** — Does NOT push (safe default). Ask Claude explicitly to push.
+
+**Large diff warning:** If >10 files OR >300 lines changed, suggests splitting into smaller commits for easier review.
+
+**Never stages:** `.env`, credentials, build artifacts, generated files, binaries >1MB.
+
+**Breaking changes:** If the diff removes/renames a public function, export, or API endpoint, uses `feat!` or `fix!` type, or adds a `BREAKING CHANGE:` footer.
 
 ### /challenge — Adversarial Plan Review
 
 **Usage:**
 ```
-/challenge docs/test-plans/auth.md          # challenge a test plan
-/challenge docs/specs/auth.md     # challenge a spec
-/challenge "user authentication"           # challenge by feature name
+/challenge docs/test-plans/auth.md   # challenge a test plan
+/challenge docs/specs/auth.md        # challenge a spec
+/challenge "user authentication"     # challenge by feature name
 ```
 
-**What it does:**
-1. Reads the plan/spec and maps assumptions, decisions, risks, scope boundaries
-2. Spawns 2-4 parallel hostile reviewers (subagents), each with one adversarial lens:
-   - **Security Adversary** — thinks like an attacker (OWASP, injection, auth bypass)
-   - **Failure Mode Analyst** — thinks like Murphy's Law (race conditions, data loss, cascading failures)
-   - **Assumption Destroyer** — thinks like a skeptic (unverified claims, scale gaps, hidden dependencies)
-   - **Scope Critic** — thinks like a minimalist (over-engineering, missing MVP cuts, gold plating)
-3. Collects findings, deduplicates, severity-rates (Critical/High/Medium)
-4. Presents findings with evidence (direct plan quotes) and suggested fixes
-5. User accepts/rejects each finding
-6. Updates the plan with accepted fixes
+**How it works (7 phases):**
+
+1. **Read & Map** — Reads the plan/spec and maps: decisions made, assumptions (stated AND implied), dependencies, scope boundaries, risk acknowledgments, spec-plan consistency.
+2. **Scale Reviewers** — Assesses complexity and selects reviewers:
+
+   | Complexity | Signals | Reviewers |
+   |------------|---------|-----------|
+   | Simple | 1 spec section, <20 test cases, no auth/data | 2 |
+   | Standard | Multiple sections, auth or data involved | 3 |
+   | Complex | Multiple integrations, concurrency, migrations, 6+ phases | 4 |
+
+3. **Spawn Reviewers** — Launches parallel subagents, each with an adversarial lens:
+   - **Security Adversary** — OWASP Top 10, injection vectors, auth/authz bypass, crypto issues, data exposure, supply chain risks
+   - **Failure Mode Analyst** — Partial failures, concurrency, cascading failures, recovery paths, idempotency, observability gaps. Assumes *"everything that can go wrong, will — simultaneously, at 3 AM, during peak traffic"*
+   - **Assumption Destroyer** — Unverified claims, scale assumptions, environment differences, integration contracts, data shape assumptions, timing dependencies, hidden dependencies. *"'It should work' is not evidence"*
+   - **Scope & YAGNI Critic** — Over-engineering, premature abstraction, missing MVP cuts, gold plating, simpler alternatives. *"The best code is no code. The best feature is the one you didn't build"*
+
+4. **Deduplicate & Rate** — Collects all findings, removes duplicates, rates severity using a Likelihood x Impact matrix. Caps at 15 findings: keeps all Critical, top High by specificity, notes how many Medium were dropped. Each reviewer is limited to top 7 findings.
+
+5. **Adjudicate** — Evaluates each finding: Accept (valid flaw, plan should change) or Reject (false positive, acceptable risk, already handled). 1-sentence rationale for each.
+
+6. **User Choice** — Two modes: "Apply all accepted" (fast) or "Review each" (walk through one by one).
+
+7. **Apply** — Surgical edits only to accepted findings. Doesn't rewrite surrounding sections.
+
+**Finding format:** Each finding includes Title, Severity, Location, Flaw description, Evidence (direct quote from the plan), step-by-step Failure scenario, and Suggested fix.
+
+**6 non-negotiable rules:**
+1. Spawn reviewers in parallel (not sequential)
+2. Reviewers read files directly, not summarized content
+3. Be hostile — no praise, no softening
+4. Every finding must quote the plan directly as evidence
+5. Quality over quantity — 3 honest findings > 15 padded ones
+6. Skip style/formatting — substance only
 
 **When to use:**
 - After `/plan`, before coding — for complex features
