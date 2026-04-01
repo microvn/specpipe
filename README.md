@@ -425,10 +425,38 @@ Priorities: **P0** (must have), **P1** (should have), **P2** (nice to have).
    | Complex | Multiple integrations, concurrency, migrations, 6+ phases | 4 |
 
 3. **Spawn Reviewers** — Launches parallel subagents, each with an adversarial lens:
-   - **Security Adversary** — OWASP Top 10, injection vectors, auth/authz bypass, crypto issues, data exposure, supply chain risks
-   - **Failure Mode Analyst** — Partial failures, concurrency, cascading failures, recovery paths, idempotency, observability gaps. Assumes *"everything that can go wrong, will — simultaneously, at 3 AM, during peak traffic"*
-   - **Assumption Destroyer** — Unverified claims, scale assumptions, environment differences, integration contracts, data shape assumptions, timing dependencies, hidden dependencies. *"'It should work' is not evidence"*
-   - **Scope & YAGNI Critic** — Over-engineering, premature abstraction, missing MVP cuts, gold plating, simpler alternatives. *"The best code is no code. The best feature is the one you didn't build"*
+
+   - **Security Adversary**
+     - OWASP Top 10
+     - Injection vectors
+     - Auth/authz bypass
+     - Crypto issues
+     - Data exposure
+     - Supply chain risks
+
+   - **Failure Mode Analyst** — *"Everything that can go wrong, will — simultaneously, at 3 AM, during peak traffic"*
+     - Partial failures
+     - Concurrency & race conditions
+     - Cascading failures
+     - Recovery paths
+     - Idempotency
+     - Observability gaps
+
+   - **Assumption Destroyer** — *"'It should work' is not evidence"*
+     - Unverified claims
+     - Scale assumptions
+     - Environment differences
+     - Integration contracts
+     - Data shape assumptions
+     - Timing dependencies
+     - Hidden dependencies
+
+   - **Scope & YAGNI Critic** — *"The best code is no code. The best feature is the one you didn't build"*
+     - Over-engineering
+     - Premature abstraction
+     - Missing MVP cuts
+     - Gold plating
+     - Simpler alternatives
 
 4. **Deduplicate & Rate** — Collects all findings, removes duplicates, rates severity using a Likelihood x Impact matrix. Caps at 15 findings: keeps all Critical, top High by specificity, notes how many Medium were dropped. Each reviewer is limited to top 7 findings.
 
