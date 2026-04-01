@@ -1,4 +1,4 @@
-# Dev Kit — Team Guide
+# claude-devkit-cli
 
 A lightweight, spec-first development toolkit for [Claude Code](https://claude.ai/code). It enforces the cycle **spec → test plan → code + tests → build pass** through custom commands, automatic hooks, and a universal test runner.
 
@@ -418,7 +418,7 @@ Priorities: **P0** (must have), **P1** (should have), **P2** (nice to have).
 
 **How it works:**
 
-1. **Phase 0: Investigate** — Parses the bug report, locates relevant code, checks git history (`git log` + `git blame`), forms a hypothesis with evidence: *"I believe the bug is caused by [X] in [file:function] because [evidence]."* If the bug is in a dependency/config/data (not our code), reports that before proceeding.
+1. **Phase 0: Investigate** — Parses the bug report, locates relevant code, checks git history (`git log` + `git blame`), forms a hypothesis with evidence: *"I believe the bug is caused by [X] in [file:function] because [evidence]."* If the bug is in a dependency/config/data (not your code), reports that before proceeding.
 2. **Phase 1: Write Failing Test** — Creates a regression test that reproduces the bug. Test includes a comment: `// Regression: <bug description> — <expected> vs <actual>`.
 3. **Phase 2: Confirm Failure** — Runs the test to verify it fails for the right reason.
 4. **Phase 3: Fix** — Minimal change to production code. If other tests break, the fix is wrong — never weakens existing tests.

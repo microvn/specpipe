@@ -13,7 +13,7 @@ Don't jump to code. Understand the bug first:
 3. **Check history.** `git log --oneline -5 -- <file>` and `git blame -L <range> <file>` — who changed this last and why?
 4. **Form a hypothesis:** "I believe the bug is caused by [X] in [file:function] because [evidence]."
 
-If the bug is in a dependency/config/data (not our code), say so before proceeding.
+If the bug is in a dependency/config/data (not project code), say so before proceeding.
 
 ---
 
