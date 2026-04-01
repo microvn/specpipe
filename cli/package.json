@@ -28,8 +28,8 @@
     "guards"
   ],
   "scripts": {
-    "prepublishOnly": "rm -rf templates && cp -r ../kit templates",
-    "postpublish": "rm -rf templates",
+    "prepublishOnly": "rm -rf templates && cp -r ../kit templates && cp ../README.md README.md",
+    "postpublish": "rm -rf templates README.md",
     "dev": "node bin/devkit.js"
   },
   "license": "MIT",
