@@ -56,11 +56,10 @@ Every code change — feature, fix, or removal — follows this cycle. The spec 
 **Time needed: 5 minutes.**
 
 ```bash
-# 1. Run setup from the kit directory
-bash /path/to/dev-kit/setup.sh /path/to/your-project
+# 1. Install dev-kit into your project
+npx claude-devkit-cli init .
 
 # 2. Open your project in Claude Code
-cd /path/to/your-project
 claude
 
 # 3. Create your first spec and test plan
@@ -76,7 +75,7 @@ claude
 /commit
 ```
 
-That's it. The setup script auto-detects your project type and configures everything.
+That's it. The CLI auto-detects your project type and configures everything.
 
 ---
 
@@ -94,27 +93,32 @@ That's it. The setup script auto-detects your project type and configures everyt
 
 ### Installation
 
-**Option A: Direct setup**
+**Option A: One-command install** (recommended)
 
 ```bash
-bash /path/to/dev-kit/setup.sh /path/to/your-project
+npx claude-devkit-cli init .
 ```
 
-**Option B: Global install** (recommended for teams)
+**Option B: Global install**
 
 ```bash
-# One-time: create a symlink
-ln -sf /path/to/dev-kit/setup.sh /usr/local/bin/devkit-init
+npm install -g claude-devkit-cli
 
 # Then, in any project:
 cd my-project
-devkit-init
+claude-devkit init .
 ```
 
 **Option C: Force re-install** (overwrites existing files)
 
 ```bash
-devkit-init --force
+npx claude-devkit-cli init --force .
+```
+
+**Option D: Selective install** (only specific components)
+
+```bash
+npx claude-devkit-cli init --only hooks,commands .
 ```
 
 ### What Gets Installed
@@ -148,7 +152,7 @@ your-project/
 
 ### Post-Install Configuration
 
-The setup script auto-detects your project type and fills in `CLAUDE.md`. Verify it's correct:
+The CLI auto-detects your project type and fills in `CLAUDE.md`. Verify it's correct:
 
 ```bash
 cat .claude/CLAUDE.md
@@ -156,10 +160,29 @@ cat .claude/CLAUDE.md
 
 Look for the **Project Info** section. Ensure language, test framework, and directories are correct. Edit manually if needed.
 
+### Upgrade
+
+```bash
+npx claude-devkit-cli upgrade
+```
+
+Smart upgrade — updates kit files but preserves any you've customized. Use `--force` to overwrite everything.
+
+```bash
+# Check if update is available
+npx claude-devkit-cli check
+
+# See what changed
+npx claude-devkit-cli diff
+
+# View installed files and status
+npx claude-devkit-cli list
+```
+
 ### Uninstall
 
 ```bash
-devkit-init --remove
+npx claude-devkit-cli remove
 ```
 
 This removes hooks, commands, settings, and build-test.sh. It preserves `CLAUDE.md` (which you may have customized) and `docs/` (which contains your specs and plans).
@@ -798,4 +821,7 @@ A: `build-test.sh` detects the first match. For monorepos, you may need to run i
 A: Yes. Drop a `.md` file in `.claude/commands/` and it becomes available as a slash command. See [Customization](#9-customization).
 
 **Q: How do I update the kit in existing projects?**
-A: Run `devkit-init --force` in the project. This overwrites kit files but preserves your customized `CLAUDE.md` only if you haven't used `--force`. To be safe, commit before updating.
+A: Run `npx claude-devkit-cli upgrade`. It automatically detects which files you've customized and only updates unchanged files. Use `--force` to overwrite everything.
+
+**Q: I installed with the old setup.sh — how do I migrate?**
+A: Run `npx claude-devkit-cli init --adopt .` to generate a manifest from your existing files without overwriting anything. Future upgrades will then work normally.
