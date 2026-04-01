@@ -91,14 +91,24 @@ export function getAllFiles() {
 
 /**
  * Copy a single file from templates to target.
- * @returns {string} 'copied' | 'skipped'
+ * @returns {string} 'copied' | 'skipped' | 'identical'
  */
 export async function installFile(relativePath, targetDir, { force = false } = {}) {
   const src = join(getTemplateDir(), relativePath);
   const dst = join(targetDir, relativePath);
 
   if (existsSync(dst) && !force) {
-    log.skip(`${relativePath} (exists, use --force to overwrite)`);
+    // Compare content to distinguish: identical, customized, or from another source
+    try {
+      const { hashFile } = await import('./hasher.js');
+      const srcHash = await hashFile(src);
+      const dstHash = await hashFile(dst);
+      if (srcHash === dstHash) {
+        log.same(`${relativePath} (identical)`);
+        return 'identical';
+      }
+    } catch { /* hash failed, treat as conflict */ }
+    log.warn(`${relativePath} (exists with different content — use --force to overwrite)`);
     return 'skipped';
   }
 

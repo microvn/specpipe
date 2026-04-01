@@ -90,10 +90,12 @@ export async function initCommand(path, opts) {
   const manifest = createManifest(pkg.version, null, components);
   let copied = 0;
   let skipped = 0;
+  let identical = 0;
 
   for (const file of files) {
     const result = await installFile(file, targetDir, { force: opts.force });
     if (result === 'copied') copied++;
+    else if (result === 'identical') identical++;
     else skipped++;
 
     // Record in manifest
@@ -166,7 +168,10 @@ export async function initCommand(path, opts) {
   console.log('  scripts/build-test.sh      — Universal test runner');
   console.log('  docs/WORKFLOW.md           — Workflow reference');
   log.blank();
-  console.log(`  ${copied} files copied, ${skipped} skipped`);
+  const parts = [`${copied} copied`];
+  if (identical > 0) parts.push(`${identical} identical`);
+  if (skipped > 0) parts.push(`${skipped} conflicted (use --force to overwrite)`);
+  console.log(`  ${parts.join(', ')}`);
   log.blank();
   console.log('Next steps:');
   console.log('  1. Review .claude/CLAUDE.md — ensure project info is correct');
