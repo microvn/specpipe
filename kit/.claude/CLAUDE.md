@@ -13,11 +13,10 @@ Every change follows this cycle: **SPEC → TEST PLAN → CODE + TESTS → BUILD
 
 | Trigger | Commands | Details |
 |---------|----------|---------|
-| New feature | `/plan` → code in chunks → `/test` each chunk | Start with spec or description |
-| Update feature | Update spec first → `/plan` (update plan) → code → `/test` | Spec changes before code changes |
+| New feature | `/plan` → `/challenge` (optional) → code in chunks → `/test` each chunk | Start with spec or description |
+| Update feature | Update spec first → `/plan` → code → `/test` | Spec changes before code changes |
 | Bug fix | `/fix "description"` | Test-first: write failing test → fix → green |
 | Remove feature | Mark spec as removed → delete code + tests → build pass | Run full suite after removal |
-| Stress-test plan | `/challenge` | Adversarial review before coding (optional) |
 | Pre-merge check | `/review` | Diff-based quality gate |
 | Commit changes | `/commit` | Secret scan + conventional commit |
 

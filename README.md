@@ -137,11 +137,11 @@ your-project/
 │   │   └── self-review.sh     ← Quality checklist on stop
 │   └── commands/
 │       ├── plan.md            ← /plan command
+│       ├── challenge.md       ← /challenge command
 │       ├── test.md            ← /test command
 │       ├── fix.md             ← /fix command
 │       ├── review.md          ← /review command
-│       ├── commit.md          ← /commit command
-│       └── challenge.md       ← /challenge command
+│       └── commit.md          ← /commit command
 ├── scripts/
 │   └── build-test.sh          ← Universal test runner
 └── docs/
@@ -304,6 +304,85 @@ Priorities: **P0** (must have), **P1** (should have), **P2** (nice to have).
 - Spec: `docs/specs/<feature>.md`
 - Test plan: `docs/test-plans/<feature>.md`
 
+### /challenge — Adversarial Plan Review
+
+**Usage:**
+```
+/challenge docs/test-plans/auth.md   # challenge a test plan
+/challenge docs/specs/auth.md        # challenge a spec
+/challenge "user authentication"     # challenge by feature name
+```
+
+**How it works (7 phases):**
+
+1. **Read & Map** — Reads the plan/spec and maps: decisions made, assumptions (stated AND implied), dependencies, scope boundaries, risk acknowledgments, spec-plan consistency.
+2. **Scale Reviewers** — Assesses complexity and selects reviewers:
+
+   | Complexity | Signals | Reviewers |
+   |------------|---------|-----------|
+   | Simple | 1 spec section, <20 test cases, no auth/data | 2 |
+   | Standard | Multiple sections, auth or data involved | 3 |
+   | Complex | Multiple integrations, concurrency, migrations, 6+ phases | 4 |
+
+3. **Spawn Reviewers** — Launches parallel subagents, each with an adversarial lens:
+
+   - **Security Adversary**
+     - OWASP Top 10
+     - Injection vectors
+     - Auth/authz bypass
+     - Crypto issues
+     - Data exposure
+     - Supply chain risks
+
+   - **Failure Mode Analyst** — *"Everything that can go wrong, will — simultaneously, at 3 AM, during peak traffic"*
+     - Partial failures
+     - Concurrency & race conditions
+     - Cascading failures
+     - Recovery paths
+     - Idempotency
+     - Observability gaps
+
+   - **Assumption Destroyer** — *"'It should work' is not evidence"*
+     - Unverified claims
+     - Scale assumptions
+     - Environment differences
+     - Integration contracts
+     - Data shape assumptions
+     - Timing dependencies
+     - Hidden dependencies
+
+   - **Scope & YAGNI Critic** — *"The best code is no code. The best feature is the one you didn't build"*
+     - Over-engineering
+     - Premature abstraction
+     - Missing MVP cuts
+     - Gold plating
+     - Simpler alternatives
+
+4. **Deduplicate & Rate** — Collects all findings, removes duplicates, rates severity using a Likelihood x Impact matrix. Caps at 15 findings: keeps all Critical, top High by specificity, notes how many Medium were dropped. Each reviewer is limited to top 7 findings.
+
+5. **Adjudicate** — Evaluates each finding: Accept (valid flaw, plan should change) or Reject (false positive, acceptable risk, already handled). 1-sentence rationale for each.
+
+6. **User Choice** — Two modes: "Apply all accepted" (fast) or "Review each" (walk through one by one).
+
+7. **Apply** — Surgical edits only to accepted findings. Doesn't rewrite surrounding sections.
+
+**Finding format:** Each finding includes Title, Severity, Location, Flaw description, Evidence (direct quote from the plan), step-by-step Failure scenario, and Suggested fix.
+
+**6 non-negotiable rules:**
+1. Spawn reviewers in parallel (not sequential)
+2. Reviewers read files directly, not summarized content
+3. Be hostile — no praise, no softening
+4. Every finding must quote the plan directly as evidence
+5. Quality over quantity — 3 honest findings > 15 padded ones
+6. Skip style/formatting — substance only
+
+**When to use:**
+- After `/plan`, before coding — for complex features
+- Features involving auth, payments, data pipelines, multi-service integration
+- NOT needed for simple CRUD, small bug fixes, or trivial features
+
+**Token cost:** 15-30k (uses parallel subagents, doesn't bloat main context)
+
 ### /test — Write + Run Tests
 
 **Usage:**
@@ -403,85 +482,6 @@ Priorities: **P0** (must have), **P1** (should have), **P2** (nice to have).
 **Never stages:** `.env`, credentials, build artifacts, generated files, binaries >1MB.
 
 **Breaking changes:** If the diff removes/renames a public function, export, or API endpoint, uses `feat!` or `fix!` type, or adds a `BREAKING CHANGE:` footer.
-
-### /challenge — Adversarial Plan Review
-
-**Usage:**
-```
-/challenge docs/test-plans/auth.md   # challenge a test plan
-/challenge docs/specs/auth.md        # challenge a spec
-/challenge "user authentication"     # challenge by feature name
-```
-
-**How it works (7 phases):**
-
-1. **Read & Map** — Reads the plan/spec and maps: decisions made, assumptions (stated AND implied), dependencies, scope boundaries, risk acknowledgments, spec-plan consistency.
-2. **Scale Reviewers** — Assesses complexity and selects reviewers:
-
-   | Complexity | Signals | Reviewers |
-   |------------|---------|-----------|
-   | Simple | 1 spec section, <20 test cases, no auth/data | 2 |
-   | Standard | Multiple sections, auth or data involved | 3 |
-   | Complex | Multiple integrations, concurrency, migrations, 6+ phases | 4 |
-
-3. **Spawn Reviewers** — Launches parallel subagents, each with an adversarial lens:
-
-   - **Security Adversary**
-     - OWASP Top 10
-     - Injection vectors
-     - Auth/authz bypass
-     - Crypto issues
-     - Data exposure
-     - Supply chain risks
-
-   - **Failure Mode Analyst** — *"Everything that can go wrong, will — simultaneously, at 3 AM, during peak traffic"*
-     - Partial failures
-     - Concurrency & race conditions
-     - Cascading failures
-     - Recovery paths
-     - Idempotency
-     - Observability gaps
-
-   - **Assumption Destroyer** — *"'It should work' is not evidence"*
-     - Unverified claims
-     - Scale assumptions
-     - Environment differences
-     - Integration contracts
-     - Data shape assumptions
-     - Timing dependencies
-     - Hidden dependencies
-
-   - **Scope & YAGNI Critic** — *"The best code is no code. The best feature is the one you didn't build"*
-     - Over-engineering
-     - Premature abstraction
-     - Missing MVP cuts
-     - Gold plating
-     - Simpler alternatives
-
-4. **Deduplicate & Rate** — Collects all findings, removes duplicates, rates severity using a Likelihood x Impact matrix. Caps at 15 findings: keeps all Critical, top High by specificity, notes how many Medium were dropped. Each reviewer is limited to top 7 findings.
-
-5. **Adjudicate** — Evaluates each finding: Accept (valid flaw, plan should change) or Reject (false positive, acceptable risk, already handled). 1-sentence rationale for each.
-
-6. **User Choice** — Two modes: "Apply all accepted" (fast) or "Review each" (walk through one by one).
-
-7. **Apply** — Surgical edits only to accepted findings. Doesn't rewrite surrounding sections.
-
-**Finding format:** Each finding includes Title, Severity, Location, Flaw description, Evidence (direct quote from the plan), step-by-step Failure scenario, and Suggested fix.
-
-**6 non-negotiable rules:**
-1. Spawn reviewers in parallel (not sequential)
-2. Reviewers read files directly, not summarized content
-3. Be hostile — no praise, no softening
-4. Every finding must quote the plan directly as evidence
-5. Quality over quantity — 3 honest findings > 15 padded ones
-6. Skip style/formatting — substance only
-
-**When to use:**
-- After `/plan`, before coding — for complex features
-- Features involving auth, payments, data pipelines, multi-service integration
-- NOT needed for simple CRUD, small bug fixes, or trivial features
-
-**Token cost:** 15-30k (uses parallel subagents, doesn't bloat main context)
 
 ---
 

@@ -21,11 +21,11 @@ export const COMPONENTS = {
   ],
   commands: [
     '.claude/commands/plan.md',
+    '.claude/commands/challenge.md',
     '.claude/commands/test.md',
     '.claude/commands/fix.md',
     '.claude/commands/review.md',
     '.claude/commands/commit.md',
-    '.claude/commands/challenge.md',
   ],
   config: [
     '.claude/settings.json',

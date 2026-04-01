@@ -162,7 +162,7 @@ export async function initCommand(path, opts) {
   console.log('  .claude/CLAUDE.md          — Project rules (review and customize)');
   console.log('  .claude/settings.json      — Hook configuration');
   console.log('  .claude/hooks/             — 6 guards (file, path, glob, comment, sensitive, self-review)');
-  console.log('  .claude/commands/          — /plan, /test, /fix, /review, /commit, /challenge');
+  console.log('  .claude/commands/          — /plan, /challenge, /test, /fix, /review, /commit');
   console.log('  scripts/build-test.sh      — Universal test runner');
   console.log('  docs/WORKFLOW.md           — Workflow reference');
   log.blank();
