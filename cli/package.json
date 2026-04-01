@@ -1,0 +1,37 @@
+{
+  "name": "claude-devkit-cli",
+  "version": "1.0.0",
+  "description": "CLI toolkit for spec-first development with Claude Code — hooks, commands, guards, and test runners",
+  "bin": {
+    "claude-devkit": "./bin/devkit.js",
+    "claude-devkit-cli": "./bin/devkit.js"
+  },
+  "files": [
+    "bin/",
+    "src/",
+    "templates/"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "chalk": "^5.4.1",
+    "commander": "^13.1.0"
+  },
+  "keywords": [
+    "claude",
+    "claude-code",
+    "devkit",
+    "spec-first",
+    "testing",
+    "hooks",
+    "guards"
+  ],
+  "scripts": {
+    "prepublishOnly": "rm -rf templates && cp -r ../kit templates",
+    "postpublish": "rm -rf templates",
+    "dev": "node bin/devkit.js"
+  },
+  "license": "MIT",
+  "type": "module"
+}
