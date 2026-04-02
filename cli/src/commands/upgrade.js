@@ -83,10 +83,25 @@ export async function upgradeCommand(path, opts) {
     updated++;
   }
 
-  // Check for files in manifest that no longer exist in kit
+  // Remove files in manifest that no longer exist in kit
+  let removed = 0;
   for (const file of Object.keys(manifest.files)) {
     if (!allFiles.includes(file)) {
-      log.warn(`${file} — no longer in kit (keeping)`);
+      const filePath = resolve(targetDir, file);
+      if (!opts.dryRun) {
+        try {
+          const { unlink } = await import('node:fs/promises');
+          await unlink(filePath);
+          delete manifest.files[file];
+          removed++;
+          log.del(file);
+        } catch {
+          log.warn(`${file} — no longer in kit (could not delete)`);
+        }
+      } else {
+        log.del(`${file} (would remove)`);
+        removed++;
+      }
     }
   }
 
@@ -100,7 +115,9 @@ export async function upgradeCommand(path, opts) {
 
   // Summary
   log.blank();
-  log.pass(`Updated ${updated}, added ${added}, unchanged ${unchanged}, skipped ${skippedCustomized} customized.`);
+  const parts = [`Updated ${updated}`, `added ${added}`, `removed ${removed}`, `unchanged ${unchanged}`];
+  if (skippedCustomized > 0) parts.push(`skipped ${skippedCustomized} customized`);
+  log.pass(parts.join(', ') + '.');
 
   if (skippedCustomized > 0) {
     log.warn(`${skippedCustomized} customized file(s) skipped. Run with --force to overwrite.`);
