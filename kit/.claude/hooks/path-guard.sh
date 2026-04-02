@@ -19,42 +19,44 @@ set -euo pipefail
 INPUT=$(cat)
 [[ -z "$INPUT" ]] && exit 0
 
-# Check Node.js availability
-if ! command -v node &>/dev/null; then
-    echo "WARNING: path-guard disabled — Node.js not found." >&2
-    exit 0
-fi
+# Extract command from JSON — try node first, fall back to grep/sed
+extract_command() {
+    if command -v node &>/dev/null; then
+        printf '%s' "$1" | node -e "
+          try {
+            const d = JSON.parse(require('fs').readFileSync(0, 'utf-8'));
+            const cmd = d.tool_input?.command;
+            if (typeof cmd === 'string') process.stdout.write(cmd);
+          } catch {}
+        " 2>/dev/null
+    else
+        # Lightweight fallback: extract "command":"..." from JSON
+        printf '%s' "$1" | grep -o '"command":"[^"]*"' | head -1 | sed 's/^"command":"//;s/"$//' 2>/dev/null
+    fi
+}
 
-# Parse JSON with inline Node.js (avoids jq dependency)
-COMMAND=$(printf '%s' "$INPUT" | node -e "
-  try {
-    const d = JSON.parse(require('fs').readFileSync(0, 'utf-8'));
-    const cmd = d.tool_input?.command;
-    if (typeof cmd === 'string') process.stdout.write(cmd);
-    else process.exit(0);
-  } catch { process.exit(0); }
-" 2>/dev/null) || exit 0
+COMMAND=$(extract_command "$INPUT") || exit 0
 
 [[ -z "$COMMAND" ]] && exit 0
 
 # ─── Blocked directory patterns ─────────────────────────────────────
 
-BLOCKED="node_modules"
-BLOCKED+="|__pycache__"
-BLOCKED+="|\.git/objects"
-BLOCKED+="|\.git/refs"
-BLOCKED+="|dist/"
-BLOCKED+="|build/"
+# Use word boundaries (\b) and explicit path separators to avoid substring false positives
+# e.g. "build/" should not match "rebuild/src" or "my-build-tool"
+BLOCKED="(^|[ /])node_modules(/|$| )"
+BLOCKED+="|(__pycache__)"
+BLOCKED+="|\.git/(objects|refs)"
+BLOCKED+="|(^|[ /])dist(/|$| )"
+BLOCKED+="|(^|[ /])build(/|$| )"
 BLOCKED+="|\.next/"
-BLOCKED+="|vendor/"
-BLOCKED+="|Pods/"
+BLOCKED+="|(^|[ /])vendor(/|$| )"
+BLOCKED+="|(^|[ /])Pods(/|$| )"
 BLOCKED+="|\.build/"
 BLOCKED+="|DerivedData"
 BLOCKED+="|\.gradle/"
-BLOCKED+="|target/debug"
-BLOCKED+="|target/release"
+BLOCKED+="|target/(debug|release)(/|$| )"
 BLOCKED+="|\.nuget"
-BLOCKED+="|\.cache"
+BLOCKED+="|\.cache(/|$| )"
 
 # Append project-specific patterns from env
 if [[ -n "${PATH_GUARD_EXTRA:-}" ]]; then

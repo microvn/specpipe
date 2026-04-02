@@ -7,7 +7,7 @@
 # Environment:
 #   SELF_REVIEW_ENABLED — set to "false" to disable (default: true)
 
-set -euo pipefail
+# No set -euo pipefail — this hook must NEVER fail
 
 # Check if disabled
 if [[ "${SELF_REVIEW_ENABLED:-true}" == "false" ]]; then

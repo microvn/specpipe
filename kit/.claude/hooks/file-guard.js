@@ -81,7 +81,6 @@ function main() {
   try {
     const stat = fs.statSync(filePath);
     if (stat.size > MAX_BYTES) {
-      // >1MB = definitely over threshold, warn without exact count
       const rel = path.relative(process.cwd(), filePath);
       process.stdout.write(JSON.stringify({
         continue: true,
@@ -89,7 +88,7 @@ function main() {
           hookEventName: "PostToolUse",
           additionalContext: `Warning: ${rel} is ${Math.round(stat.size / 1024)}KB. Consider splitting into smaller modules.`,
         },
-      }));
+      }) + "\n");
       process.exit(0);
     }
     const buf = fs.readFileSync(filePath);
@@ -113,7 +112,7 @@ function main() {
         hookEventName: "PostToolUse",
         additionalContext: warning,
       },
-    })
+    }) + "\n"
   );
 }
 

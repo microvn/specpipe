@@ -57,13 +57,9 @@ is_sensitive() {
             return 0 ;;
         serviceAccountKey.json|service-account*.json)
             return 0 ;;
-        .mcp.json|config.json)
-            # config.json only sensitive inside .docker/ — check full path
-            if [[ "$basename" == "config.json" ]]; then
-                [[ "$filepath" == *".docker/config.json"* ]] && return 0
-            else
-                return 0
-            fi
+        config.json)
+            # config.json only sensitive inside .docker/
+            [[ "$filepath" == *".docker/config.json"* ]] && return 0
             ;;
     esac
 
@@ -151,11 +147,28 @@ warn_with_message() {
     exit 0
 }
 
+# ─── Fast-path: skip obviously safe files ──────────────────────────
+
+fast_path_safe() {
+    local ext="${1##*.}"
+    case "$ext" in
+        md|ts|tsx|js|jsx|css|scss|html|svg|json|yaml|yml|toml|xml|txt|sh|py|rb|rs|go|java|kt|swift|c|cpp|h|hpp|cs|vue|svelte|astro)
+            # But json could be sensitive — check name
+            if [[ "$ext" == "json" ]]; then
+                return 1  # not fast-path safe, need full check
+            fi
+            return 0 ;;
+    esac
+    return 1
+}
+
 # ─── Check direct file access (Read/Write/Edit) → BLOCK ────────────
 
 if [[ -n "$FILE_PATH" ]]; then
-    if is_sensitive "$FILE_PATH" || check_agentignore "$FILE_PATH"; then
-        block_with_message "$FILE_PATH"
+    if ! fast_path_safe "$FILE_PATH"; then
+        if is_sensitive "$FILE_PATH" || check_agentignore "$FILE_PATH"; then
+            block_with_message "$FILE_PATH"
+        fi
     fi
 fi
 
