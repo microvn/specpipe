@@ -54,9 +54,27 @@ BLOCKED+="|(^|[ /])Pods(/|$| )"
 BLOCKED+="|\.build/"
 BLOCKED+="|DerivedData"
 BLOCKED+="|\.gradle/"
-BLOCKED+="|target/(debug|release)(/|$| )"
+BLOCKED+="|(^|[ /])target/"
 BLOCKED+="|\.nuget"
 BLOCKED+="|\.cache(/|$| )"
+# Python
+BLOCKED+="|(^|[ /])\.venv/"
+BLOCKED+="|(^|[ /])venv/"
+BLOCKED+="|\.mypy_cache/"
+BLOCKED+="|\.pytest_cache/"
+BLOCKED+="|\.ruff_cache/"
+BLOCKED+="|\.egg-info(/|$| )"
+# C# .NET (match .NET-specific subdirs to avoid false positives on generic bin/)
+BLOCKED+="|(^|[ /])bin/(Debug|Release|net|x64|x86)"
+BLOCKED+="|(^|[ /])obj/(Debug|Release|net)"
+# Node.js frameworks
+BLOCKED+="|\.nuxt/"
+BLOCKED+="|\.svelte-kit/"
+BLOCKED+="|\.parcel-cache/"
+BLOCKED+="|\.turbo/"
+BLOCKED+="|(^|[ /])out/(server|static|_next)"
+# Ruby
+BLOCKED+="|\.bundle/"
 
 # Append project-specific patterns from env
 if [[ -n "${PATH_GUARD_EXTRA:-}" ]]; then
