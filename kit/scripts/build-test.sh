@@ -55,6 +55,37 @@ detect_swift_spm() {
     fi
 }
 
+# Resolve a partial test name to a fully-qualified xcodebuild test ID.
+# xcodebuild -only-testing requires: TestTarget/TestClass/methodName
+# If FILTER already contains '/', treat as already qualified.
+# Otherwise, grep Swift test files to find which class/struct contains the method.
+resolve_xcode_filter() {
+    local filter="$1"
+    [[ "$filter" == *"/"* ]] && { echo "$filter"; return; }
+
+    # Find the Swift file containing this test method
+    local file
+    file=$(grep -rl "func ${filter}" --include="*.swift" . 2>/dev/null | head -1)
+    [[ -z "$file" ]] && { echo "$filter"; return; }
+
+    # Extract the class/struct name enclosing the method (handles @Test @MainActor etc.)
+    local class_line
+    class_line=$(awk '/^[[:space:]]*(final[[:space:]]+|open[[:space:]]+|public[[:space:]]+)*(class|struct)[[:space:]]/{cls=$0} \
+        /func '"$filter"'/{print cls; exit}' "$file")
+    [[ -z "$class_line" ]] && { echo "$filter"; return; }
+
+    local class_name
+    class_name=$(echo "$class_line" | awk '{for(i=1;i<=NF;i++) if($i=="class"||$i=="struct"){print $(i+1); exit}}' | tr -d '{:')
+    [[ -z "$class_name" ]] && { echo "$filter"; return; }
+
+    # Extract test target name from the file path (directory component ending in *Tests)
+    local target
+    target=$(echo "$file" | grep -oE '[^/]+(Tests|UITests)[^/]*' | head -1)
+    [[ -z "$target" ]] && { echo "$class_name/$filter"; return; }
+
+    echo "$target/$class_name/$filter"
+}
+
 detect_swift_xcode() {
     local project=""
     local flag=""
@@ -78,7 +109,10 @@ detect_swift_xcode() {
     LANG_NAME="Swift (Xcode: $scheme)"
     TEST_CMD="xcodebuild test $flag '$project' -scheme '$scheme' -destination 'platform=macOS,arch=arm64'"
     if [[ -n "$FILTER" ]]; then
-        TEST_CMD="$TEST_CMD -only-testing:'$FILTER'"
+        local qualified
+        qualified=$(resolve_xcode_filter "$FILTER")
+        info "Filter resolved: '$FILTER' → '$qualified'"
+        TEST_CMD="$TEST_CMD -only-testing:'$qualified'"
     fi
 }
 
