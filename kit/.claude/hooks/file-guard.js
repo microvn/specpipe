@@ -60,8 +60,9 @@ function main() {
   if (!filePath) process.exit(0);
 
   // Skip files outside the project directory (e.g. ~/.claude/plans/)
-  const projectDir = process.cwd();
-  if (!path.resolve(filePath).startsWith(projectDir)) process.exit(0);
+  const projectDir = process.cwd() + path.sep;
+  const resolvedFile = path.resolve(filePath);
+  if (!resolvedFile.startsWith(projectDir) && resolvedFile !== process.cwd()) process.exit(0);
 
   // Skip excluded patterns
   if (matchesExclude(filePath)) process.exit(0);
