@@ -178,7 +178,7 @@ Files to delete: [list]
 | `/mf-challenge` (adversarial) | 15–30k | After /mf-plan, for complex features |
 | Full audit (manual) | 100k+ | Before release, quarterly |
 
-**Rule of thumb:** Daily work uses templates + `/test` → low token cost.
+**Rule of thumb:** Daily work uses templates + `/mf-test` → low token cost.
 Save `/mf-plan` and full audits for significant milestones.
 
 ---
