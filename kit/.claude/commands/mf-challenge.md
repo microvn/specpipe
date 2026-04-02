@@ -5,14 +5,12 @@ Adversarial review — spawn hostile reviewers to break the plan before coding.
 Target: $ARGUMENTS
 
 If argument is a file path → use that.
-If argument is a feature name → search `docs/test-plans/` and `docs/specs/` for matches.
-If no argument → list recent files in both dirs, ask user which to challenge.
+If argument is a feature name → search `docs/specs/` for matches.
+If no argument → list recent files in `docs/specs/`, ask user which to challenge.
 
 ## Phase 1: Read and Map
 
-Read the ENTIRE target file. Also read related files:
-- If target is a test plan → also read the corresponding spec in `docs/specs/`
-- If target is a spec → also read the corresponding test plan in `docs/test-plans/`
+Read the ENTIRE target file. The spec contains both the feature definition and acceptance scenarios (in `## Stories` section).
 
 Map the plan's attack surface:
 - Decisions made (and what was rejected)
@@ -20,7 +18,7 @@ Map the plan's attack surface:
 - Dependencies (external services, APIs, libraries, infra)
 - Scope boundaries (in/out/suspiciously unmentioned)
 - Risk acknowledgments (mentioned vs. conspicuously absent)
-- Spec↔plan consistency (use cases without test cases? contradictions?)
+- Story↔AS consistency (stories without acceptance scenarios? contradictions?)
 
 Collect all file paths the reviewers will need to read.
 
@@ -30,7 +28,7 @@ Assess plan complexity and select which lenses to deploy:
 
 | Complexity Signal | Reviewers | Lenses |
 |-------------------|-----------|--------|
-| Simple (1 spec section, <20 test cases, no auth/data) | 2 | Assumptions + Scope |
+| Simple (1 spec section, <20 acceptance scenarios, no auth/data) | 2 | Assumptions + Scope |
 | Standard (multiple sections, auth or data involved) | 3 | + Security |
 | Complex (multiple integrations, concurrency, migrations, 6+ phases) | 4 | + Failure Modes |
 
@@ -158,7 +156,7 @@ After all reviewers complete:
 
 4. **Sort** by severity: Critical → High → Medium → Low
 5. **Cap** at 15 findings: keep all Critical, top High by specificity, note how many Medium were dropped
-6. **Cross-reference check** (you, not reviewers): If both spec and test plan exist, flag any use cases in spec without test cases, and any test cases that contradict the spec
+6. **Cross-reference check** (you, not reviewers): Flag any stories without acceptance scenarios, and any AS that contradicts the story description
 
 ## Phase 5: Adjudicate
 

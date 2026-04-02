@@ -7,7 +7,7 @@ Pre-merge code review — security, correctness, spec alignment.
    BASE=$(git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null | sed 's|refs/remotes/origin/||') || BASE="main"
    git log --oneline "$BASE"...HEAD
    ```
-2. Check for spec in `docs/specs/` and test plan in `docs/test-plans/` — review against INTENT.
+2. Check for spec in `docs/specs/<feature>/<feature>.md` — review against INTENT.
 3. Read the diff: `git diff "$BASE"...HEAD`
 
 If `$ARGUMENTS` provided → scope to those files only.
@@ -50,11 +50,15 @@ Spend 60% of analysis on the primary focus. Cover all categories, but proportion
 - **Null safety:** Optionals used without guards? `object!.property` without nil check?
 
 ### Spec-Test Alignment (Medium)
-- Source changed but no spec update in `docs/specs/`? → flag
+- Source changed but no spec update in `docs/specs/<feature>/`? → flag
 - Source changed but no test update? → flag
-- Spec changed but tests not updated? → flag
+- Spec changed but acceptance scenarios or tests not updated? → flag
 - Code removed but dead tests remain? → flag
 - Spec contains vague requirements without metrics ("fast", "secure", "easy", "scalable")? → flag with suggestion to add SC-NNN with concrete numbers
+- **AS-to-test name check:** Read the spec's `## Stories` section. For each AS-NNN, check if a test file contains a test named or described with that AS ID or its short description. Flag:
+  - AS in spec with no matching test → "AS-NNN: \<description\> has no corresponding test"
+  - Test referencing an AS-NNN that no longer exists in the spec → "Test references removed AS-NNN"
+  Keep this lightweight — match on AS-NNN identifiers and story name substrings, not semantic analysis.
 
 ### Code Quality (Medium)
 - Dead code: removed functions still imported elsewhere?

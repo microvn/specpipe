@@ -1,4 +1,4 @@
-Write tests from test plan, compile, run, fix until green.
+Write tests from spec acceptance scenarios, compile, run, fix until green.
 
 ## Phase 0: Build Context
 
@@ -10,8 +10,7 @@ Write tests from test plan, compile, run, fix until green.
    If `$ARGUMENTS` provided → scope to that file or feature only.
    If no changes → "No source changes found. Specify a file or feature."
 
-2. **Read the test plan** in `docs/test-plans/` if it exists — this is your roadmap.
-3. **Read the spec** in `docs/specs/` if it exists — understand the INTENT behind the code.
+2. **Read the spec** at `docs/specs/<feature>/<feature>.md` — the `## Stories` section with acceptance scenarios is your roadmap. The `## Overview` and `## Constraints` sections tell you the INTENT behind the code.
 4. **Read existing tests** for the changed files — find patterns, fixtures, naming conventions. Don't duplicate.
 
 ---
@@ -86,14 +85,25 @@ If tests fail:
 
 ```
 Tests: X added, Y modified, Z unchanged
-Result: All passing ✓
+Result: All passing ✓ / N failing ✗
 Coverage: [critical uncovered paths if any]
 Files: [test files touched]
-Plan: [TC-001 ✓, TC-002 ✓, TC-005 new]
+Stories: [AS-001 ✓, AS-002 ✓, AS-005 new]
 ```
 
-If behavior changed: "Consider updating the spec in docs/specs/."
+If behavior changed: "Consider updating the spec in docs/specs/<feature>/<feature>.md."
+
+### Spec Gap Detection
+
+If a test fails due to an edge case, error path, or boundary condition that is NOT covered by any existing AS in the spec:
+
+1. State explicitly: **"This failure suggests a missing acceptance scenario."**
+2. Describe the gap: what behavior was tested, which story it belongs to, why no AS covers it.
+3. Prompt: **"Run `/mf-plan <spec-path> 'Add AS for <description>'` to add the missing scenario."**
+
+Do not silently fix the test and move on. A test that has no corresponding AS means the spec is incomplete — the spec must be updated first.
 
 ## Rules
 1. **Behavior over implementation.** Test what code DOES, not how.
 2. **Independent tests.** Each test sets up its own state, cleans up after.
+3. **Spec stays upstream.** If a test reveals a spec gap, update the spec before adding the test.

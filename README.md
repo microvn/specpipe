@@ -1,6 +1,6 @@
 # claude-devkit-cli
 
-A lightweight, spec-first development toolkit for [Claude Code](https://claude.ai/code). It enforces the cycle **spec → test plan → code + tests → build pass** through custom commands, automatic hooks, and a universal test runner.
+A lightweight, spec-first development toolkit for [Claude Code](https://claude.ai/code). It enforces the cycle **spec (with acceptance scenarios) → code + tests → build pass** through custom commands, automatic hooks, and a universal test runner.
 
 **Works with:** Swift, TypeScript/JavaScript, Python, Rust, Go, Java/Kotlin, C#, Ruby.
 **Dependencies:** None (requires only Claude Code CLI, Node.js, Git, and Bash).
@@ -16,7 +16,7 @@ A lightweight, spec-first development toolkit for [Claude Code](https://claude.a
 5. [Commands Reference](#5-commands-reference)
 6. [Automatic Guards (Hooks)](#6-automatic-guards-hooks)
 7. [Build Test Script](#7-build-test-script)
-8. [Specs & Test Plans Format](#8-specs--test-plans-format)
+8. [Spec Format](#8-spec-format)
 9. [Customization](#9-customization)
 10. [Token Cost Guide](#10-token-cost-guide)
 11. [Troubleshooting](#11-troubleshooting)
@@ -29,16 +29,16 @@ A lightweight, spec-first development toolkit for [Claude Code](https://claude.a
 ### The Core Cycle
 
 ```
-SPEC → TEST PLAN → CODE + TESTS → BUILD PASS
+SPEC (with acceptance scenarios) → CODE + TESTS → BUILD PASS
 ```
 
-Every code change — feature, fix, or removal — follows this cycle. The spec is the source of truth. If code contradicts the spec, the code is wrong.
+Every code change — feature, fix, or removal — follows this cycle. The spec is the source of truth. Acceptance scenarios (Given/When/Then) are embedded directly in the spec — no separate test plan file. If code contradicts the spec, the code is wrong.
 
 ### Why Spec-First?
 
-- **Prevents drift.** Without a spec, code becomes the only documentation and diverges from intent over time.
-- **Tests have purpose.** Test plans derived from specs test behavior, not implementation details. This means tests survive refactoring.
-- **AI writes better code.** When Claude Code has a spec to reference, it generates more accurate implementations and more meaningful tests.
+- **Prevents drift.** Acceptance scenarios live inside the spec — no separate test plan to fall out of sync.
+- **Tests have purpose.** Scenarios derived from specs test behavior, not implementation details. This means tests survive refactoring.
+- **AI writes better code.** When Claude Code has a spec with concrete Given/When/Then scenarios, it generates more accurate implementations and more meaningful tests.
 - **Reviews are grounded.** Reviewers can check code against the spec rather than guessing at intent.
 
 ### Principles
@@ -62,7 +62,7 @@ npx claude-devkit-cli init .
 # 2. Open your project in Claude Code
 claude
 
-# 3. Create your first spec and test plan
+# 3. Create your first spec
 /mf-plan "describe your feature here"
 
 # 4. Write code, then test
@@ -145,8 +145,10 @@ your-project/
 ├── scripts/
 │   └── build-test.sh          ← Universal test runner
 └── docs/
-    ├── specs/                 ← Your specs go here
-    ├── test-plans/             ← Generated test plans
+    ├── specs/                 ← Your specs (folder-per-feature)
+    │   └── <feature>/
+    │       ├── <feature>.md   ← Spec with acceptance scenarios
+    │       └── snapshots/     ← Version history (managed by /mf-plan)
     └── WORKFLOW.md            ← Process reference
 ```
 
@@ -185,7 +187,7 @@ npx claude-devkit-cli list
 npx claude-devkit-cli remove
 ```
 
-This removes hooks, commands, settings, and build-test.sh. It preserves `CLAUDE.md` (which you may have customized) and `docs/` (which contains your specs and plans).
+This removes hooks, commands, settings, and build-test.sh. It preserves `CLAUDE.md` (which you may have customized) and `docs/` (which contains your specs).
 
 ---
 
@@ -197,7 +199,7 @@ This removes hooks, commands, settings, and build-test.sh. It preserves `CLAUDE.
 
 ```
 1. /mf-plan "description of the feature"
-   → Generates spec + test plan. Review both.
+   → Generates spec with acceptance scenarios at docs/specs/<feature>/<feature>.md.
 
 2. Implement code in chunks.
    After each chunk: /mf-test
@@ -218,16 +220,15 @@ This removes hooks, commands, settings, and build-test.sh. It preserves `CLAUDE.
 > When: Changing behavior of something that already exists.
 
 ```
-1. Edit the spec first: docs/specs/<feature>.md
+1. /mf-plan docs/specs/<feature>/<feature>.md "description of changes"
+   → Mode C handles everything: snapshot → classification → change report → apply.
+   Do NOT manually edit the spec before running /mf-plan.
 
-2. /mf-plan docs/specs/<feature>.md
-   → Updates the test plan with new/modified/removed cases.
-
-3. Implement the code change.
+2. Implement the code change.
    /mf-test
    Fix until green.
 
-4. /mf-review → /mf-commit
+3. /mf-review → /mf-commit
 ```
 
 ### Bug Fix
@@ -251,7 +252,8 @@ This removes hooks, commands, settings, and build-test.sh. It preserves `CLAUDE.
 > When: Deleting code, removing deprecated functionality.
 
 ```
-1. Mark spec sections as removed in docs/specs/<feature>.md
+1. /mf-plan docs/specs/<feature>/<feature>.md "remove stories S-XXX"
+   → Mode C creates a snapshot (removing stories = Major), then marks as removed.
 
 2. Delete production code + related tests.
 
@@ -265,62 +267,69 @@ This removes hooks, commands, settings, and build-test.sh. It preserves `CLAUDE.
 
 ## 5. Commands Reference
 
-### /mf-plan — Generate Spec + Test Plan
+### /mf-plan — Generate Spec with Acceptance Scenarios
 
 **Usage:**
 ```
-/mf-plan docs/specs/auth.md                    # Mode A: from existing spec
-/mf-plan "user authentication with OAuth2"     # Mode B: from description
-/mf-plan docs/specs/auth.md (after spec edit)  # Mode C: update existing plan
+/mf-plan "user authentication with OAuth2"                          # Mode A: new spec from description
+/mf-plan docs/specs/auth/auth.md                                    # Mode B: add scenarios to existing spec
+/mf-plan docs/specs/auth/auth.md "add password reset flow"          # Mode C: update existing spec
 ```
 
 **Modes:**
-- **Mode A** — Reads an existing spec, generates a test plan.
-- **Mode B** — Drafts a spec from your description, asks for confirmation, then generates the test plan.
-- **Mode C** — Updates an existing spec + test plan when requirements change.
+- **Mode A** — Creates a new spec with stories and acceptance scenarios from your description.
+- **Mode B** — Reads an existing spec that has no acceptance scenarios yet, adds them.
+- **Mode C** — Updates an existing spec: creates a snapshot before Major changes, shows a change report, waits for confirmation, then applies.
 
 **How it works:**
 
-1. **Phase 0: Codebase Awareness** — Scans existing code, `docs/specs/`, `docs/test-plans/`, and project patterns before planning. Prevents plans that conflict with existing implementations.
-2. **Phase 1: Write/Update Spec** — Generates a structured spec with sections: Overview, Data Model, Use Cases, State Machine, Constraints & Invariants, Error Handling, Security Considerations. Depth is proportional to complexity — simple CRUD gets 1 paragraph + 3 use cases, complex auth gets the full template.
-3. **Phase 2: Clarify Ambiguities** — Systematically finds gaps across behavioral, data, auth, non-functional, integration, and concurrency dimensions. Asks 3-5 targeted questions with 2-4 options each before proceeding. If the spec is clear and complete, 0 questions is valid.
-4. **Phase 3: Generate Test Plan** — Derives test cases from the spec (never from code).
+1. **Phase 0: Codebase Awareness** — Scans existing code, `docs/specs/`, and project patterns before planning. Prevents specs that conflict with existing implementations.
+2. **Phase 1: Scope & Split Assessment** — Evaluates feature size. Features with >7 stories or >20 acceptance scenarios must be split into sub-specs.
+3. **Phase 2: Draft Spec** — Generates a structured spec with stories and acceptance scenarios (Given/When/Then). Depth scales by priority: P0 gets full GWT + test data, P1 gets GWT, P2 gets 1-2 line descriptions. Runs consistency checks (CC1-CC6) before showing draft.
+4. **Phase 3: Clarify Ambiguities** — Systematically finds gaps across behavioral, data, auth, non-functional, integration, and concurrency dimensions. Asks 3-5 targeted questions. Waits for user answers before continuing.
+5. **Phase 4: Summary** — Shows story counts, AS counts, implementation order, next steps.
 
-**Traceability IDs:** Every requirement gets a traceable ID:
-- `UC-NNN` — Use Cases
-- `FR-NNN` — Functional Requirements
-- `SC-NNN` — Security Constraints
-- `TC-NNN` — Test Cases (each must reference at least one FR or SC)
+**Mode C (Update) adds:**
+- **Classification** — Walks through M1-M6 checklist to determine Major vs Minor change.
+- **Snapshot** — Major changes trigger an automatic snapshot (`cp`, bit-perfect) before editing.
+- **Change report** — Shows what will change, waits for user confirmation.
+- **Consistency check** — Runs CC1-CC6 after every update.
 
-**Test plan table format:**
+**Traceability IDs:**
+- `S-NNN` — Stories (with priority P0/P1/P2)
+- `AS-NNN` — Acceptance Scenarios (Given/When/Then, embedded in stories)
+- `FR-NNN` — Functional Requirements (if needed)
+- `SC-NNN` — Success Criteria (if needed)
+- IDs are immutable — deleted IDs are never reused.
 
-| ID | Priority | Type | UC | FR/SC | Description | Expected |
-|----|----------|------|----|-------|-------------|----------|
-| TC-001 | P0 | unit | UC-001 | FR-001 | ... | ... |
-
-Priorities: **P0** (must have), **P1** (should have), **P2** (nice to have).
+**Directory structure:**
+```
+docs/specs/<feature>/
+  <feature>.md              # single source of truth — always read this file
+  snapshots/                # version history (managed by mf-plan, not developers)
+    YYYY-MM-DD.md
+    YYYY-MM-DD-<REF>.md
+```
 
 **Output:**
-- Spec: `docs/specs/<feature>.md`
-- Test plan: `docs/test-plans/<feature>.md`
+- Spec with acceptance scenarios: `docs/specs/<feature>/<feature>.md`
 
 ### /mf-challenge — Adversarial Plan Review
 
 **Usage:**
 ```
-/mf-challenge docs/test-plans/auth.md   # challenge a test plan
-/mf-challenge docs/specs/auth.md        # challenge a spec
+/mf-challenge docs/specs/auth/auth.md   # challenge a spec
 /mf-challenge "user authentication"     # challenge by feature name
 ```
 
 **How it works (7 phases):**
 
-1. **Read & Map** — Reads the plan/spec and maps: decisions made, assumptions (stated AND implied), dependencies, scope boundaries, risk acknowledgments, spec-plan consistency.
+1. **Read & Map** — Reads the spec (including acceptance scenarios) and maps: decisions made, assumptions (stated AND implied), dependencies, scope boundaries, risk acknowledgments, story-AS consistency.
 2. **Scale Reviewers** — Assesses complexity and selects reviewers:
 
    | Complexity | Signals | Reviewers |
    |------------|---------|-----------|
-   | Simple | 1 spec section, <20 test cases, no auth/data | 2 |
+   | Simple | 1 spec section, <20 acceptance scenarios, no auth/data | 2 |
    | Standard | Multiple sections, auth or data involved | 3 |
    | Complex | Multiple integrations, concurrency, migrations, 6+ phases | 4 |
 
@@ -394,8 +403,8 @@ Priorities: **P0** (must have), **P1** (should have), **P2** (nice to have).
 
 **How it works:**
 
-1. **Phase 0: Build Context** — Finds changed files vs base branch, reads matching test plan/spec, reads existing tests for patterns, fixtures, and naming conventions. Doesn't duplicate what already exists.
-2. **Phase 1: Write Tests** — Creates or updates tests based on the test plan. Each test covers one concept, is independent, deterministic (no random, no time-dependent, no external calls), and has a clear name.
+1. **Phase 0: Build Context** — Finds changed files vs base branch, reads the spec (acceptance scenarios in `## Stories` section are the roadmap), reads existing tests for patterns, fixtures, and naming conventions. Doesn't duplicate what already exists.
+2. **Phase 1: Write Tests** — Creates or updates tests based on acceptance scenarios. Each test covers one concept, is independent, deterministic (no random, no time-dependent, no external calls), and has a clear name.
 3. **Phase 2: Compile First** — Runs typecheck/compile before executing tests. Catches syntax errors early.
 4. **Phase 3: Run Tests** — Executes the test suite.
 5. **Phase 4: Fix Loop** — If tests fail, fixes **test code only** (max 3 attempts, then hard stop and report). If tests expect X but code does Y, asks you whether to fix production code or adjust the test.
@@ -422,7 +431,7 @@ Priorities: **P0** (must have), **P1** (should have), **P2** (nice to have).
 2. **Phase 1: Write Failing Test** — Creates a regression test that reproduces the bug. Test includes a comment: `// Regression: <bug description> — <expected> vs <actual>`.
 3. **Phase 2: Confirm Failure** — Runs the test to verify it fails for the right reason.
 4. **Phase 3: Fix** — Minimal change to production code. If other tests break, the fix is wrong — never weakens existing tests.
-5. **Phase 4: Root Cause Analysis** — Documents: Symptom, Root cause, Gap (why wasn't this caught earlier?), Prevention (suggests one: type constraint, validation, lint rule, spec update, or test plan update). Non-optional for serious bugs; for trivial bugs, the fix summary is enough.
+5. **Phase 4: Root Cause Analysis** — Documents: Symptom, Root cause, Gap (why wasn't this caught earlier?), Prevention (suggests one: type constraint, validation, lint rule, spec update including acceptance scenarios). Non-optional for serious bugs; for trivial bugs, the fix summary is enough.
 6. **Phase 5: Full Suite** — Runs all tests to catch regressions.
 
 **Multiple bugs:** Triages by severity, fixes one at a time, commits each separately.
@@ -437,7 +446,7 @@ Priorities: **P0** (must have), **P1** (should have), **P2** (nice to have).
 
 **How it works:**
 
-1. **Phase 0: Understand Intent** — Reads commit messages and checks for related spec/test plan. Understands *why* the change was made before reviewing *how*.
+1. **Phase 0: Understand Intent** — Reads commit messages and checks for related spec. Understands *why* the change was made before reviewing *how*.
 2. **Phase 1: Smart Focus** — Auto-detects what to focus on based on the diff:
 
    | Diff contains | Focus on |
@@ -459,7 +468,7 @@ Priorities: **P0** (must have), **P1** (should have), **P2** (nice to have).
 **Rules:**
 - At least 1 positive note — reinforces good patterns, not just problems
 - Never auto-fixes code — report only
-- Checks spec-test alignment: code changed → spec/tests also changed? Vague requirements without metrics ("fast", "secure") get flagged with a suggestion to add concrete numbers
+- Checks spec-test alignment: code changed → spec/acceptance scenarios/tests also changed? Vague requirements without metrics ("fast", "secure") get flagged with a suggestion to add concrete numbers
 
 ### /mf-commit — Smart Git Commit
 
@@ -708,77 +717,95 @@ Edit `scripts/build-test.sh`:
 
 ---
 
-## 8. Specs & Test Plans Format
+## 8. Spec Format
 
-### Business Logic Spec Template
+### Spec Template
 
-Create specs at `docs/specs/<feature-name>.md`:
+Create specs at `docs/specs/<feature>/<feature>.md`:
 
 ```markdown
 # Spec: <Feature Name>
+
+**Created:** 2026-04-02
+**Last updated:** 2026-04-02
+**Status:** Draft | Active | Deprecated
 
 ## Overview
 What this feature does, why it exists, who uses it. 2-3 sentences.
 
 ## Data Model
-Entities, attributes, relationships (table format).
+Entities, attributes, relationships (if applicable).
 
-## Use Cases
+## Stories
 
-### UC-001: <Name>
-- **Actor:** User / System
-- **Preconditions:** ...
-- **Flow:** 1. ... 2. ...
-- **Postconditions:** ...
-- **Error cases:** ...
+### S-001: <Story name> (P0)
 
-## Settings / Configuration
-Configurable behavior and defaults.
+**Description:** [user story]
+**Source:** [optional: ticket/issue ref]
+
+**Acceptance Scenarios:**
+
+AS-001: <short description>
+- **Given:** [state]
+- **When:** [action]
+- **Then:** [expected]
+- **Data:** [test data]
+
+AS-002: <short description>
+- **Given:** [error state]
+- **When:** [action]
+- **Then:** [error handling]
+
+### S-002: <Story name> (P1)
+
+AS-003: <short description>
+- **Given:** [state]
+- **When:** [action]
+- **Then:** [expected]
+
+### S-003: <Story name> (P2)
+
+AS-004: <short description>
+- [flow description + expected behavior]
 
 ## Constraints & Invariants
 Rules that must always hold.
 
-## Error Handling
-How errors surface to users and are logged.
+## Change Log
 
-## Security Considerations
-Auth, authorization, data sensitivity.
+| Date | Change | Ref |
+|------|--------|-----|
+| 2026-04-02 | Initial creation | -- |
 ```
 
 Skip sections that don't apply. Match depth to feature complexity.
 
-### Test Plan Format
+**Acceptance Scenario depth by priority:**
+- **P0:** Full Given + When + Then + Data + Setup. At least 1 happy path + 1 error path.
+- **P1:** Given + When + Then. At least 1 happy path.
+- **P2:** 1-2 line flow description. At least 1 scenario.
 
-Generated by `/mf-plan` at `docs/test-plans/<feature-name>.md`:
+### Snapshots (Version History)
 
-```markdown
-# Test Plan: <Feature Name>
+When `/mf-plan` Mode C detects a Major change (new story, removed story, priority change, flow change, behavior change for P0, or constraint change), it automatically creates a snapshot before updating:
 
-**Spec:** docs/specs/<feature-name>.md
-**Generated:** 2026-04-01
-
-## Test Cases
-
-| ID | Priority | Type | UC | FR/SC | Description | Expected |
-|----|----------|------|----|-------|-------------|----------|
-| TC-001 | P0 | unit | UC-001 | FR-001 | Valid login returns token | 200 + JWT |
-| TC-002 | P0 | unit | UC-001 | FR-002 | Wrong password returns 401 | 401 + error msg |
-| TC-003 | P1 | integration | UC-002 | FR-003 | Session expires after 24h | Auto-logout |
-
-## Coverage Notes
-- Highest risk areas: ...
-- Edge cases needing attention: ...
+```
+docs/specs/<feature>/snapshots/
+  2026-04-02.md              ← full copy at that point in time
+  2026-04-05-BILL-101.md     ← with ticket reference
 ```
 
-### Naming Conventions
+Snapshots are immutable, managed by mf-plan (not developers), and capped at 5 most recent.
 
+### Naming Conventions
 | Item | Convention | Example |
 |------|-----------|---------|
-| Spec file | `<feature-name>.md` in `docs/specs/` | `user-auth.md` |
-| Test plan | Same name as spec, in `docs/test-plans/` | `user-auth.md` |
-| Test case ID | `TC-NNN` sequential | `TC-001`, `TC-042` |
-| Priority | `P0` (critical), `P1` (important), `P2` (nice-to-have) | — |
-| Type | `unit`, `integration`, `e2e`, `snapshot`, `performance` | — |
+| Spec directory | `docs/specs/<feature>/` | `docs/specs/user-auth/` |
+| Spec file | `<feature>.md` in feature directory | `user-auth.md` |
+| Story ID | `S-NNN` sequential per spec | `S-001`, `S-005` |
+| Scenario ID | `AS-NNN` sequential across all stories | `AS-001`, `AS-042` |
+| Priority | `P0` (critical), `P1` (important), `P2` (nice-to-have) — per story | — |
+| Snapshot | `YYYY-MM-DD.md` or `YYYY-MM-DD-<REF>.md` in `snapshots/` | `2026-04-02.md` |
 
 ---
 
@@ -910,13 +937,13 @@ A: Only for external services you can't run locally (third-party APIs, email ser
 A: This usually means the spec is ambiguous. Clarify the spec first, then re-run `/mf-test`. Good specs produce good tests.
 
 **Q: Can I use this with other AI coding tools?**
-A: The commands and hooks are Claude Code-specific. The specs, test plans, workflow, and `build-test.sh` work with any tool or manual workflow.
+A: The commands and hooks are Claude Code-specific. The specs, workflow, and `build-test.sh` work with any tool or manual workflow.
 
 **Q: When should I use `/mf-challenge`?**
 A: After `/mf-plan`, for complex features involving authentication, payments, data pipelines, or multi-service integration. It spawns parallel hostile reviewers that find security holes, failure modes, and false assumptions BEFORE you write code. Skip it for simple CRUD or small features — the overhead isn't worth it.
 
 **Q: How do I do a full coverage audit?**
-A: This is intentionally not a command (it's expensive and rare). When needed, prompt Claude directly: "Audit test coverage for feature X against docs/test-plans/X.md. Identify gaps and write missing tests."
+A: This is intentionally not a command (it's expensive and rare). When needed, prompt Claude directly: "Audit test coverage for feature X against docs/specs/X/X.md acceptance scenarios. Identify gaps and write missing tests."
 
 **Q: What if my project uses multiple languages?**
 A: `build-test.sh` detects the first match. For monorepos, you may need to run it from each sub-project directory or customize the script.

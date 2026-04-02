@@ -62,7 +62,7 @@ After fixing, document:
 Symptom: <what the user saw>
 Root cause: <why it happened>
 Gap: <why not caught earlier — missing test? wrong assumption? missing spec?>
-Prevention: <suggest one: type constraint, validation, lint rule, spec update, or test plan update>
+Prevention: <suggest one: type constraint, validation, lint rule, spec update (including acceptance scenarios)>
 ```
 
 This is non-optional for serious bugs. For trivial bugs, the fix summary is enough.
@@ -81,7 +81,7 @@ Prevention: <suggestion>
 Full suite: All passing ✓
 ```
 
-If the bug reveals an undocumented edge case: "Consider updating the spec at docs/specs/<feature>.md."
+If the bug reveals an undocumented edge case: "Consider updating the spec at docs/specs/<feature>/<feature>.md."
 
 ## Multiple Bugs
 

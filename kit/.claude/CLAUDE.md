@@ -2,10 +2,10 @@
 
 ## Spec-First Development
 
-Every change follows this cycle: **SPEC → TEST PLAN → CODE + TESTS → BUILD PASS**.
+Every change follows this cycle: **SPEC (with acceptance scenarios) → CODE + TESTS → BUILD PASS**.
 
-- Business logic specs live in `docs/specs/`
-- Test plans live in `docs/test-plans/`
+- Business logic specs live in `docs/specs/<feature>/<feature>.md`
+- Acceptance scenarios (Given/When/Then) are embedded in the spec under `## Stories`
 - Never write code before the spec exists. Never auto-modify specs from code.
 - Specs are the source of truth. If code contradicts the spec, the code is wrong.
 
@@ -14,9 +14,9 @@ Every change follows this cycle: **SPEC → TEST PLAN → CODE + TESTS → BUILD
 | Trigger | Commands | Details |
 |---------|----------|---------|
 | New feature | `/mf-plan` → `/mf-challenge` (optional) → code in chunks → `/mf-test` each chunk | Start with spec or description |
-| Update feature | Update spec first → `/mf-plan` → code → `/mf-test` | Spec changes before code changes |
+| Update feature | `/mf-plan <spec-path> "changes"` → code → `/mf-test` | Do NOT manually edit spec before /mf-plan |
 | Bug fix | `/mf-fix "description"` | Test-first: write failing test → fix → green |
-| Remove feature | Mark spec as removed → delete code + tests → build pass | Run full suite after removal |
+| Remove feature | `/mf-plan <spec-path> "remove stories"` → delete code + tests → build pass | /mf-plan handles snapshot before removal |
 | Pre-merge check | `/mf-review` | Diff-based quality gate |
 | Commit changes | `/mf-commit` | Secret scan + conventional commit |
 
@@ -49,11 +49,11 @@ For detailed workflow steps, templates, and decision trees, see `docs/WORKFLOW.m
 - **File naming:** Descriptive enough that AI tools understand the purpose from the path alone.
   Prefer kebab-case for new files (e.g., `user-authentication-service.ts`).
 - **Dates in filenames:** Use `$(date +%Y-%m-%d)` — never guess dates.
-- **Specs & test plans naming:**
-  - kebab-case, lowercase: `user-auth.md`, `file-sync.md`
-  - Feature name, not module name: `user-auth.md` not `AuthService.md`
-  - Spec and test plan share the SAME name: `docs/specs/user-auth.md` ↔ `docs/test-plans/user-auth.md`
-  - Short (2-3 words): `payment-flow.md` not `payment-processing-with-stripe-integration.md`
+- **Spec naming:**
+  - kebab-case, lowercase: `user-auth/user-auth.md`, `file-sync/file-sync.md`
+  - Feature name, not module name: `user-auth/` not `AuthService/`
+  - Each feature gets its own directory: `docs/specs/<feature>/<feature>.md`
+  - Short (2-3 words): `payment-flow/` not `payment-processing-with-stripe-integration/`
   - No prefix/suffix: `user-auth.md` not `spec-user-auth.md`
 
 ## Forbidden

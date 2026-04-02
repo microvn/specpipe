@@ -1,6 +1,6 @@
 # Development Workflow Reference
 
-> Spec-first development: every change follows SPEC → TEST PLAN → CODE + TESTS → BUILD PASS.
+> Spec-first development: every change follows SPEC (with acceptance scenarios) → CODE + TESTS → BUILD PASS.
 
 ---
 
@@ -12,12 +12,11 @@ When: Building something that doesn't exist yet (no code, no spec).
 
 ```
 Step 1 → /mf-plan "description of feature"
-          Generates: docs/specs/<feature>.md (spec)
-                     docs/test-plans/<feature>.md (test plan)
+          Generates: docs/specs/<feature>/<feature>.md (spec with acceptance scenarios)
           Answers validation questions about assumptions.
-          Review both before proceeding.
+          Review before proceeding.
 
-Step 2 → (Optional) /mf-challenge docs/test-plans/<feature>.md
+Step 2 → (Optional) /mf-challenge docs/specs/<feature>/<feature>.md
           Adversarial review: spawns hostile reviewers to find flaws.
           Recommended for complex features, auth, data pipelines.
           Skip for simple CRUD or small features.
@@ -36,13 +35,12 @@ Step 5 → /mf-commit
 When: Changing behavior, adding options, refactoring logic.
 
 ```
-Step 1 → Update spec FIRST: docs/specs/<feature>.md
-          Describe what's changing and why.
+Step 1 → /mf-plan docs/specs/<feature>/<feature>.md "description of changes"
+          Mode C handles everything: snapshot → classification → change report → apply.
+          Do NOT manually edit the spec before running /mf-plan — it creates the
+          snapshot first, then applies changes. Manual edits bypass snapshot protection.
 
-Step 2 → /mf-plan docs/specs/<feature>.md
-          Updates the test plan with new/modified/removed test cases.
-
-Step 3 → Implement code changes.
+Step 2 → Implement code changes.
           /mf-test
           Fix until green.
 
@@ -67,8 +65,10 @@ Optional → If the bug reveals an undocumented edge case, update the spec.
 When: Deleting a feature, removing deprecated code.
 
 ```
-Step 1 → Mark spec sections as removed in docs/specs/<feature>.md
-          (Or archive the entire file if the feature is fully removed.)
+Step 1 → /mf-plan docs/specs/<feature>/<feature>.md "remove stories S-XXX"
+          Mode C creates a snapshot (removing stories = M2 = Major),
+          then marks stories and AS as removed in the spec.
+          (Or if removing the entire feature: archive the directory.)
 
 Step 2 → Delete production code and related test code.
 
@@ -96,7 +96,7 @@ Is this a brand new feature (no existing spec or code)?
     │   └─ No
     │       ├─ Are you removing/deprecating code?
     │       │   ├─ Yes → Remove Feature workflow.
-    │       │   └─ No → Update Feature workflow. Start by editing the spec.
+    │       │   └─ No → Update Feature workflow. Start with /mf-plan.
     │       │
     │       └─ Is the change very small (< 5 lines, behavior unchanged)?
     │           └─ Yes → Skip spec update. Just /mf-test and /mf-commit.
@@ -115,8 +115,8 @@ I just implemented [brief description].
 Files changed: [list files]
 
 Based on:
-- Spec: docs/specs/<feature>.md (section §X)
-- Test plan: docs/test-plans/<feature>.md
+- Spec: docs/specs/<feature>/<feature>.md (section §X)
+- Acceptance scenarios: docs/specs/<feature>/<feature>.md (section ## Stories)
 
 Write tests for the part I just implemented.
 Only tests related to this change — not the entire feature.
@@ -130,11 +130,11 @@ If the spec seems incomplete, note what's missing but don't change it.
 I'm about to change [description of change].
 Affected files: [list]
 
-1. Update the spec: docs/specs/<feature>.md
-2. Update the test plan: docs/test-plans/<feature>.md (only affected test cases)
-3. Implement the code change
-4. Update tests to match
-5. Build and run → fix until green
+1. /mf-plan docs/specs/<feature>/<feature>.md "description of changes"
+   (handles snapshot + spec update + acceptance scenarios)
+2. Implement the code change
+3. Update tests to match
+4. Build and run → fix until green
 ```
 
 ### Template C — Test-First Bug Fix
@@ -157,11 +157,11 @@ Actual: [broken behavior]
 Removing: [feature name]
 Files to delete: [list]
 
-1. Mark relevant spec sections as removed
-2. Mark related test plan entries as removed
-3. Delete production code
-4. Delete test code
-5. Run full test suite → fix cascading breaks
+1. /mf-plan docs/specs/<feature>/<feature>.md "remove stories S-XXX, S-YYY"
+   (handles snapshot + marks stories and AS as removed)
+2. Delete production code
+3. Delete test code
+4. Run full test suite → fix cascading breaks
 ```
 
 ---
@@ -187,8 +187,8 @@ Save `/mf-plan` and full audits for significant milestones.
 
 Use this as a PR review checklist (enforce manually or via CI):
 
-- [ ] **Spec updated?** If production behavior changed, `docs/specs/` should have changes.
-- [ ] **Test plan updated?** If spec changed, `docs/test-plans/` should have changes.
+- [ ] **Spec updated?** If production behavior changed, `docs/specs/<feature>/` should have changes.
+- [ ] **Acceptance scenarios updated?** If spec behavior changed, AS in spec should reflect it.
 - [ ] **Tests pass?** `bash scripts/build-test.sh` exits 0.
 - [ ] **No dead tests?** Removed production code → removed corresponding tests.
 - [ ] **Coverage not decreased?** (Optional, per-team decision.)
@@ -201,16 +201,15 @@ Use this as a PR review checklist (enforce manually or via CI):
 
 | Change | Must Also Update |
 |--------|-----------------|
-| Production code behavior changed | Spec + test plan + tests |
-| Spec updated | Test plan + tests (if behavior changed) |
-| Test plan updated | Tests (implement new/modified test cases) |
-| Code removed | Remove related tests. Mark spec as removed. |
+| Production code behavior changed | Spec (including acceptance scenarios) + tests |
+| Spec updated | Acceptance scenarios + tests (if behavior changed) |
+| Code removed | Remove related tests. Mark spec and AS as removed. |
 | Bug fix | Add test. Update spec if edge case was undocumented. |
 
 **Never acceptable:**
 - Code changed, spec not updated (spec drift)
 - Code changed, tests not updated (untested code)
-- Spec changed, tests not updated (plan drift)
+- Spec changed, acceptance scenarios or tests not updated (AS drift)
 - Code removed, dead tests remain (orphaned tests)
 
 **Acceptable shortcut** for changes under 5 lines with no behavior change:
