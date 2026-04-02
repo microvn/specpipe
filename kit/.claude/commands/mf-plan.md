@@ -1,5 +1,40 @@
 Generate spec with acceptance scenarios from description or existing spec.
 
+## Question Format
+
+When presenting a question to the user with multiple options, ALWAYS use this structured format:
+
+```
+Q<N>: <Plain-language problem statement — what needs deciding and why>
+
+  A) <option> — <1-line rationale>
+     Fit: X/10  |  Trade-off: <what you gain vs. lose>
+
+  B) <option> — <1-line rationale>
+     Fit: X/10  |  Trade-off: <what you gain vs. lose>
+
+  C) <option> — <1-line rationale> (if applicable)
+     Fit: X/10  |  Trade-off: <what you gain vs. lose>
+
+  RECOMMENDATION: [A/B/C] — <one-sentence reason>
+```
+
+**Fit scoring calibration:**
+- **9-10:** Covers the requirement fully, no meaningful downside.
+- **7-8:** Solid choice, minor trade-offs that are acceptable for most projects.
+- **5-6:** Workable but defers significant decisions or adds friction.
+- **3-4:** Shortcut — gets past the question but creates debt.
+- **1-2:** Placeholder only, must be revisited.
+
+Rules:
+- 2-4 options per question. Never more than 4.
+- Every option must have a Fit score AND a Trade-off. No score without rationale.
+- RECOMMENDATION is mandatory. Pick one. State why.
+- If two options score within 1 point, flag it: "Close call — A and B are both strong. Leaning A because [reason]."
+- Present all questions at once (not one-by-one) unless the answer to Q1 changes what Q2 should be.
+
+---
+
 ## Determine mode
 
 Examine `$ARGUMENTS`:
@@ -78,7 +113,7 @@ Mode C does not run Phase 1 — it uses its own flow (see Mode C section).
 | T6 | Splitting would duplicate >50% of context (entities, constraints) | DO NOT split |
 
 "MUST" = mandatory split, inform user.
-"SHOULD" = suggest split, ask user.
+"SHOULD" = suggest split, present using **Question Format** with split vs. keep-together as options.
 "DO NOT" = keep together, unless user requests split.
 
 If splitting:
@@ -240,7 +275,22 @@ Before finalizing, scan the spec for gaps. Check BOTH the spec content AND the a
 | Priority consistency | P0 story with only 1 happy path AS? |
 | Constraint coverage | Which constraint has no AS verifying it? |
 
-Identify the top 3-5 ambiguities (most impactful first). For each, ask the user a targeted question with 2-4 concrete options and a recommendation.
+Identify the top 3-5 ambiguities (most impactful first). Present each using the **Question Format** (see top of this file). Example:
+
+```
+Q1: Auth strategy not specified — spec mentions "logged-in users" but no auth mechanism.
+
+  A) Session-based auth (cookie) — traditional, simple server-side
+     Fit: 8/10  |  Trade-off: simple setup vs. harder to scale across services
+
+  B) JWT (stateless tokens) — API-friendly, no server session
+     Fit: 7/10  |  Trade-off: scalable vs. token revocation complexity
+
+  C) Defer — add auth story later when auth requirements are clearer
+     Fit: 5/10  |  Trade-off: unblocks now vs. may require spec rewrite later
+
+  RECOMMENDATION: A — single-service app, session auth is simplest path.
+```
 
 If 0 questions remain, you MUST state why — not just "spec is clear." Cite at minimum:
 - **Edge cases checked:** which boundary conditions were considered and found covered.
@@ -373,6 +423,23 @@ Display to the user:
 
 ### Unchanged
 S-001, S-003
+```
+
+Present the decision using **Question Format**:
+
+```
+Q1: Apply these changes to <feature> spec?
+
+  A) Apply all — accept the full change report as shown
+     Fit: N/10  |  Trade-off: fast vs. no per-item control
+
+  B) Review each — walk through changes one by one, accept/reject/modify
+     Fit: N/10  |  Trade-off: precise control vs. slower
+
+  C) Reject all — discard and start over
+     Fit: N/10  |  Trade-off: clean slate vs. loses work
+
+  RECOMMENDATION: [A or B] — <reason based on change count and complexity>
 ```
 
 > **⛔ MUST wait for user confirmation before applying.**

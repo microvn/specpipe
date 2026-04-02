@@ -173,11 +173,33 @@ Include 1-sentence rationale for each disposition. Be honest — don't reject va
 
 Show adjudicated findings using the reviewer output format plus Disposition and Rationale fields.
 
-Then ask: "How would you like to proceed?"
-1. **"Apply all accepted"** — update the plan with all accepted fixes
-2. **"Review each"** — walk through one by one, accept/reject/modify each
+Then present the decision:
 
-If user picks "Review each": for each finding, ask "Accept / Reject / Modify fix?"
+```
+How to proceed with N accepted findings?
+
+  A) Apply all accepted — bulk-apply all fixes at once
+     Fit: N/10  |  Trade-off: fast vs. no per-finding control
+
+  B) Review each — walk through one by one, accept/reject/modify
+     Fit: N/10  |  Trade-off: precise control vs. slower
+
+  RECOMMENDATION: [A or B] — <reason based on finding count and severity>
+```
+
+Score Fit based on context: if most findings are High/Critical, recommend B (review each). If mostly Medium with clear fixes, recommend A.
+
+If user picks B: for each finding, present:
+
+```
+Finding [C-1]: <title>
+
+  A) Accept — apply the suggested fix
+  B) Modify — accept with changes (describe your modification)
+  C) Reject — skip this finding
+
+  RECOMMENDATION: [A/B/C] — <based on your adjudication>
+```
 
 ## Phase 7: Apply
 
