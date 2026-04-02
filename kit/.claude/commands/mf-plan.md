@@ -1,4 +1,4 @@
-Think hard about this task. A bad plan wastes days, a good plan saves weeks.
+Generate spec + test plan from description or existing spec.
 
 ## Determine mode
 
@@ -116,7 +116,7 @@ Write to `docs/test-plans/<feature-name>.md`:
 ## Phase 4: Summary
 
 Show: test case counts (P0/P1/P2), implementation order, estimated scope.
-Next steps: "Use `/test` after each chunk. For complex plans, run `/challenge` first."
+Next steps: "Use `/mf-test` after each chunk. For complex plans, run `/mf-challenge` first."
 
 ## Naming Convention
 

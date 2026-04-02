@@ -63,16 +63,16 @@ npx claude-devkit-cli init .
 claude
 
 # 3. Create your first spec and test plan
-/plan "describe your feature here"
+/mf-plan "describe your feature here"
 
 # 4. Write code, then test
-/test
+/mf-test
 
 # 5. Review before merging
-/review
+/mf-review
 
 # 6. Commit
-/commit
+/mf-commit
 ```
 
 That's it. The CLI auto-detects your project type and configures everything.
@@ -136,12 +136,12 @@ your-project/
 │   │   ├── sensitive-guard.sh ← Blocks access to secrets
 │   │   └── self-review.sh     ← Quality checklist on stop
 │   └── commands/
-│       ├── plan.md            ← /plan command
-│       ├── challenge.md       ← /challenge command
-│       ├── test.md            ← /test command
-│       ├── fix.md             ← /fix command
-│       ├── review.md          ← /review command
-│       └── commit.md          ← /commit command
+│       ├── mf-plan.md         ← /mf-plan command
+│       ├── mf-challenge.md    ← /mf-challenge command
+│       ├── mf-test.md         ← /mf-test command
+│       ├── mf-fix.md          ← /mf-fix command
+│       ├── mf-review.md       ← /mf-review command
+│       └── mf-commit.md       ← /mf-commit command
 ├── scripts/
 │   └── build-test.sh          ← Universal test runner
 └── docs/
@@ -196,21 +196,21 @@ This removes hooks, commands, settings, and build-test.sh. It preserves `CLAUDE.
 > When: Building something new — no existing code or spec.
 
 ```
-1. /plan "description of the feature"
+1. /mf-plan "description of the feature"
    → Generates spec + test plan. Review both.
 
 2. Implement code in chunks.
-   After each chunk: /test
+   After each chunk: /mf-test
    Repeat until green.
 
-3. /review (before merge)
+3. /mf-review (before merge)
 
-4. /commit
+4. /mf-commit
 ```
 
 **Example:**
 ```
-/plan "User authentication with email/password login, password reset via email, and session management with 24h expiry"
+/mf-plan "User authentication with email/password login, password reset via email, and session management with 24h expiry"
 ```
 
 ### Update Existing Feature
@@ -220,14 +220,14 @@ This removes hooks, commands, settings, and build-test.sh. It preserves `CLAUDE.
 ```
 1. Edit the spec first: docs/specs/<feature>.md
 
-2. /plan docs/specs/<feature>.md
+2. /mf-plan docs/specs/<feature>.md
    → Updates the test plan with new/modified/removed cases.
 
 3. Implement the code change.
-   /test
+   /mf-test
    Fix until green.
 
-4. /review → /commit
+4. /mf-review → /mf-commit
 ```
 
 ### Bug Fix
@@ -235,15 +235,15 @@ This removes hooks, commands, settings, and build-test.sh. It preserves `CLAUDE.
 > When: Something is broken.
 
 ```
-1. /fix "description of the bug"
+1. /mf-fix "description of the bug"
    → Writes failing test → fixes code → runs full suite.
 
-2. /commit
+2. /mf-commit
 ```
 
 **Example:**
 ```
-/fix "Search returns no results when query contains apostrophes like O'Brien"
+/mf-fix "Search returns no results when query contains apostrophes like O'Brien"
 ```
 
 ### Remove Feature
@@ -258,20 +258,20 @@ This removes hooks, commands, settings, and build-test.sh. It preserves `CLAUDE.
 3. bash scripts/build-test.sh (run full suite)
    Fix cascading breaks.
 
-4. /commit
+4. /mf-commit
 ```
 
 ---
 
 ## 5. Commands Reference
 
-### /plan — Generate Spec + Test Plan
+### /mf-plan — Generate Spec + Test Plan
 
 **Usage:**
 ```
-/plan docs/specs/auth.md                    # Mode A: from existing spec
-/plan "user authentication with OAuth2"     # Mode B: from description
-/plan docs/specs/auth.md (after spec edit)  # Mode C: update existing plan
+/mf-plan docs/specs/auth.md                    # Mode A: from existing spec
+/mf-plan "user authentication with OAuth2"     # Mode B: from description
+/mf-plan docs/specs/auth.md (after spec edit)  # Mode C: update existing plan
 ```
 
 **Modes:**
@@ -304,13 +304,13 @@ Priorities: **P0** (must have), **P1** (should have), **P2** (nice to have).
 - Spec: `docs/specs/<feature>.md`
 - Test plan: `docs/test-plans/<feature>.md`
 
-### /challenge — Adversarial Plan Review
+### /mf-challenge — Adversarial Plan Review
 
 **Usage:**
 ```
-/challenge docs/test-plans/auth.md   # challenge a test plan
-/challenge docs/specs/auth.md        # challenge a spec
-/challenge "user authentication"     # challenge by feature name
+/mf-challenge docs/test-plans/auth.md   # challenge a test plan
+/mf-challenge docs/specs/auth.md        # challenge a spec
+/mf-challenge "user authentication"     # challenge by feature name
 ```
 
 **How it works (7 phases):**
@@ -377,19 +377,19 @@ Priorities: **P0** (must have), **P1** (should have), **P2** (nice to have).
 6. Skip style/formatting — substance only
 
 **When to use:**
-- After `/plan`, before coding — for complex features
+- After `/mf-plan`, before coding — for complex features
 - Features involving auth, payments, data pipelines, multi-service integration
 - NOT needed for simple CRUD, small bug fixes, or trivial features
 
 **Token cost:** 15-30k (uses parallel subagents, doesn't bloat main context)
 
-### /test — Write + Run Tests
+### /mf-test — Write + Run Tests
 
 **Usage:**
 ```
-/test                              # test all changes vs base branch
-/test src/api/users.ts             # test specific file
-/test "user authentication"        # test specific feature
+/mf-test                              # test all changes vs base branch
+/mf-test src/api/users.ts             # test specific file
+/mf-test "user authentication"        # test specific feature
 ```
 
 **How it works:**
@@ -409,11 +409,11 @@ Priorities: **P0** (must have), **P1** (should have), **P2** (nice to have).
 
 **What NOT to test:** Private/internal methods, framework behavior, trivial getters/setters, implementation details.
 
-### /fix — Test-First Bug Fix
+### /mf-fix — Test-First Bug Fix
 
 **Usage:**
 ```
-/fix "description of the bug"
+/mf-fix "description of the bug"
 ```
 
 **How it works:**
@@ -427,12 +427,12 @@ Priorities: **P0** (must have), **P1** (should have), **P2** (nice to have).
 
 **Multiple bugs:** Triages by severity, fixes one at a time, commits each separately.
 
-### /review — Pre-Merge Quality Gate
+### /mf-review — Pre-Merge Quality Gate
 
 **Usage:**
 ```
-/review                            # review all changes vs base branch
-/review src/auth/                  # review specific directory
+/mf-review                            # review all changes vs base branch
+/mf-review src/auth/                  # review specific directory
 ```
 
 **How it works:**
@@ -461,11 +461,11 @@ Priorities: **P0** (must have), **P1** (should have), **P2** (nice to have).
 - Never auto-fixes code — report only
 - Checks spec-test alignment: code changed → spec/tests also changed? Vague requirements without metrics ("fast", "secure") get flagged with a suggestion to add concrete numbers
 
-### /commit — Smart Git Commit
+### /mf-commit — Smart Git Commit
 
 **Usage:**
 ```
-/commit
+/mf-commit
 ```
 
 **How it works:**
@@ -749,7 +749,7 @@ Skip sections that don't apply. Match depth to feature complexity.
 
 ### Test Plan Format
 
-Generated by `/plan` at `docs/test-plans/<feature-name>.md`:
+Generated by `/mf-plan` at `docs/test-plans/<feature-name>.md`:
 
 ```markdown
 # Test Plan: <Feature Name>
@@ -817,8 +817,8 @@ Create new `.md` files in `.claude/commands/`:
 # .claude/commands/deploy.md
 
 Run the deployment pipeline:
-1. /review
-2. /commit
+1. /mf-review
+2. /mf-commit
 3. Run: bash scripts/deploy.sh $ARGUMENTS
 4. Verify deployment health: curl -f https://api.example.com/health
 ```
@@ -831,20 +831,20 @@ Then use: `/deploy staging`
 
 | Activity | Tokens | Frequency |
 |----------|--------|-----------|
-| `/test` (incremental, 1-3 files) | 5–10k | Every code chunk |
-| `/fix` (single bug) | 3–5k | As needed |
-| `/commit` | 2–4k | Every commit |
-| `/review` (diff-based) | 10–20k | Before merge |
-| `/plan` (new feature) | 20–40k | Start of feature |
-| `/challenge` (adversarial review) | 15–30k | After /plan, complex features |
+| `/mf-test` (incremental, 1-3 files) | 5–10k | Every code chunk |
+| `/mf-fix` (single bug) | 3–5k | As needed |
+| `/mf-commit` | 2–4k | Every commit |
+| `/mf-review` (diff-based) | 10–20k | Before merge |
+| `/mf-plan` (new feature) | 20–40k | Start of feature |
+| `/mf-challenge` (adversarial review) | 15–30k | After /mf-plan, complex features |
 | Full audit (manual prompt) | 100k+ | Before release |
 
 ### Minimizing Token Usage
 
-- **Test incrementally.** `/test` after each small chunk uses 5-10k. Waiting until everything is done then running `/test` on a large diff uses 50k+.
-- **Use filters.** `/test src/auth/login.ts` is cheaper than `/test` on the whole project.
-- **Skip `/plan` for tiny changes.** Under 5 lines with no behavior change? Just `/test` and `/commit`.
-- **Use `/review` only before merge.** Not after every commit.
+- **Test incrementally.** `/mf-test` after each small chunk uses 5-10k. Waiting until everything is done then running `/mf-test` on a large diff uses 50k+.
+- **Use filters.** `/mf-test src/auth/login.ts` is cheaper than `/mf-test` on the whole project.
+- **Skip `/mf-plan` for tiny changes.** Under 5 lines with no behavior change? Just `/mf-test` and `/mf-commit`.
+- **Use `/mf-review` only before merge.** Not after every commit.
 
 ---
 
@@ -871,7 +871,7 @@ Then use: `/deploy staging`
 
 ### Wrong base branch
 
-**Symptom:** `/test` or `/review` compares against wrong branch.
+**Symptom:** `/mf-test` or `/mf-review` compares against wrong branch.
 
 **Check:**
 ```bash
@@ -901,19 +901,19 @@ export FILE_GUARD_EXCLUDE="*.generated.swift,*.pb.go,*.min.js,*.snap"
 ## 12. FAQ
 
 **Q: Do I need specs for every tiny change?**
-A: No. Changes under 5 lines with no behavior change can skip the spec. Just `/test` and `/commit`. The spec-first rule is for meaningful behavior changes.
+A: No. Changes under 5 lines with no behavior change can skip the spec. Just `/mf-test` and `/mf-commit`. The spec-first rule is for meaningful behavior changes.
 
 **Q: Can I use mocks in tests?**
 A: Only for external services you can't run locally (third-party APIs, email services). Never mock your own code or database just to make tests pass faster.
 
 **Q: What if Claude writes a test that tests the wrong thing?**
-A: This usually means the spec is ambiguous. Clarify the spec first, then re-run `/test`. Good specs produce good tests.
+A: This usually means the spec is ambiguous. Clarify the spec first, then re-run `/mf-test`. Good specs produce good tests.
 
 **Q: Can I use this with other AI coding tools?**
 A: The commands and hooks are Claude Code-specific. The specs, test plans, workflow, and `build-test.sh` work with any tool or manual workflow.
 
-**Q: When should I use `/challenge`?**
-A: After `/plan`, for complex features involving authentication, payments, data pipelines, or multi-service integration. It spawns parallel hostile reviewers that find security holes, failure modes, and false assumptions BEFORE you write code. Skip it for simple CRUD or small features — the overhead isn't worth it.
+**Q: When should I use `/mf-challenge`?**
+A: After `/mf-plan`, for complex features involving authentication, payments, data pipelines, or multi-service integration. It spawns parallel hostile reviewers that find security holes, failure modes, and false assumptions BEFORE you write code. Skip it for simple CRUD or small features — the overhead isn't worth it.
 
 **Q: How do I do a full coverage audit?**
 A: This is intentionally not a command (it's expensive and rare). When needed, prompt Claude directly: "Audit test coverage for feature X against docs/test-plans/X.md. Identify gaps and write missing tests."

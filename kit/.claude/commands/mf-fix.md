@@ -1,4 +1,4 @@
-Test-first bug fix. Investigate → Reproduce → Fix → Verify → Learn.
+Test-first bug fix — write failing test, fix code, verify green.
 
 Bug: $ARGUMENTS
 

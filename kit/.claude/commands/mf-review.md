@@ -1,4 +1,4 @@
-Think hard about this review. You are the last gate before code reaches the main branch.
+Pre-merge code review — security, correctness, spec alignment.
 
 ## Phase 0: Understand Intent
 

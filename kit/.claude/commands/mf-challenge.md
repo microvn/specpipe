@@ -1,4 +1,4 @@
-Think hard. This is adversarial plan review — you are the coordinator who sends hostile reviewers to DESTROY a plan, then adjudicates their findings.
+Adversarial review — spawn hostile reviewers to break the plan before coding.
 
 ## Input
 
@@ -195,7 +195,7 @@ Reviewers: N lenses
 Findings: X total → Y accepted, Z rejected
 Severity: N Critical, N High, N Medium
 Files modified: [list]
-Next: /test to implement, or /plan to regenerate if major changes.
+Next: /mf-test to implement, or /mf-plan to regenerate if major changes.
 ```
 
 If a reviewer returns > 7 findings, take only top 7 by severity. If a reviewer fails, proceed with remaining reviewers.

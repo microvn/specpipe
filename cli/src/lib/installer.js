@@ -20,12 +20,12 @@ export const COMPONENTS = {
     '.claude/hooks/sensitive-guard.sh',
   ],
   commands: [
-    '.claude/commands/plan.md',
-    '.claude/commands/challenge.md',
-    '.claude/commands/test.md',
-    '.claude/commands/fix.md',
-    '.claude/commands/review.md',
-    '.claude/commands/commit.md',
+    '.claude/commands/mf-plan.md',
+    '.claude/commands/mf-challenge.md',
+    '.claude/commands/mf-test.md',
+    '.claude/commands/mf-fix.md',
+    '.claude/commands/mf-review.md',
+    '.claude/commands/mf-commit.md',
   ],
   config: [
     '.claude/settings.json',

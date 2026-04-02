@@ -164,7 +164,7 @@ export async function initCommand(path, opts) {
   console.log('  .claude/CLAUDE.md          — Project rules (review and customize)');
   console.log('  .claude/settings.json      — Hook configuration');
   console.log('  .claude/hooks/             — 6 guards (file, path, glob, comment, sensitive, self-review)');
-  console.log('  .claude/commands/          — /plan, /challenge, /test, /fix, /review, /commit');
+  console.log('  .claude/commands/          — /mf-plan, /mf-challenge, /mf-test, /mf-fix, /mf-review, /mf-commit');
   console.log('  scripts/build-test.sh      — Universal test runner');
   console.log('  docs/WORKFLOW.md           — Workflow reference');
   log.blank();
@@ -176,8 +176,8 @@ export async function initCommand(path, opts) {
   console.log('Next steps:');
   console.log('  1. Review .claude/CLAUDE.md — ensure project info is correct');
   console.log('  2. Write your first spec:   docs/specs/<feature>.md');
-  console.log('  3. Generate test plan:      /plan docs/specs/<feature>.md');
-  console.log('  4. Start coding + testing:  /test');
+  console.log('  3. Generate test plan:      /mf-plan docs/specs/<feature>.md');
+  console.log('  4. Start coding + testing:  /mf-test');
   log.blank();
 
   if (warnings > 0) {

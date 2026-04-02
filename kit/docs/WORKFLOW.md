@@ -11,24 +11,24 @@
 When: Building something that doesn't exist yet (no code, no spec).
 
 ```
-Step 1 → /plan "description of feature"
+Step 1 → /mf-plan "description of feature"
           Generates: docs/specs/<feature>.md (spec)
                      docs/test-plans/<feature>.md (test plan)
           Answers validation questions about assumptions.
           Review both before proceeding.
 
-Step 2 → (Optional) /challenge docs/test-plans/<feature>.md
+Step 2 → (Optional) /mf-challenge docs/test-plans/<feature>.md
           Adversarial review: spawns hostile reviewers to find flaws.
           Recommended for complex features, auth, data pipelines.
           Skip for simple CRUD or small features.
 
 Step 3 → Implement in chunks. After each chunk:
-          /test
+          /mf-test
           Repeat until chunk is green.
 
-Step 4 → /review (before merge)
+Step 4 → /mf-review (before merge)
 
-Step 5 → /commit
+Step 5 → /mf-commit
 ```
 
 ### Update Existing Feature
@@ -39,14 +39,14 @@ When: Changing behavior, adding options, refactoring logic.
 Step 1 → Update spec FIRST: docs/specs/<feature>.md
           Describe what's changing and why.
 
-Step 2 → /plan docs/specs/<feature>.md
+Step 2 → /mf-plan docs/specs/<feature>.md
           Updates the test plan with new/modified/removed test cases.
 
 Step 3 → Implement code changes.
-          /test
+          /mf-test
           Fix until green.
 
-Step 4 → /review → /commit
+Step 4 → /mf-review → /mf-commit
 ```
 
 ### Bug Fix
@@ -54,10 +54,10 @@ Step 4 → /review → /commit
 When: Something is broken and needs fixing.
 
 ```
-Step 1 → /fix "description of the bug"
+Step 1 → /mf-fix "description of the bug"
           Writes failing test → fixes code → confirms green → runs full suite.
 
-Step 2 → /commit
+Step 2 → /mf-commit
 
 Optional → If the bug reveals an undocumented edge case, update the spec.
 ```
@@ -75,7 +75,7 @@ Step 2 → Delete production code and related test code.
 Step 3 → Run full test suite: bash scripts/build-test.sh
           Fix any cascading breakage.
 
-Step 4 → /commit
+Step 4 → /mf-commit
 ```
 
 ---
@@ -86,20 +86,20 @@ Use this to decide which workflow to follow:
 
 ```
 Is this a brand new feature (no existing spec or code)?
-├─ Yes → New Feature workflow. Start with /plan.
+├─ Yes → New Feature workflow. Start with /mf-plan.
 │   └─ Is the feature complex (auth, data pipeline, multi-service)?
-│       ├─ Yes → Run /challenge after /plan, before coding.
-│       └─ No → Skip /challenge, go straight to implementation.
+│       ├─ Yes → Run /mf-challenge after /mf-plan, before coding.
+│       └─ No → Skip /mf-challenge, go straight to implementation.
 └─ No
     ├─ Is this a bug fix?
-    │   ├─ Yes → Bug Fix workflow. Start with /fix.
+    │   ├─ Yes → Bug Fix workflow. Start with /mf-fix.
     │   └─ No
     │       ├─ Are you removing/deprecating code?
     │       │   ├─ Yes → Remove Feature workflow.
     │       │   └─ No → Update Feature workflow. Start by editing the spec.
     │       │
     │       └─ Is the change very small (< 5 lines, behavior unchanged)?
-    │           └─ Yes → Skip spec update. Just /test and /commit.
+    │           └─ Yes → Skip spec update. Just /mf-test and /mf-commit.
 ```
 
 ---
@@ -170,16 +170,16 @@ Files to delete: [list]
 
 | Workflow | Estimated Tokens | When |
 |----------|-----------------|------|
-| `/test` (incremental) | 5–10k | Daily, after each code chunk |
-| `/fix` (single bug) | 3–5k | As bugs arise |
-| `/commit` | 2–4k | Each commit |
-| `/review` (diff-based) | 10–20k | Before merge |
-| `/plan` (new feature) | 20–40k | Start of new feature |
-| `/challenge` (adversarial) | 15–30k | After /plan, for complex features |
+| `/mf-test` (incremental) | 5–10k | Daily, after each code chunk |
+| `/mf-fix` (single bug) | 3–5k | As bugs arise |
+| `/mf-commit` | 2–4k | Each commit |
+| `/mf-review` (diff-based) | 10–20k | Before merge |
+| `/mf-plan` (new feature) | 20–40k | Start of new feature |
+| `/mf-challenge` (adversarial) | 15–30k | After /mf-plan, for complex features |
 | Full audit (manual) | 100k+ | Before release, quarterly |
 
 **Rule of thumb:** Daily work uses templates + `/test` → low token cost.
-Save `/plan` and full audits for significant milestones.
+Save `/mf-plan` and full audits for significant milestones.
 
 ---
 

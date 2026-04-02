@@ -1,4 +1,4 @@
-EXECUTE, not EXPLORE. Follow these steps exactly. Minimize tool calls.
+Stage, scan secrets, generate conventional commit message.
 
 ## Step 1 — Analyze (single compound command)
 

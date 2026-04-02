@@ -1,4 +1,4 @@
-EXECUTE, not EXPLORE. Write tests, run them, make them pass. Don't read unrelated files.
+Write tests from test plan, compile, run, fix until green.
 
 ## Phase 0: Build Context
 

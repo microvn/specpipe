@@ -13,12 +13,12 @@ Every change follows this cycle: **SPEC → TEST PLAN → CODE + TESTS → BUILD
 
 | Trigger | Commands | Details |
 |---------|----------|---------|
-| New feature | `/plan` → `/challenge` (optional) → code in chunks → `/test` each chunk | Start with spec or description |
-| Update feature | Update spec first → `/plan` → code → `/test` | Spec changes before code changes |
-| Bug fix | `/fix "description"` | Test-first: write failing test → fix → green |
+| New feature | `/mf-plan` → `/mf-challenge` (optional) → code in chunks → `/mf-test` each chunk | Start with spec or description |
+| Update feature | Update spec first → `/mf-plan` → code → `/mf-test` | Spec changes before code changes |
+| Bug fix | `/mf-fix "description"` | Test-first: write failing test → fix → green |
 | Remove feature | Mark spec as removed → delete code + tests → build pass | Run full suite after removal |
-| Pre-merge check | `/review` | Diff-based quality gate |
-| Commit changes | `/commit` | Secret scan + conventional commit |
+| Pre-merge check | `/mf-review` | Diff-based quality gate |
+| Commit changes | `/mf-commit` | Secret scan + conventional commit |
 
 For detailed workflow steps, templates, and decision trees, see `docs/WORKFLOW.md`.
 
