@@ -59,6 +59,10 @@ function main() {
   const filePath = payload.tool_input?.file_path;
   if (!filePath) process.exit(0);
 
+  // Skip files outside the project directory (e.g. ~/.claude/plans/)
+  const projectDir = process.cwd();
+  if (!path.resolve(filePath).startsWith(projectDir)) process.exit(0);
+
   // Skip excluded patterns
   if (matchesExclude(filePath)) process.exit(0);
 

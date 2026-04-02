@@ -11,6 +11,7 @@
 "use strict";
 
 const fs = require("fs");
+const path = require("path");
 
 // Patterns that indicate lazy placeholder comments (case-insensitive)
 const PLACEHOLDER_PATTERNS = [
@@ -62,6 +63,10 @@ function main() {
   } catch {
     process.exit(0);
   }
+
+  // Skip files outside the project directory (e.g. ~/.claude/plans/)
+  const filePath = payload.tool_input?.file_path;
+  if (filePath && !path.resolve(filePath).startsWith(process.cwd())) process.exit(0);
 
   const oldStr = payload.tool_input?.old_string;
   const newStr = payload.tool_input?.new_string;
