@@ -34,7 +34,7 @@ function isCommentLine(line) {
   if (trimmed.startsWith("#") && !trimmed.startsWith("#!")) return true;
   if (trimmed.startsWith("/*") || trimmed.startsWith("*") || trimmed.endsWith("*/")) return true;
   if (trimmed.startsWith("<!--")) return true;
-  if (trimmed === "pass") return true; // Python pass statement as placeholder
+  if (trimmed === "pass" || /^pass\s*#/.test(trimmed)) return true; // Python pass / pass # comment
   return false;
 }
 

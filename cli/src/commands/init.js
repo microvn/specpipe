@@ -1,19 +1,96 @@
-import { resolve } from 'node:path';
+import { resolve, join, dirname } from 'node:path';
 import { existsSync } from 'node:fs';
 import { execSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
-import { dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { log } from '../lib/logger.js';
 import { detectProject } from '../lib/detector.js';
 import { readManifest, writeManifest, createManifest, setFileEntry } from '../lib/manifest.js';
 import { hashFile } from '../lib/hasher.js';
+import { homedir } from 'node:os';
+import { mkdir } from 'node:fs/promises';
 import {
   getAllFiles, getFilesForComponents, installFile,
   ensurePlaceholderDir, setPermissions, fillTemplate,
   verifySettingsJson, PLACEHOLDER_DIRS, COMPONENTS,
-  getTemplateDir,
+  getTemplateDir, installSkillGlobal, getGlobalSkillsDir,
+  installHookGlobal, getGlobalHooksDir, mergeGlobalSettings,
 } from '../lib/installer.js';
+import { readFile, writeFile } from 'node:fs/promises';
+
+const GLOBAL_MANIFEST = join(homedir(), '.claude', '.devkit-manifest.json');
+
+async function readGlobalManifest() {
+  try {
+    return JSON.parse(await readFile(GLOBAL_MANIFEST, 'utf-8'));
+  } catch {
+    return null;
+  }
+}
+
+async function writeGlobalManifest(data) {
+  await mkdir(join(homedir(), '.claude'), { recursive: true });
+  await writeFile(GLOBAL_MANIFEST, JSON.stringify(data, null, 2) + '\n');
+}
+
+export async function initGlobal({ force = false, hooks = false } = {}) {
+  const globalSkillsDir = getGlobalSkillsDir();
+  await mkdir(globalSkillsDir, { recursive: true });
+
+  log.blank();
+  console.log('--- Installing global skills ---');
+
+  let copied = 0; let skipped = 0; let identical = 0;
+  for (const relPath of COMPONENTS.skills) {
+    const result = await installSkillGlobal(relPath, globalSkillsDir, { force });
+    if (result === 'copied') copied++;
+    else if (result === 'identical') identical++;
+    else skipped++;
+  }
+
+  const parts = [`${copied} copied`];
+  if (identical > 0) parts.push(`${identical} identical`);
+  if (skipped > 0) parts.push(`${skipped} customized (use --force to overwrite)`);
+  log.pass(`Global skills: ${parts.join(', ')}`);
+  log.info('Skills available in all projects via ~/.claude/skills/');
+
+  if (hooks) {
+    await initGlobalHooks({ force });
+  }
+
+  // Write global manifest
+  const existing = await readGlobalManifest() || {};
+  await writeGlobalManifest({
+    ...existing,
+    globalInstalled: true,
+    globalHooksInstalled: hooks || existing.globalHooksInstalled || false,
+    updatedAt: new Date().toISOString(),
+  });
+}
+
+export async function initGlobalHooks({ force = false } = {}) {
+  const globalHooksDir = getGlobalHooksDir();
+  await mkdir(globalHooksDir, { recursive: true });
+
+  log.blank();
+  console.log('--- Installing global hooks ---');
+
+  let copied = 0; let skipped = 0; let identical = 0;
+  for (const relPath of COMPONENTS.hooks) {
+    const result = await installHookGlobal(relPath, globalHooksDir, { force });
+    if (result === 'copied') copied++;
+    else if (result === 'identical') identical++;
+    else skipped++;
+  }
+
+  await mergeGlobalSettings(globalHooksDir);
+
+  const parts = [`${copied} copied`];
+  if (identical > 0) parts.push(`${identical} identical`);
+  if (skipped > 0) parts.push(`${skipped} customized (use --force to overwrite)`);
+  log.pass(`Global hooks: ${parts.join(', ')}`);
+  log.info('Hooks registered in ~/.claude/settings.json — active in all projects');
+}
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const pkg = JSON.parse(readFileSync(resolve(__dirname, '../../package.json'), 'utf-8'));
@@ -29,6 +106,12 @@ export async function initCommand(path, opts) {
   log.info(`claude-devkit v${pkg.version}`);
   log.info(`Target: ${targetDir}`);
   log.blank();
+
+  // --- Global mode ---
+  if (opts.global) {
+    await initGlobal({ force: opts.force, hooks: true });
+    return;
+  }
 
   // --- Adopt mode ---
   if (opts.adopt) {
@@ -164,7 +247,7 @@ export async function initCommand(path, opts) {
   console.log('  .claude/CLAUDE.md          — Project rules (review and customize)');
   console.log('  .claude/settings.json      — Hook configuration');
   console.log('  .claude/hooks/             — 6 guards (file, path, glob, comment, sensitive, self-review)');
-  console.log('  .claude/commands/          — /mf-plan, /mf-challenge, /mf-test, /mf-fix, /mf-review, /mf-commit');
+  console.log('  .claude/skills/            — /mf-plan, /mf-challenge, /mf-build, /mf-fix, /mf-review, /mf-commit');
   console.log('  scripts/build-test.sh      — Universal test runner');
   console.log('  docs/WORKFLOW.md           — Workflow reference');
   log.blank();
@@ -177,12 +260,84 @@ export async function initCommand(path, opts) {
   console.log('  1. Review .claude/CLAUDE.md — ensure project info is correct');
   console.log('  2. Write your first spec:   docs/specs/<feature>.md');
   console.log('  3. Generate test plan:      /mf-plan docs/specs/<feature>.md');
-  console.log('  4. Start coding + testing:  /mf-test');
+  console.log('  4. Start coding + testing:  /mf-build');
   log.blank();
 
   if (warnings > 0) {
     console.log(`⚠ ${warnings} warning(s) above — review before proceeding.`);
   }
+
+  // --- Global install prompt (first-time only) ---
+  if (!opts.global) {
+    const globalMeta = await readGlobalManifest();
+    if (globalMeta?.globalInstalled === undefined) {
+      await promptGlobalInstall(opts);
+    } else if (globalMeta?.globalInstalled === true) {
+      // Auto-upgrade global on init if previously installed
+      await initGlobal({ force: opts.force });
+    }
+  }
+}
+
+async function promptGlobalInstall(opts) {
+  log.blank();
+  console.log('─── Global Install ───');
+  console.log('');
+  console.log('Skills and hooks are installed per-project by default.');
+  console.log('You can install them globally so every project is covered without running init again.');
+  console.log('');
+  console.log('  ~/.claude/skills/   ← global skills (fallback when no per-project skills)');
+  console.log('  ~/.claude/hooks/    ← global hooks  (active in all projects)');
+  console.log('  .claude/skills/     ← per-project skills (takes precedence over global)');
+  console.log('  .claude/hooks/      ← per-project hooks  (takes precedence over global)');
+  console.log('');
+  console.log('To revert global hooks back to per-project later:');
+  console.log('  claude-devkit remove --global');
+  console.log('  then: claude-devkit init  (in each project)');
+  console.log('');
+  console.log('RECOMMENDATION: Choose A if you work across many projects.');
+  console.log('');
+
+  const answer = await askGlobalInstall();
+
+  if (answer === 'skills+hooks') {
+    await initGlobal({ force: opts.force, hooks: true });
+    await trackProjectPath(process.cwd());
+  } else if (answer === 'skills') {
+    await initGlobal({ force: opts.force, hooks: false });
+    await trackProjectPath(process.cwd());
+  } else if (answer === 'no') {
+    await writeGlobalManifest({ globalInstalled: false, updatedAt: new Date().toISOString() });
+    log.info('Skipping global install. Run `claude-devkit init --global` anytime.');
+  }
+  // 'later' = don't write anything, prompt again next time
+}
+
+async function askGlobalInstall() {
+  const { createInterface } = await import('node:readline');
+  const rl = createInterface({ input: process.stdin, output: process.stdout });
+  return new Promise((resolve) => {
+    console.log('A) Skills + Hooks globally  (recommended)');
+    console.log('B) Skills only              (hooks stay per-project)');
+    console.log('C) No — keep everything per-project');
+    console.log('D) Ask me next time');
+    console.log('');
+    rl.question('Choice [A/B/C/D]: ', (answer) => {
+      rl.close();
+      const a = answer.trim().toUpperCase();
+      if (a === 'A') resolve('skills+hooks');
+      else if (a === 'B') resolve('skills');
+      else if (a === 'C') resolve('no');
+      else resolve('later');
+    });
+  });
+}
+
+async function trackProjectPath(projectPath) {
+  const meta = await readGlobalManifest() || {};
+  const projects = new Set(meta.projects || []);
+  projects.add(projectPath);
+  await writeGlobalManifest({ ...meta, projects: [...projects] });
 }
 
 /**

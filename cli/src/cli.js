@@ -18,7 +18,8 @@ export function cli(argv) {
     .command('init [path]')
     .description('Initialize a project with the dev-kit')
     .option('-f, --force', 'Overwrite existing files')
-    .option('--only <components>', 'Install only specific components (comma-separated: hooks,commands,scripts,docs,config)')
+    .option('-g, --global', 'Install skills globally to ~/.claude/skills/ (available in all projects)')
+    .option('--only <components>', 'Install only specific components (comma-separated: hooks,skills,scripts,docs,config)')
     .option('--adopt', 'Adopt existing kit files without overwriting (migration from setup.sh)')
     .option('--dry-run', 'Show what would be done without making changes')
     .action(async (path, opts) => {
@@ -30,6 +31,7 @@ export function cli(argv) {
     .command('upgrade [path]')
     .description('Smart upgrade — preserves customized files')
     .option('-f, --force', 'Overwrite even customized files')
+    .option('-g, --global', 'Upgrade skills globally in ~/.claude/skills/')
     .option('--dry-run', 'Show what would be done without making changes')
     .action(async (path, opts) => {
       const { upgradeCommand } = await import('./commands/upgrade.js');
@@ -63,9 +65,10 @@ export function cli(argv) {
   program
     .command('remove [path]')
     .description('Uninstall dev-kit (preserves CLAUDE.md and docs/)')
-    .action(async (path) => {
+    .option('-g, --global', 'Remove global install (~/.claude/skills/, ~/.claude/hooks/, hook entries from ~/.claude/settings.json)')
+    .action(async (path, opts) => {
       const { removeCommand } = await import('./commands/remove.js');
-      await removeCommand(path || '.');
+      await removeCommand(path || '.', opts);
     });
 
   program.parse(argv);

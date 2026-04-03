@@ -8,6 +8,7 @@
 #   SELF_REVIEW_ENABLED — set to "false" to disable (default: true)
 
 # No set -euo pipefail — this hook must NEVER fail
+# Windows note: requires bash (WSL or Git Bash). Silently skipped on Windows native.
 
 # Check if disabled
 if [[ "${SELF_REVIEW_ENABLED:-true}" == "false" ]]; then

@@ -1,3 +1,7 @@
+---
+description: TDD delivery loop — write failing tests from spec, implement story by story, drive to GREEN
+allowed-tools: Read, Write, Edit, Bash, Glob, Grep, AskUserQuestion
+---
 TDD delivery loop — write failing tests from spec AS, implement story by story, drive to GREEN.
 
 ## Phase 0: Build Context

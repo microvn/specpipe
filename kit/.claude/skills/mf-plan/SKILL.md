@@ -1,3 +1,7 @@
+---
+description: Generate spec with acceptance scenarios from description or existing spec
+allowed-tools: Read, Write, Edit, Bash, Glob, Grep, AskUserQuestion, Agent
+---
 Generate spec with acceptance scenarios from description or existing spec.
 
 ## Question Format

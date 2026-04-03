@@ -109,7 +109,16 @@ cd my-project
 claude-devkit init .
 ```
 
-**Option C: Force re-install** (overwrites existing files)
+**Option C: Global skills install** (available in all projects without running `init` again)
+
+```bash
+claude-devkit init --global
+# or after per-project init, answer "yes" to the global prompt
+```
+
+Skills installed globally at `~/.claude/skills/` are available in every project. Per-project `.claude/skills/` always takes precedence over global — so projects can still override individual skills.
+
+**Option D: Force re-install** (overwrites existing files)
 
 ```bash
 npx claude-devkit-cli init --force .
@@ -118,7 +127,7 @@ npx claude-devkit-cli init --force .
 **Option D: Selective install** (only specific components)
 
 ```bash
-npx claude-devkit-cli init --only hooks,commands .
+npx claude-devkit-cli init --only hooks,skills .
 ```
 
 ### What Gets Installed
@@ -135,13 +144,13 @@ your-project/
 │   │   ├── comment-guard.js   ← Blocks placeholder comments
 │   │   ├── sensitive-guard.sh ← Blocks access to secrets
 │   │   └── self-review.sh     ← Quality checklist on stop
-│   └── commands/
-│       ├── mf-plan.md         ← /mf-plan command
-│       ├── mf-challenge.md    ← /mf-challenge command
-│       ├── mf-build.md        ← /mf-build command
-│       ├── mf-fix.md          ← /mf-fix command
-│       ├── mf-review.md       ← /mf-review command
-│       └── mf-commit.md       ← /mf-commit command
+│   └── skills/
+│       ├── mf-plan/SKILL.md         ← /mf-plan skill
+│       ├── mf-challenge/SKILL.md    ← /mf-challenge skill
+│       ├── mf-build/SKILL.md        ← /mf-build skill
+│       ├── mf-fix/SKILL.md          ← /mf-fix skill
+│       ├── mf-review/SKILL.md       ← /mf-review skill
+│       └── mf-commit/SKILL.md       ← /mf-commit skill
 ├── scripts/
 │   └── build-test.sh          ← Universal test runner
 └── docs/
@@ -187,7 +196,7 @@ npx claude-devkit-cli list
 npx claude-devkit-cli remove
 ```
 
-This removes hooks, commands, settings, and build-test.sh. It preserves `CLAUDE.md` (which you may have customized) and `docs/` (which contains your specs).
+This removes hooks, skills, settings, and build-test.sh. It preserves `CLAUDE.md` (which you may have customized) and `docs/` (which contains your specs).
 
 ---
 
@@ -836,12 +845,12 @@ Add project-specific rules to `.claude/CLAUDE.md`:
 - All strings must be localized via i18n keys
 ```
 
-### Adding Custom Commands
+### Adding Custom Skills
 
-Create new `.md` files in `.claude/commands/`:
+Create new skills in `.claude/skills/<name>/SKILL.md`:
 
 ```markdown
-# .claude/commands/deploy.md
+# .claude/skills/deploy/SKILL.md
 
 Run the deployment pipeline:
 1. /mf-review
@@ -948,8 +957,8 @@ A: This is intentionally not a command (it's expensive and rare). When needed, p
 **Q: What if my project uses multiple languages?**
 A: `build-test.sh` detects the first match. For monorepos, you may need to run it from each sub-project directory or customize the script.
 
-**Q: Can I add more commands?**
-A: Yes. Drop a `.md` file in `.claude/commands/` and it becomes available as a slash command. See [Customization](#9-customization).
+**Q: Can I add more skills?**
+A: Yes. Create a directory `.claude/skills/<name>/SKILL.md` and it becomes available as a slash command. See [Customization](#9-customization).
 
 **Q: How do I update the kit in existing projects?**
 A: Run `npx claude-devkit-cli upgrade`. It automatically detects which files you've customized and only updates unchanged files. Use `--force` to overwrite everything.

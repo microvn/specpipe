@@ -14,6 +14,10 @@
 
 set -euo pipefail
 
+# Windows note: this hook requires bash (WSL or Git Bash).
+# On Windows without bash, Claude Code will fail to run this hook and skip it silently.
+# Install WSL or Git Bash and ensure `bash` is in PATH to activate protection.
+
 # ─── Read hook payload from stdin ───────────────────────────────────
 
 INPUT=$(cat)
@@ -41,40 +45,42 @@ COMMAND=$(extract_command "$INPUT") || exit 0
 
 # ─── Blocked directory patterns ─────────────────────────────────────
 
-# Use word boundaries (\b) and explicit path separators to avoid substring false positives
+# Use explicit path separators to avoid substring false positives.
+# [/\\] matches both forward slash (Unix/macOS) and backslash (Windows Git Bash).
 # e.g. "build/" should not match "rebuild/src" or "my-build-tool"
-BLOCKED="(^|[ /])node_modules(/|$| )"
+SEP="[/\\\\]"
+BLOCKED="(^|[ /\\\\])node_modules(${SEP}|$| )"
 BLOCKED+="|(__pycache__)"
-BLOCKED+="|\.git/(objects|refs)"
-BLOCKED+="|(^|[ /])dist/"
-BLOCKED+="|(^|[ /])build/"
-BLOCKED+="|\.next/"
-BLOCKED+="|(^|[ /])vendor(/|$| )"
-BLOCKED+="|(^|[ /])Pods(/|$| )"
-BLOCKED+="|\.build/"
+BLOCKED+="|\.git${SEP}(objects|refs)"
+BLOCKED+="|(^|[ /\\\\])dist${SEP}"
+BLOCKED+="|(^|[ /\\\\])build${SEP}"
+BLOCKED+="|\.next${SEP}"
+BLOCKED+="|(^|[ /\\\\])vendor(${SEP}|$| )"
+BLOCKED+="|(^|[ /\\\\])Pods(${SEP}|$| )"
+BLOCKED+="|\.build${SEP}"
 BLOCKED+="|DerivedData"
-BLOCKED+="|\.gradle/"
-BLOCKED+="|(^|[ /])target/"
+BLOCKED+="|\.gradle${SEP}"
+BLOCKED+="|(^|[ /\\\\])target${SEP}"
 BLOCKED+="|\.nuget"
-BLOCKED+="|\.cache(/|$| )"
+BLOCKED+="|\.cache(${SEP}|$| )"
 # Python
-BLOCKED+="|(^|[ /])\.venv/"
-BLOCKED+="|(^|[ /])venv/"
-BLOCKED+="|\.mypy_cache/"
-BLOCKED+="|\.pytest_cache/"
-BLOCKED+="|\.ruff_cache/"
-BLOCKED+="|\.egg-info(/|$| )"
+BLOCKED+="|(^|[ /\\\\])\.venv${SEP}"
+BLOCKED+="|(^|[ /\\\\])venv${SEP}"
+BLOCKED+="|\.mypy_cache${SEP}"
+BLOCKED+="|\.pytest_cache${SEP}"
+BLOCKED+="|\.ruff_cache${SEP}"
+BLOCKED+="|\.egg-info(${SEP}|$| )"
 # C# .NET (match .NET-specific subdirs to avoid false positives on generic bin/)
-BLOCKED+="|(^|[ /])bin/(Debug|Release|net|x64|x86)"
-BLOCKED+="|(^|[ /])obj/(Debug|Release|net)"
+BLOCKED+="|(^|[ /\\\\])bin${SEP}(Debug|Release|net|x64|x86)"
+BLOCKED+="|(^|[ /\\\\])obj${SEP}(Debug|Release|net)"
 # Node.js frameworks
-BLOCKED+="|\.nuxt/"
-BLOCKED+="|\.svelte-kit/"
-BLOCKED+="|\.parcel-cache/"
-BLOCKED+="|\.turbo/"
-BLOCKED+="|(^|[ /])out/(server|static|_next)"
+BLOCKED+="|\.nuxt${SEP}"
+BLOCKED+="|\.svelte-kit${SEP}"
+BLOCKED+="|\.parcel-cache${SEP}"
+BLOCKED+="|\.turbo${SEP}"
+BLOCKED+="|(^|[ /\\\\])out${SEP}(server|static|_next)"
 # Ruby
-BLOCKED+="|\.bundle/"
+BLOCKED+="|\.bundle${SEP}"
 
 # Append project-specific patterns from env
 if [[ -n "${PATH_GUARD_EXTRA:-}" ]]; then

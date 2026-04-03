@@ -1,18 +1,92 @@
-import { resolve } from 'node:path';
+import { resolve, dirname, join } from 'node:path';
 import { existsSync } from 'node:fs';
-import { copyFile as fsCopyFile, mkdir } from 'node:fs/promises';
-import { dirname } from 'node:path';
+import { copyFile as fsCopyFile, mkdir, readFile, writeFile } from 'node:fs/promises';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
+import { homedir } from 'node:os';
 import { log } from '../lib/logger.js';
 import { hashFile } from '../lib/hasher.js';
 import { readManifest, writeManifest, setFileEntry, refreshCustomizationStatus } from '../lib/manifest.js';
-import { getAllFiles, getTemplateDir, setPermissions } from '../lib/installer.js';
+import { getAllFiles, getTemplateDir, setPermissions, COMPONENTS, installSkillGlobal, getGlobalSkillsDir, installHookGlobal, getGlobalHooksDir, mergeGlobalSettings } from '../lib/installer.js';
+
+const GLOBAL_MANIFEST = join(homedir(), '.claude', '.devkit-manifest.json');
+
+async function readGlobalManifest() {
+  try { return JSON.parse(await readFile(GLOBAL_MANIFEST, 'utf-8')); } catch { return null; }
+}
+async function writeGlobalManifest(data) {
+  await mkdir(join(homedir(), '.claude'), { recursive: true });
+  await writeFile(GLOBAL_MANIFEST, JSON.stringify(data, null, 2) + '\n');
+}
+
+export async function upgradeGlobal({ force = false } = {}) {
+  const globalSkillsDir = getGlobalSkillsDir();
+  await mkdir(globalSkillsDir, { recursive: true });
+
+  log.blank();
+  console.log('--- Upgrading global skills ---');
+  let updated = 0; let skipped = 0; let identical = 0;
+
+  for (const relPath of COMPONENTS.skills) {
+    const result = await installSkillGlobal(relPath, globalSkillsDir, { force });
+    if (result === 'copied') updated++;
+    else if (result === 'identical') identical++;
+    else skipped++;
+  }
+
+  let skillParts = [`${updated} updated`, `${identical} unchanged`];
+  if (skipped > 0) skillParts.push(`${skipped} customized (use --force to overwrite)`);
+  log.pass(`Global skills: ${skillParts.join(', ')}`);
+
+  const meta = await readGlobalManifest() || {};
+
+  // Upgrade hooks if previously installed globally
+  if (meta.globalHooksInstalled) {
+    const globalHooksDir = getGlobalHooksDir();
+    await mkdir(globalHooksDir, { recursive: true });
+
+    log.blank();
+    console.log('--- Upgrading global hooks ---');
+    let hUpdated = 0; let hSkipped = 0; let hIdentical = 0;
+
+    for (const relPath of COMPONENTS.hooks) {
+      const result = await installHookGlobal(relPath, globalHooksDir, { force });
+      if (result === 'copied') hUpdated++;
+      else if (result === 'identical') hIdentical++;
+      else hSkipped++;
+    }
+
+    await mergeGlobalSettings(globalHooksDir);
+
+    let hookParts = [`${hUpdated} updated`, `${hIdentical} unchanged`];
+    if (hSkipped > 0) hookParts.push(`${hSkipped} customized (use --force to overwrite)`);
+    log.pass(`Global hooks: ${hookParts.join(', ')}`);
+  }
+
+  await writeGlobalManifest({ ...meta, globalInstalled: true, updatedAt: new Date().toISOString() });
+
+  // Warn about per-project skills that shadow global
+  const projects = meta.projects || [];
+  const projectsWithSkills = projects.filter((p) => existsSync(join(p, '.claude/skills')));
+  if (projectsWithSkills.length > 0) {
+    log.blank();
+    log.info(`Found per-project skills in ${projectsWithSkills.length} project(s):`);
+    for (const p of projectsWithSkills) log.info(`  ${p}`);
+    log.info('Per-project skills take precedence over global. Remove them to use global instead.');
+    log.info('Run `claude-devkit remove <path>` in each project to remove per-project install.');
+  }
+}
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const pkg = JSON.parse(readFileSync(resolve(__dirname, '../../package.json'), 'utf-8'));
 
 export async function upgradeCommand(path, opts) {
+  // --- Global mode ---
+  if (opts.global) {
+    await upgradeGlobal({ force: opts.force });
+    return;
+  }
+
   const targetDir = resolve(path);
   const manifest = await readManifest(targetDir);
 
@@ -121,5 +195,11 @@ export async function upgradeCommand(path, opts) {
 
   if (skippedCustomized > 0) {
     log.warn(`${skippedCustomized} customized file(s) skipped. Run with --force to overwrite.`);
+  }
+
+  // --- Auto-upgrade global if previously installed ---
+  const globalMeta = await readGlobalManifest();
+  if (globalMeta?.globalInstalled === true) {
+    await upgradeGlobal({ force: opts.force });
   }
 }

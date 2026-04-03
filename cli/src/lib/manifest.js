@@ -36,7 +36,7 @@ export function createManifest(version, projectType, components) {
     installedAt: now,
     updatedAt: now,
     projectType: projectType || null,
-    components: components || ['hooks', 'commands', 'scripts', 'docs'],
+    components: components || ['hooks', 'skills', 'scripts', 'docs'],
     files: {},
   };
 }

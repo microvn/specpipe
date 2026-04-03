@@ -13,6 +13,10 @@
 
 set -euo pipefail
 
+# Windows note: this hook requires bash (WSL or Git Bash).
+# On Windows without bash, Claude Code will fail to run this hook and skip it silently.
+# Install WSL or Git Bash and ensure `bash` is in PATH to activate protection.
+
 # ─── Read hook payload from stdin ───────────────────────────────────
 
 INPUT=$(cat)
@@ -117,7 +121,11 @@ check_agentignore() {
 
     # Simple line-by-line match (not full gitignore glob, but covers common cases)
     local relpath
-    relpath=$(echo "$filepath" | sed "s|^$(pwd)/||") 2>/dev/null || relpath="$filepath"
+    # Normalize separators to forward slash before stripping prefix (handles Git Bash on Windows)
+    local normalized_fp normalized_pwd
+    normalized_fp=$(printf '%s' "$filepath" | tr '\\' '/')
+    normalized_pwd=$(pwd | tr '\\' '/')
+    relpath=$(printf '%s' "$normalized_fp" | sed "s|^${normalized_pwd}/||") 2>/dev/null || relpath="$filepath"
 
     while IFS= read -r pattern || [[ -n "$pattern" ]]; do
         # Skip comments and empty lines
@@ -211,14 +219,6 @@ if [[ -n "$COMMAND" ]]; then
         while IFS= read -r match; do
             warn_with_message "$match"
         done <<< "$CRED_FILES"
-    fi
-fi
-
-# ─── Check Grep pattern for sensitive file paths ───────────────────
-
-if [[ -n "$PATTERN" ]]; then
-    if is_sensitive "$PATTERN"; then
-        block_with_message "$PATTERN"
     fi
 fi
 

@@ -1,8 +1,10 @@
 import { resolve, join } from 'node:path';
 import { unlink, rmdir, rm } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
+import { homedir } from 'node:os';
 import { log } from '../lib/logger.js';
 import { readManifest } from '../lib/manifest.js';
+import { removeGlobalHooksFromSettings } from '../lib/installer.js';
 
 const PRESERVE = [
   '.claude/CLAUDE.md',
@@ -12,7 +14,50 @@ const PRESERVE_DIRS = [
   'docs/',
 ];
 
-export async function removeCommand(path) {
+export async function removeGlobal() {
+  log.info('Removing global claude-devkit install...');
+  log.blank();
+
+  // Remove ~/.claude/skills/
+  const globalSkillsDir = join(homedir(), '.claude', 'skills');
+  if (existsSync(globalSkillsDir)) {
+    await rm(globalSkillsDir, { recursive: true, force: true });
+    log.del('~/.claude/skills/');
+  } else {
+    log.skip('~/.claude/skills/ (not found)');
+  }
+
+  // Remove ~/.claude/hooks/
+  const globalHooksDir = join(homedir(), '.claude', 'hooks');
+  if (existsSync(globalHooksDir)) {
+    await rm(globalHooksDir, { recursive: true, force: true });
+    log.del('~/.claude/hooks/');
+  } else {
+    log.skip('~/.claude/hooks/ (not found)');
+  }
+
+  // Remove devkit hook entries from ~/.claude/settings.json
+  await removeGlobalHooksFromSettings();
+  log.del('hook entries from ~/.claude/settings.json');
+
+  // Remove global manifest
+  const globalManifest = join(homedir(), '.claude', '.devkit-manifest.json');
+  if (existsSync(globalManifest)) {
+    await unlink(globalManifest);
+    log.del('~/.claude/.devkit-manifest.json');
+  }
+
+  log.blank();
+  log.pass('Global install removed. Per-project installs are unaffected.');
+  log.info('Run `claude-devkit init` in each project to restore per-project hooks.');
+}
+
+export async function removeCommand(path, opts = {}) {
+  if (opts.global) {
+    await removeGlobal();
+    return;
+  }
+
   const targetDir = resolve(path);
   const manifest = await readManifest(targetDir);
 
@@ -56,7 +101,6 @@ export async function removeCommand(path) {
   // Clean up empty directories
   const dirsToClean = [
     '.claude/hooks',
-    '.claude/commands',
     'scripts',
   ];
 
@@ -67,6 +111,13 @@ export async function removeCommand(path) {
     } catch {
       // Not empty or doesn't exist
     }
+  }
+
+  // Skills are nested dirs — use recursive rm
+  const skillsDir = join(targetDir, '.claude/skills');
+  if (existsSync(skillsDir)) {
+    await rm(skillsDir, { recursive: true, force: true });
+    log.del('.claude/skills/');
   }
 
   log.blank();

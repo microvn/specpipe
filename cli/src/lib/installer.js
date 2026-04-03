@@ -3,6 +3,7 @@ import { existsSync } from 'node:fs';
 import { join, dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { chmod } from 'node:fs/promises';
+import { homedir } from 'node:os';
 import { log } from './logger.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -19,13 +20,13 @@ export const COMPONENTS = {
     '.claude/hooks/self-review.sh',
     '.claude/hooks/sensitive-guard.sh',
   ],
-  commands: [
-    '.claude/commands/mf-plan.md',
-    '.claude/commands/mf-challenge.md',
-    '.claude/commands/mf-test.md',
-    '.claude/commands/mf-fix.md',
-    '.claude/commands/mf-review.md',
-    '.claude/commands/mf-commit.md',
+  skills: [
+    '.claude/skills/mf-plan/SKILL.md',
+    '.claude/skills/mf-build/SKILL.md',
+    '.claude/skills/mf-challenge/SKILL.md',
+    '.claude/skills/mf-fix/SKILL.md',
+    '.claude/skills/mf-review/SKILL.md',
+    '.claude/skills/mf-commit/SKILL.md',
   ],
   config: [
     '.claude/settings.json',
@@ -69,7 +70,7 @@ export function getTemplateDir() {
 
 /**
  * Get all files for the given component list.
- * @param {string[]} components - e.g. ['hooks', 'commands']
+ * @param {string[]} components - e.g. ['hooks', 'skills']
  * @returns {string[]} relative file paths
  */
 export function getFilesForComponents(components) {
@@ -182,4 +183,177 @@ export async function verifySettingsJson(targetDir) {
   } catch {
     return false;
   }
+}
+
+/**
+ * Global skills directory: ~/.claude/skills/
+ */
+export function getGlobalSkillsDir() {
+  return join(homedir(), '.claude', 'skills');
+}
+
+/**
+ * Global hooks directory: ~/.claude/hooks/
+ */
+export function getGlobalHooksDir() {
+  return join(homedir(), '.claude', 'hooks');
+}
+
+/**
+ * Copy a hook to the global ~/.claude/hooks/ directory.
+ * Strips the '.claude/hooks/' prefix so path-guard.sh lands at
+ * ~/.claude/hooks/path-guard.sh.
+ * @returns {string} 'copied' | 'skipped' | 'identical'
+ */
+export async function installHookGlobal(hookRelPath, globalHooksDir, { force = false } = {}) {
+  const stripped = hookRelPath.replace(/^\.claude\/hooks\//, '');
+  const src = join(getTemplateDir(), hookRelPath);
+  const dst = join(globalHooksDir, stripped);
+
+  if (existsSync(dst) && !force) {
+    try {
+      const { hashFile } = await import('./hasher.js');
+      const srcHash = await hashFile(src);
+      const dstHash = await hashFile(dst);
+      if (srcHash === dstHash) {
+        log.same(`~/.claude/hooks/${stripped} (identical)`);
+        return 'identical';
+      }
+      log.skip(`~/.claude/hooks/${stripped} (customized — use --force to overwrite)`);
+      return 'skipped';
+    } catch { /* hash failed */ }
+  }
+
+  await mkdir(dirname(dst), { recursive: true });
+  await fsCopyFile(src, dst);
+  await chmod(dst, 0o755);
+  log.copy(`~/.claude/hooks/${stripped}`);
+  return 'copied';
+}
+
+/**
+ * Build hook entries for ~/.claude/settings.json pointing to globalHooksDir.
+ */
+function buildGlobalHookEntries(globalHooksDir) {
+  // Normalize to forward slashes — bash on all platforms (WSL, Git Bash, macOS, Linux)
+  // requires forward slashes even when the host OS is Windows.
+  const dir = globalHooksDir.replace(/\\/g, '/');
+  const h = (file) => `"${dir}/${file}"`;
+  return {
+    PreToolUse: [
+      { matcher: 'Bash', hooks: [
+        { type: 'command', command: `bash ${h('path-guard.sh')}` },
+        { type: 'command', command: `bash ${h('sensitive-guard.sh')}` },
+      ]},
+      { matcher: 'Read|Write|Edit|MultiEdit|Grep', hooks: [
+        { type: 'command', command: `bash ${h('sensitive-guard.sh')}` },
+      ]},
+      { matcher: 'Edit|MultiEdit', hooks: [
+        { type: 'command', command: `node ${h('comment-guard.js')}` },
+      ]},
+      { matcher: 'Glob', hooks: [
+        { type: 'command', command: `node ${h('glob-guard.js')}` },
+      ]},
+    ],
+    PostToolUse: [
+      { matcher: 'Write|Edit|MultiEdit', hooks: [
+        { type: 'command', command: `node ${h('file-guard.js')}` },
+      ]},
+    ],
+    Stop: [
+      { matcher: '', hooks: [
+        { type: 'command', command: `bash ${h('self-review.sh')}` },
+      ]},
+    ],
+  };
+}
+
+function isDevkitHookCommand(command) {
+  return command.includes('/.claude/hooks/');
+}
+
+function stripDevkitHooks(existingHooks) {
+  if (!existingHooks || typeof existingHooks !== 'object') return {};
+  const result = {};
+  for (const [event, matchers] of Object.entries(existingHooks)) {
+    if (!Array.isArray(matchers)) continue;
+    const kept = [];
+    for (const group of matchers) {
+      const keptHooks = (group.hooks || []).filter((h) => !isDevkitHookCommand(h.command || ''));
+      if (keptHooks.length > 0) kept.push({ ...group, hooks: keptHooks });
+    }
+    if (kept.length > 0) result[event] = kept;
+  }
+  return result;
+}
+
+/**
+ * Merge devkit hook registrations into ~/.claude/settings.json.
+ * Preserves any existing non-devkit hooks the user may have.
+ */
+export async function mergeGlobalSettings(globalHooksDir) {
+  const settingsPath = join(homedir(), '.claude', 'settings.json');
+  let existing = {};
+  try {
+    existing = JSON.parse(await readFile(settingsPath, 'utf-8'));
+  } catch { /* file doesn't exist yet — start fresh */ }
+
+  // Remove old devkit entries (identified by /.claude/hooks/ in command path)
+  const cleanedHooks = stripDevkitHooks(existing.hooks);
+
+  // Append new devkit entries
+  const newEntries = buildGlobalHookEntries(globalHooksDir);
+  const mergedHooks = { ...cleanedHooks };
+  for (const [event, entries] of Object.entries(newEntries)) {
+    mergedHooks[event] = [...(mergedHooks[event] || []), ...entries];
+  }
+
+  await mkdir(dirname(settingsPath), { recursive: true });
+  await writeFile(settingsPath, JSON.stringify({ ...existing, hooks: mergedHooks }, null, 2) + '\n');
+}
+
+/**
+ * Remove devkit hook registrations from ~/.claude/settings.json.
+ * Leaves any non-devkit hooks untouched.
+ */
+export async function removeGlobalHooksFromSettings() {
+  const settingsPath = join(homedir(), '.claude', 'settings.json');
+  let existing = {};
+  try {
+    existing = JSON.parse(await readFile(settingsPath, 'utf-8'));
+  } catch { return; }
+
+  const cleanedHooks = stripDevkitHooks(existing.hooks || {});
+  await writeFile(settingsPath, JSON.stringify({ ...existing, hooks: cleanedHooks }, null, 2) + '\n');
+}
+
+/**
+ * Copy a skill to the global ~/.claude/skills/ directory.
+ * Strips the '.claude/skills/' prefix so mf-plan/SKILL.md lands at
+ * ~/.claude/skills/mf-plan/SKILL.md.
+ * @returns {string} 'copied' | 'skipped' | 'identical'
+ */
+export async function installSkillGlobal(skillRelPath, globalSkillsDir, { force = false } = {}) {
+  const stripped = skillRelPath.replace(/^\.claude\/skills\//, '');
+  const src = join(getTemplateDir(), skillRelPath);
+  const dst = join(globalSkillsDir, stripped);
+
+  if (existsSync(dst) && !force) {
+    try {
+      const { hashFile } = await import('./hasher.js');
+      const srcHash = await hashFile(src);
+      const dstHash = await hashFile(dst);
+      if (srcHash === dstHash) {
+        log.same(`~/.claude/skills/${stripped} (identical)`);
+        return 'identical';
+      }
+      log.skip(`~/.claude/skills/${stripped} (customized — use --force to overwrite)`);
+      return 'skipped';
+    } catch { /* hash failed, treat as conflict */ }
+  }
+
+  await mkdir(dirname(dst), { recursive: true });
+  await fsCopyFile(src, dst);
+  log.copy(`~/.claude/skills/${stripped}`);
+  return 'copied';
 }

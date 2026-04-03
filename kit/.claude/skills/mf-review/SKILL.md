@@ -1,3 +1,7 @@
+---
+description: Pre-merge code review — security, correctness, spec alignment
+allowed-tools: Read, Bash, Glob, Grep
+---
 Pre-merge code review — security, correctness, spec alignment.
 
 ## Phase 0: Understand Intent

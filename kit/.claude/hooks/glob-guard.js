@@ -33,6 +33,14 @@ const SCOPED_DIRS = [
   "Sources", "Tests", "cmd", "pkg", "internal",
 ];
 
+// Allow project-specific scoped dirs via env var
+// e.g. GLOB_GUARD_SCOPED_DIRS=Feature,Domain,Presentation
+const extraDirs = (process.env.GLOB_GUARD_SCOPED_DIRS || "")
+  .split(",")
+  .map((d) => d.trim())
+  .filter(Boolean);
+if (extraDirs.length > 0) SCOPED_DIRS.push(...extraDirs);
+
 function isBroadPattern(pattern) {
   if (!pattern) return false;
   return BROAD_PATTERNS.some((re) => re.test(pattern.trim()));

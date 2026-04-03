@@ -1,3 +1,7 @@
+---
+description: Stage, scan secrets, generate conventional commit message
+allowed-tools: Bash, AskUserQuestion
+---
 Stage, scan secrets, generate conventional commit message.
 
 ## Step 1 — Analyze (single compound command)

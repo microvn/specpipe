@@ -1,3 +1,7 @@
+---
+description: Test-first bug fix — write failing test, fix code, verify green
+allowed-tools: Read, Write, Edit, Bash, Glob, Grep, AskUserQuestion
+---
 Test-first bug fix — write failing test, fix code, verify green.
 
 Bug: $ARGUMENTS

@@ -1,3 +1,7 @@
+---
+description: Adversarial review — spawn hostile reviewers to break the plan before coding
+allowed-tools: Read, Bash, Glob, Grep, AskUserQuestion, Agent
+---
 Adversarial review — spawn hostile reviewers to break the plan before coding.
 
 ## Input

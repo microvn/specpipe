@@ -24,6 +24,12 @@ fi
 
 cd "$ROOT_DIR"
 
+# Run test suite — must pass before publish
+echo "running test suite..."
+bash test/hooks.sh || { echo "error: hooks tests failed — aborting publish"; exit 1; }
+bash test/cli.sh   || { echo "error: cli tests failed — aborting publish"; exit 1; }
+echo ""
+
 # Stage + commit any pending changes first
 if [[ -n "$(git status --short)" ]]; then
   if [[ -z "$COMMIT_MSG" ]]; then
@@ -58,3 +64,11 @@ npm publish
 
 echo ""
 echo "published claude-devkit-cli@$NEW_VERSION"
+
+# Update global skills on the publishing machine
+if command -v claude-devkit &>/dev/null; then
+  echo "updating global skills..."
+  claude-devkit upgrade --global
+else
+  echo "note: install globally to auto-update skills: npm install -g claude-devkit-cli && claude-devkit init --global"
+fi
