@@ -15,6 +15,9 @@ TDD delivery loop — write failing tests from spec AS, implement story by story
    If no changes → "No source changes found. Specify a file or feature."
 
 2. **Read the spec** at `docs/specs/<feature>/<feature>.md` — the `## Stories` section with acceptance scenarios is your roadmap. The `## Overview` and `## Constraints` sections tell you the INTENT behind the code.
+
+3. **Locate related code:** If `codebase-memory-mcp` is available, use `search_code` to find all files touching this feature, and `trace_call_path` to understand dependency chain before writing tests — faster and more accurate than manual grep. Fallback: Grep for the main function/type names in the changed files.
+
 4. **Read existing tests** for the changed files — find patterns, fixtures, naming conventions. Don't duplicate.
 
 ---
@@ -111,19 +114,32 @@ Files: [test files touched]
 Stories: [AS-001 ✓, AS-002 ✓, AS-005 new]
 ```
 
-If behavior changed: "Consider updating the spec in docs/specs/<feature>/<feature>.md."
+### Spec Update Signal
 
-### Spec Gap Detection
+After every build, check against these conditions. If ANY is true → **must** signal.
 
-If a test fails due to an edge case, error path, or boundary condition that is NOT covered by any existing AS in the spec:
+**Signal when (MUST):**
 
-1. State explicitly: **"This failure suggests a missing acceptance scenario."**
-2. Describe the gap: what behavior was tested, which story it belongs to, why no AS covers it.
-3. Prompt: **"Run `/mf-plan <spec-path> 'Add AS for <description>'` to add the missing scenario, then re-run `/mf-build`."**
+| # | Condition |
+|---|-----------|
+| S1 | A new test covers behavior, edge case, or error path with no corresponding AS in the spec |
+| S2 | Code behavior no longer matches the Given/When/Then of an existing AS (spec is stale) |
+| S3 | Implementation adds a new constraint or guard not documented in any AS or Constraints section |
 
-Do not silently fix the test and move on. A test that has no corresponding AS means the spec is incomplete — the spec must be updated first.
+**Do not signal when:**
+- Pure refactor — behavior unchanged, all existing AS still map correctly
+- Performance fix — same output, just faster
+- Fix to match spec — code was wrong, spec was right, no new behavior added
+
+**Signal format:**
+```
+⚠️ Spec Update Needed — run `/mf-plan docs/specs/<feature>/<feature>.md '<describe change>'`
+Reason: [S1 | S2 | S3] — <one line: what is missing or mismatched>
+```
+
+If S1 applies to a failing test: state **"This failure suggests a missing acceptance scenario."** Describe the gap and prompt to run `/mf-plan` before re-running `/mf-build`. Do not silently add the test without the AS.
 
 ## Rules
 1. **Behavior over implementation.** Test what code DOES, not how.
 2. **Independent tests.** Each test sets up its own state, cleans up after.
-3. **Spec stays upstream.** If a test reveals a spec gap, update the spec before adding the test.
+3. **Spec stays upstream.** If a test reveals a spec gap (S1), signal and update the spec before adding the test. If code drifts from spec (S2), signal. If new constraint added (S3), signal.

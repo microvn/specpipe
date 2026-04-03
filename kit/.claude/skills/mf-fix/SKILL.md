@@ -13,7 +13,7 @@ Bug: $ARGUMENTS
 Don't jump to code. Understand the bug first:
 
 1. **Parse the report.** Symptom? Expected vs actual? Repro steps?
-2. **Locate the code.** Grep for keywords from the bug (error messages, function names).
+2. **Locate the code.** If `codebase-memory-mcp` is available, use `search_code("<error message or function name>")` to find related files faster, and `trace_call_path` to map callers and impact radius. Fallback: Grep for keywords from the bug (error messages, function names).
 3. **Check history.** `git log --oneline -5 -- <file>` and `git blame -L <range> <file>` — who changed this last and why?
 4. **Form a hypothesis:** "I believe the bug is caused by [X] in [file:function] because [evidence]."
 
@@ -102,7 +102,27 @@ Prevention: <suggestion>
 Full suite: All passing ✓
 ```
 
-If the bug reveals an undocumented edge case: "Consider updating the spec at docs/specs/<feature>/<feature>.md."
+### Spec Update Signal
+
+After fixing, check these conditions. If ANY is true → **must** signal.
+
+**Signal when (MUST):**
+
+| # | Condition |
+|---|-----------|
+| S1 | Fix covers an edge case or error path with no corresponding AS in the spec |
+| S2 | Bug existed because an AS described wrong behavior — After fix, code and AS now conflict |
+| S3 | Fix adds a new constraint or guard (null check, balance guard, validation) not in spec |
+
+**Do not signal when:**
+- Fix is a clear typo/off-by-one — code was always wrong relative to spec, no new behavior
+- Performance-only fix — output unchanged
+
+**Signal format:**
+```
+⚠️ Spec Update Needed — run `/mf-plan docs/specs/<feature>/<feature>.md '<describe change>'`
+Reason: [S1 | S2 | S3] — <one line: what is missing or mismatched>
+```
 
 ## Multiple Bugs
 
