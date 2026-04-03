@@ -65,10 +65,6 @@ npm publish
 echo ""
 echo "published claude-devkit-cli@$NEW_VERSION"
 
-# Update global skills on the publishing machine
-if command -v claude-devkit &>/dev/null; then
-  echo "updating global skills..."
-  claude-devkit upgrade --global
-else
-  echo "note: install globally to auto-update skills: npm install -g claude-devkit-cli && claude-devkit init --global"
-fi
+# Update global skills on the publishing machine using local CLI (no global install required)
+echo "updating global skills..."
+node "$CLI_DIR/bin/devkit.js" upgrade --global
