@@ -22,9 +22,41 @@ echo "=== DEBUG ===" && \
 
 **Secrets (hard block):** If count > 0, show matched lines and STOP. Do not commit.
 
-**Debug code (soft warn):** If count > 0, show matched lines. Proceed only after user confirms they're intentional.
+**Debug code (soft warn):** If count > 0, show matched lines. Use `AskUserQuestion` to confirm:
 
-**Large diff:** If > 10 files or > 300 lines, note: "Large commit — consider splitting for easier review." Continue unless user says to split.
+```json
+{
+  "questions": [
+    {
+      "question": "Found <N> debug statements (console.log, debugger, etc.) in the diff. Are these intentional?",
+      "header": "Debug Code",
+      "multiSelect": false,
+      "options": [
+        {"label": "Yes, intentional — proceed with commit"},
+        {"label": "No, remove them first"}
+      ]
+    }
+  ]
+}
+```
+
+**Large diff:** If > 10 files or > 300 lines, use `AskUserQuestion` to confirm:
+
+```json
+{
+  "questions": [
+    {
+      "question": "Large commit detected (<N> files, <M> lines). Large commits are harder to review and revert.",
+      "header": "Large Commit",
+      "multiSelect": false,
+      "options": [
+        {"label": "Proceed — commit everything as one"},
+        {"label": "Split — I'll stage specific files myself"}
+      ]
+    }
+  ]
+}
+```
 
 ---
 
@@ -67,12 +99,7 @@ Never stage: `.env`, credentials, build artifacts, generated files, binaries > 1
 ## Step 5 — Commit
 
 ```bash
-git commit -m "$(cat <<'EOF'
-type(scope): description
-
-Co-Authored-By: Claude <noreply@anthropic.com>
-EOF
-)"
+git commit -m "type(scope): description"
 ```
 
 **Do NOT push** unless user explicitly asks.

@@ -70,7 +70,23 @@ If `scripts/build-test.sh` doesn't exist, detect and run directly:
 
 If tests fail:
 1. Read error output. Is the test wrong or the production code wrong?
-2. If production code seems wrong → **ASK the user:** "Test expects X but code does Y. Fix production code or adjust test?"
+2. If production code seems wrong → use `AskUserQuestion`:
+
+```json
+{
+  "questions": [
+    {
+      "question": "Test expects <X> but code does <Y>. Which is correct?",
+      "header": "Test vs Code Mismatch",
+      "multiSelect": false,
+      "options": [
+        {"label": "Fix production code — the test is correct"},
+        {"label": "Adjust the test — the code behavior is intentional"}
+      ]
+    }
+  ]
+}
+```
 3. Fix test code only. Re-run. Max 3 attempts, then stop and report.
 
 **NEVER:**

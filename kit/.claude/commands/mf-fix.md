@@ -29,7 +29,24 @@ bash scripts/build-test.sh --filter "<test name>"
 ```
 
 - **FAILS** → reproduced. Continue.
-- **PASSES** → hypothesis may be wrong. Ask: "Test passes — need different repro steps or environment details."
+- **PASSES** → hypothesis may be wrong. Use `AskUserQuestion`:
+
+```json
+{
+  "questions": [
+    {
+      "question": "The test passes with current code — the bug isn't reproduced yet. How to proceed?",
+      "header": "Test Passes Unexpectedly",
+      "multiSelect": false,
+      "options": [
+        {"label": "Provide different repro steps or environment details"},
+        {"label": "The bug may be environment-specific — describe the setup"},
+        {"label": "Skip test-first for this bug — fix directly"}
+      ]
+    }
+  ]
+}
+```
 
 ---
 

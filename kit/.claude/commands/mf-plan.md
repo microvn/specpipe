@@ -2,21 +2,24 @@ Generate spec with acceptance scenarios from description or existing spec.
 
 ## Question Format
 
-When presenting a question to the user with multiple options, ALWAYS use this structured format:
+When presenting questions to the user with multiple options, use the `AskUserQuestion` tool.
 
-```
-Q<N>: <Plain-language problem statement — what needs deciding and why>
-
-  A) <option> — <1-line rationale>
-     Fit: X/10  |  Trade-off: <what you gain vs. lose>
-
-  B) <option> — <1-line rationale>
-     Fit: X/10  |  Trade-off: <what you gain vs. lose>
-
-  C) <option> — <1-line rationale> (if applicable)
-     Fit: X/10  |  Trade-off: <what you gain vs. lose>
-
-  RECOMMENDATION: [A/B/C] — <one-sentence reason>
+**Schema:**
+```json
+{
+  "questions": [
+    {
+      "question": "<plain-language problem statement — what needs deciding and why. Include RECOMMENDATION: Choose [X] because [one-line reason]>",
+      "header": "<short label>",
+      "multiSelect": false,
+      "options": [
+        {"label": "A) <option> — <1-line rationale> | Fit: X/10 | Trade-off: <gain vs. lose>"},
+        {"label": "B) <option> — <1-line rationale> | Fit: X/10 | Trade-off: <gain vs. lose>"},
+        {"label": "C) <option> — <1-line rationale> | Fit: X/10 | Trade-off: <gain vs. lose>"}
+      ]
+    }
+  ]
+}
 ```
 
 **Fit scoring calibration:**
@@ -29,9 +32,9 @@ Q<N>: <Plain-language problem statement — what needs deciding and why>
 Rules:
 - 2-4 options per question. Never more than 4.
 - Every option must have a Fit score AND a Trade-off. No score without rationale.
-- RECOMMENDATION is mandatory. Pick one. State why.
+- RECOMMENDATION is mandatory in the question text. Pick one. State why.
 - If two options score within 1 point, flag it: "Close call — A and B are both strong. Leaning A because [reason]."
-- Present all questions at once (not one-by-one) unless the answer to Q1 changes what Q2 should be.
+- Pass all questions in a single `AskUserQuestion` call (not one-by-one) unless the answer to Q1 changes what Q2 should be.
 
 ---
 
@@ -275,21 +278,23 @@ Before finalizing, scan the spec for gaps. Check BOTH the spec content AND the a
 | Priority consistency | P0 story with only 1 happy path AS? |
 | Constraint coverage | Which constraint has no AS verifying it? |
 
-Identify the top 3-5 ambiguities (most impactful first). Present each using the **Question Format** (see top of this file). Example:
+Identify the top 3-5 ambiguities (most impactful first). Present all at once using the `AskUserQuestion` tool (see Question Format at top). Example call:
 
-```
-Q1: Auth strategy not specified — spec mentions "logged-in users" but no auth mechanism.
-
-  A) Session-based auth (cookie) — traditional, simple server-side
-     Fit: 8/10  |  Trade-off: simple setup vs. harder to scale across services
-
-  B) JWT (stateless tokens) — API-friendly, no server session
-     Fit: 7/10  |  Trade-off: scalable vs. token revocation complexity
-
-  C) Defer — add auth story later when auth requirements are clearer
-     Fit: 5/10  |  Trade-off: unblocks now vs. may require spec rewrite later
-
-  RECOMMENDATION: A — single-service app, session auth is simplest path.
+```json
+{
+  "questions": [
+    {
+      "question": "Auth strategy not specified — spec mentions 'logged-in users' but no auth mechanism. RECOMMENDATION: Choose A — single-service app, session auth is simplest path.",
+      "header": "Auth Strategy",
+      "multiSelect": false,
+      "options": [
+        {"label": "A) Session-based auth (cookie) — traditional, simple server-side | Fit: 8/10 | Trade-off: simple setup vs. harder to scale across services"},
+        {"label": "B) JWT (stateless tokens) — API-friendly, no server session | Fit: 7/10 | Trade-off: scalable vs. token revocation complexity"},
+        {"label": "C) Defer — add auth story later when auth requirements are clearer | Fit: 5/10 | Trade-off: unblocks now vs. may require spec rewrite later"}
+      ]
+    }
+  ]
+}
 ```
 
 If 0 questions remain, you MUST state why — not just "spec is clear." Cite at minimum:
@@ -425,21 +430,23 @@ Display to the user:
 S-001, S-003
 ```
 
-Present the decision using **Question Format**:
+Present the decision using the `AskUserQuestion` tool:
 
-```
-Q1: Apply these changes to <feature> spec?
-
-  A) Apply all — accept the full change report as shown
-     Fit: N/10  |  Trade-off: fast vs. no per-item control
-
-  B) Review each — walk through changes one by one, accept/reject/modify
-     Fit: N/10  |  Trade-off: precise control vs. slower
-
-  C) Reject all — discard and start over
-     Fit: N/10  |  Trade-off: clean slate vs. loses work
-
-  RECOMMENDATION: [A or B] — <reason based on change count and complexity>
+```json
+{
+  "questions": [
+    {
+      "question": "Apply these changes to <feature> spec? RECOMMENDATION: Choose A — <reason based on change count and complexity>.",
+      "header": "Apply Changes",
+      "multiSelect": false,
+      "options": [
+        {"label": "A) Apply all — accept the full change report as shown | Fit: N/10 | Trade-off: fast vs. no per-item control"},
+        {"label": "B) Review each — walk through changes one by one, accept/reject/modify | Fit: N/10 | Trade-off: precise control vs. slower"},
+        {"label": "C) Reject all — discard and start over | Fit: N/10 | Trade-off: clean slate vs. loses work"}
+      ]
+    }
+  ]
+}
 ```
 
 > **⛔ MUST wait for user confirmation before applying.**

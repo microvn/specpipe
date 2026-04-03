@@ -173,32 +173,43 @@ Include 1-sentence rationale for each disposition. Be honest — don't reject va
 
 Show adjudicated findings using the reviewer output format plus Disposition and Rationale fields.
 
-Then present the decision:
+Then present the decision using the `AskUserQuestion` tool:
 
+```json
+{
+  "questions": [
+    {
+      "question": "How to proceed with N accepted findings? RECOMMENDATION: Choose A if mostly Medium fixes, B if any Critical/High findings.",
+      "header": "Apply Findings",
+      "multiSelect": false,
+      "options": [
+        {"label": "A) Apply all accepted — bulk-apply all fixes at once | Trade-off: fast vs. no per-finding control"},
+        {"label": "B) Review each — walk through one by one, accept/reject/modify | Trade-off: precise control vs. slower"}
+      ]
+    }
+  ]
+}
 ```
-How to proceed with N accepted findings?
 
-  A) Apply all accepted — bulk-apply all fixes at once
-     Fit: N/10  |  Trade-off: fast vs. no per-finding control
+Score: if most findings are High/Critical, recommend B. If mostly Medium with clear fixes, recommend A.
 
-  B) Review each — walk through one by one, accept/reject/modify
-     Fit: N/10  |  Trade-off: precise control vs. slower
+If user picks B: for each finding, use `AskUserQuestion`:
 
-  RECOMMENDATION: [A or B] — <reason based on finding count and severity>
-```
-
-Score Fit based on context: if most findings are High/Critical, recommend B (review each). If mostly Medium with clear fixes, recommend A.
-
-If user picks B: for each finding, present:
-
-```
-Finding [C-1]: <title>
-
-  A) Accept — apply the suggested fix
-  B) Modify — accept with changes (describe your modification)
-  C) Reject — skip this finding
-
-  RECOMMENDATION: [A/B/C] — <based on your adjudication>
+```json
+{
+  "questions": [
+    {
+      "question": "Finding [C-1]: <title>\n<flaw summary>\nRECOMMENDATION: Choose A — <adjudication rationale>.",
+      "header": "Finding C-1",
+      "multiSelect": false,
+      "options": [
+        {"label": "A) Accept — apply the suggested fix"},
+        {"label": "B) Modify — accept with changes (describe your modification)"},
+        {"label": "C) Reject — skip this finding"}
+      ]
+    }
+  ]
+}
 ```
 
 ## Phase 7: Apply
