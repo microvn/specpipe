@@ -37,15 +37,20 @@ export async function initGlobal({ force = false, hooks = false } = {}) {
   const globalSkillsDir = getGlobalSkillsDir();
   await mkdir(globalSkillsDir, { recursive: true });
 
+  const existing = await readGlobalManifest() || {};
+  const globalFiles = existing.files || {};
+  const updatedFiles = { ...globalFiles };
+
   log.blank();
   console.log('--- Installing global skills ---');
 
   let copied = 0; let skipped = 0; let identical = 0;
   for (const relPath of COMPONENTS.skills) {
-    const result = await installSkillGlobal(relPath, globalSkillsDir, { force });
+    const { result, kitHash } = await installSkillGlobal(relPath, globalSkillsDir, { force, globalFiles });
     if (result === 'copied') copied++;
     else if (result === 'identical') identical++;
     else skipped++;
+    if (result !== 'skipped') updatedFiles[relPath] = { kitHash };
   }
 
   const parts = [`${copied} copied`];
@@ -55,32 +60,36 @@ export async function initGlobal({ force = false, hooks = false } = {}) {
   log.info('Skills available in all projects via ~/.claude/skills/');
 
   if (hooks) {
-    await initGlobalHooks({ force });
+    await initGlobalHooks({ force, _globalFiles: updatedFiles, _skipManifestWrite: true });
   }
 
-  // Write global manifest
-  const existing = await readGlobalManifest() || {};
   await writeGlobalManifest({
     ...existing,
     globalInstalled: true,
     globalHooksInstalled: hooks || existing.globalHooksInstalled || false,
+    files: updatedFiles,
     updatedAt: new Date().toISOString(),
   });
 }
 
-export async function initGlobalHooks({ force = false } = {}) {
+export async function initGlobalHooks({ force = false, _globalFiles, _skipManifestWrite = false } = {}) {
   const globalHooksDir = getGlobalHooksDir();
   await mkdir(globalHooksDir, { recursive: true });
+
+  const existing = _skipManifestWrite ? null : (await readGlobalManifest() || {});
+  const globalFiles = _globalFiles || existing?.files || {};
+  const updatedFiles = { ...globalFiles };
 
   log.blank();
   console.log('--- Installing global hooks ---');
 
   let copied = 0; let skipped = 0; let identical = 0;
   for (const relPath of COMPONENTS.hooks) {
-    const result = await installHookGlobal(relPath, globalHooksDir, { force });
+    const { result, kitHash } = await installHookGlobal(relPath, globalHooksDir, { force, globalFiles });
     if (result === 'copied') copied++;
     else if (result === 'identical') identical++;
     else skipped++;
+    if (result !== 'skipped') updatedFiles[relPath] = { kitHash };
   }
 
   await mergeGlobalSettings(globalHooksDir);
@@ -90,6 +99,15 @@ export async function initGlobalHooks({ force = false } = {}) {
   if (skipped > 0) parts.push(`${skipped} customized (use --force to overwrite)`);
   log.pass(`Global hooks: ${parts.join(', ')}`);
   log.info('Hooks registered in ~/.claude/settings.json — active in all projects');
+
+  if (!_skipManifestWrite) {
+    await writeGlobalManifest({
+      ...existing,
+      globalHooksInstalled: true,
+      files: updatedFiles,
+      updatedAt: new Date().toISOString(),
+    });
+  }
 }
 
 const __dirname = dirname(fileURLToPath(import.meta.url));

@@ -23,22 +23,25 @@ export async function upgradeGlobal({ force = false } = {}) {
   const globalSkillsDir = getGlobalSkillsDir();
   await mkdir(globalSkillsDir, { recursive: true });
 
+  const meta = await readGlobalManifest() || {};
+  const globalFiles = meta.files || {};
+  const updatedFiles = { ...globalFiles };
+
   log.blank();
   console.log('--- Upgrading global skills ---');
   let updated = 0; let skipped = 0; let identical = 0;
 
   for (const relPath of COMPONENTS.skills) {
-    const result = await installSkillGlobal(relPath, globalSkillsDir, { force });
+    const { result, kitHash } = await installSkillGlobal(relPath, globalSkillsDir, { force, globalFiles });
     if (result === 'copied') updated++;
     else if (result === 'identical') identical++;
     else skipped++;
+    if (result !== 'skipped') updatedFiles[relPath] = { kitHash };
   }
 
   let skillParts = [`${updated} updated`, `${identical} unchanged`];
   if (skipped > 0) skillParts.push(`${skipped} customized (use --force to overwrite)`);
   log.pass(`Global skills: ${skillParts.join(', ')}`);
-
-  const meta = await readGlobalManifest() || {};
 
   // Upgrade hooks if previously installed globally
   if (meta.globalHooksInstalled) {
@@ -50,10 +53,11 @@ export async function upgradeGlobal({ force = false } = {}) {
     let hUpdated = 0; let hSkipped = 0; let hIdentical = 0;
 
     for (const relPath of COMPONENTS.hooks) {
-      const result = await installHookGlobal(relPath, globalHooksDir, { force });
+      const { result, kitHash } = await installHookGlobal(relPath, globalHooksDir, { force, globalFiles });
       if (result === 'copied') hUpdated++;
       else if (result === 'identical') hIdentical++;
       else hSkipped++;
+      if (result !== 'skipped') updatedFiles[relPath] = { kitHash };
     }
 
     await mergeGlobalSettings(globalHooksDir);
@@ -63,7 +67,7 @@ export async function upgradeGlobal({ force = false } = {}) {
     log.pass(`Global hooks: ${hookParts.join(', ')}`);
   }
 
-  await writeGlobalManifest({ ...meta, globalInstalled: true, updatedAt: new Date().toISOString() });
+  await writeGlobalManifest({ ...meta, globalInstalled: true, files: updatedFiles, updatedAt: new Date().toISOString() });
 
   // Warn about per-project skills that shadow global
   const projects = meta.projects || [];

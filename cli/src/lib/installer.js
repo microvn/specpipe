@@ -203,24 +203,31 @@ export function getGlobalHooksDir() {
  * Copy a hook to the global ~/.claude/hooks/ directory.
  * Strips the '.claude/hooks/' prefix so path-guard.sh lands at
  * ~/.claude/hooks/path-guard.sh.
- * @returns {string} 'copied' | 'skipped' | 'identical'
+ * @param {object} [opts.globalFiles] - files section from global manifest, used to detect true customization
+ * @returns {{ result: 'copied'|'skipped'|'identical', kitHash: string }}
  */
-export async function installHookGlobal(hookRelPath, globalHooksDir, { force = false } = {}) {
+export async function installHookGlobal(hookRelPath, globalHooksDir, { force = false, globalFiles = {} } = {}) {
   const stripped = hookRelPath.replace(/^\.claude\/hooks\//, '');
   const src = join(getTemplateDir(), hookRelPath);
   const dst = join(globalHooksDir, stripped);
 
+  const { hashFile } = await import('./hasher.js');
+  const srcHash = await hashFile(src);
+
   if (existsSync(dst) && !force) {
     try {
-      const { hashFile } = await import('./hasher.js');
-      const srcHash = await hashFile(src);
       const dstHash = await hashFile(dst);
       if (srcHash === dstHash) {
         log.same(`~/.claude/hooks/${stripped} (identical)`);
-        return 'identical';
+        return { result: 'identical', kitHash: srcHash };
       }
-      log.skip(`~/.claude/hooks/${stripped} (customized — use --force to overwrite)`);
-      return 'skipped';
+      const savedKitHash = globalFiles[hookRelPath]?.kitHash;
+      if (savedKitHash && dstHash === savedKitHash) {
+        // fall through to copy
+      } else {
+        log.skip(`~/.claude/hooks/${stripped} (customized — use --force to overwrite)`);
+        return { result: 'skipped', kitHash: srcHash };
+      }
     } catch { /* hash failed */ }
   }
 
@@ -228,7 +235,7 @@ export async function installHookGlobal(hookRelPath, globalHooksDir, { force = f
   await fsCopyFile(src, dst);
   await chmod(dst, 0o755);
   log.copy(`~/.claude/hooks/${stripped}`);
-  return 'copied';
+  return { result: 'copied', kitHash: srcHash };
 }
 
 /**
@@ -331,29 +338,38 @@ export async function removeGlobalHooksFromSettings() {
  * Copy a skill to the global ~/.claude/skills/ directory.
  * Strips the '.claude/skills/' prefix so mf-plan/SKILL.md lands at
  * ~/.claude/skills/mf-plan/SKILL.md.
- * @returns {string} 'copied' | 'skipped' | 'identical'
+ * @param {object} [opts.globalFiles] - files section from global manifest, used to detect true customization
+ * @returns {{ result: 'copied'|'skipped'|'identical', kitHash: string }}
  */
-export async function installSkillGlobal(skillRelPath, globalSkillsDir, { force = false } = {}) {
+export async function installSkillGlobal(skillRelPath, globalSkillsDir, { force = false, globalFiles = {} } = {}) {
   const stripped = skillRelPath.replace(/^\.claude\/skills\//, '');
   const src = join(getTemplateDir(), skillRelPath);
   const dst = join(globalSkillsDir, stripped);
 
+  const { hashFile } = await import('./hasher.js');
+  const srcHash = await hashFile(src);
+
   if (existsSync(dst) && !force) {
     try {
-      const { hashFile } = await import('./hasher.js');
-      const srcHash = await hashFile(src);
       const dstHash = await hashFile(dst);
       if (srcHash === dstHash) {
         log.same(`~/.claude/skills/${stripped} (identical)`);
-        return 'identical';
+        return { result: 'identical', kitHash: srcHash };
       }
-      log.skip(`~/.claude/skills/${stripped} (customized — use --force to overwrite)`);
-      return 'skipped';
+      // If the installed file still matches the kitHash we saved at last install,
+      // the user hasn't touched it — the kit just changed. Safe to update.
+      const savedKitHash = globalFiles[skillRelPath]?.kitHash;
+      if (savedKitHash && dstHash === savedKitHash) {
+        // fall through to copy
+      } else {
+        log.skip(`~/.claude/skills/${stripped} (customized — use --force to overwrite)`);
+        return { result: 'skipped', kitHash: srcHash };
+      }
     } catch { /* hash failed, treat as conflict */ }
   }
 
   await mkdir(dirname(dst), { recursive: true });
   await fsCopyFile(src, dst);
   log.copy(`~/.claude/skills/${stripped}`);
-  return 'copied';
+  return { result: 'copied', kitHash: srcHash };
 }
