@@ -106,7 +106,37 @@ Never stage: `.env`, credentials, build artifacts, generated files, binaries > 1
 git commit -m "type(scope): description"
 ```
 
-**Do NOT push** unless user explicitly asks.
+---
+
+## Step 6 — Push?
+
+Check if a remote exists:
+
+```bash
+git remote
+```
+
+If no remote → skip this step entirely.
+
+If remote exists, use `AskUserQuestion`:
+
+```json
+{
+  "questions": [
+    {
+      "question": "Commit successful. Push to remote now?",
+      "header": "Push",
+      "multiSelect": false,
+      "options": [
+        {"label": "Yes — push now (git push, or git push -u origin <branch> if no upstream)"},
+        {"label": "No — push later"}
+      ]
+    }
+  ]
+}
+```
+
+If user chooses Yes → run `git push` (or `git push -u origin <branch>` if upstream not set).
 
 ---
 
@@ -116,7 +146,7 @@ git commit -m "type(scope): description"
 staged: N files (+X/-Y lines)
 checks: secrets ✓ | debug ✓
 commit: abc1234 type(scope): description
-pushed: no
+pushed: yes → origin/<branch>  (or "no")
 ```
 
 Keep under 5 lines. No explanations.
@@ -124,5 +154,5 @@ Keep under 5 lines. No explanations.
 ## Rules
 1. **Specific files, not `git add -A`.** Stage intentionally.
 2. **Secrets = hard block.** No exceptions.
-3. **Never push without explicit request.**
+3. **Ask before pushing.** Push only if user confirms in Step 6.
 4. **One concern per commit.** Mixed features → suggest separate commits.
