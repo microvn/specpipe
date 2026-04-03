@@ -66,7 +66,7 @@ claude
 /mf-plan "describe your feature here"
 
 # 4. Write code, then test
-/mf-test
+/mf-build
 
 # 5. Review before merging
 /mf-review
@@ -138,7 +138,7 @@ your-project/
 │   └── commands/
 │       ├── mf-plan.md         ← /mf-plan command
 │       ├── mf-challenge.md    ← /mf-challenge command
-│       ├── mf-test.md         ← /mf-test command
+│       ├── mf-build.md        ← /mf-build command
 │       ├── mf-fix.md          ← /mf-fix command
 │       ├── mf-review.md       ← /mf-review command
 │       └── mf-commit.md       ← /mf-commit command
@@ -202,7 +202,7 @@ This removes hooks, commands, settings, and build-test.sh. It preserves `CLAUDE.
    → Generates spec with acceptance scenarios at docs/specs/<feature>/<feature>.md.
 
 2. Implement code in chunks.
-   After each chunk: /mf-test
+   After each chunk: /mf-build
    Repeat until green.
 
 3. /mf-review (before merge)
@@ -225,7 +225,7 @@ This removes hooks, commands, settings, and build-test.sh. It preserves `CLAUDE.
    Do NOT manually edit the spec before running /mf-plan.
 
 2. Implement the code change.
-   /mf-test
+   /mf-build
    Fix until green.
 
 3. /mf-review → /mf-commit
@@ -392,21 +392,21 @@ docs/specs/<feature>/
 
 **Token cost:** 15-30k (uses parallel subagents, doesn't bloat main context)
 
-### /mf-test — Write + Run Tests
+### /mf-build — TDD Delivery Loop
 
 **Usage:**
 ```
-/mf-test                              # test all changes vs base branch
-/mf-test src/api/users.ts             # test specific file
-/mf-test "user authentication"        # test specific feature
+/mf-build                              # build all changes vs base branch
+/mf-build src/api/users.ts             # build specific file
+/mf-build "user authentication"        # build specific feature
 ```
 
 **How it works:**
 
 1. **Phase 0: Build Context** — Finds changed files vs base branch, reads the spec (acceptance scenarios in `## Stories` section are the roadmap), reads existing tests for patterns, fixtures, and naming conventions. Doesn't duplicate what already exists.
-2. **Phase 1: Write Tests** — Creates or updates tests based on acceptance scenarios. Each test covers one concept, is independent, deterministic (no random, no time-dependent, no external calls), and has a clear name.
+2. **Phase 1: Write Failing Tests** — Creates tests from acceptance scenarios (RED). Each test covers one AS, is independent, deterministic (no random, no time-dependent, no external calls), and has a clear name.
 3. **Phase 2: Compile First** — Runs typecheck/compile before executing tests. Catches syntax errors early.
-4. **Phase 3: Run Tests** — Executes the test suite.
+4. **Phase 3: Implement + Run** — Implements story code, executes tests, drives to GREEN story by story.
 5. **Phase 4: Fix Loop** — If tests fail, fixes **test code only** (max 3 attempts, then hard stop and report). If tests expect X but code does Y, asks you whether to fix production code or adjust the test.
 6. **Phase 5: Report** — Summary with test counts, results, coverage, and files touched.
 
@@ -858,7 +858,7 @@ Then use: `/deploy staging`
 
 | Activity | Tokens | Frequency |
 |----------|--------|-----------|
-| `/mf-test` (incremental, 1-3 files) | 5–10k | Every code chunk |
+| `/mf-build` (incremental, 1-3 files) | 5–10k | Every code chunk |
 | `/mf-fix` (single bug) | 3–5k | As needed |
 | `/mf-commit` | 2–4k | Every commit |
 | `/mf-review` (diff-based) | 10–20k | Before merge |
@@ -868,9 +868,9 @@ Then use: `/deploy staging`
 
 ### Minimizing Token Usage
 
-- **Test incrementally.** `/mf-test` after each small chunk uses 5-10k. Waiting until everything is done then running `/mf-test` on a large diff uses 50k+.
-- **Use filters.** `/mf-test src/auth/login.ts` is cheaper than `/mf-test` on the whole project.
-- **Skip `/mf-plan` for tiny changes.** Under 5 lines with no behavior change? Just `/mf-test` and `/mf-commit`.
+- **Test incrementally.** `/mf-build` after each small chunk uses 5-10k. Waiting until everything is done then running `/mf-build` on a large diff uses 50k+.
+- **Use filters.** `/mf-build src/auth/login.ts` is cheaper than `/mf-build` on the whole project.
+- **Skip `/mf-plan` for tiny changes.** Under 5 lines with no behavior change? Just `/mf-build` and `/mf-commit`.
 - **Use `/mf-review` only before merge.** Not after every commit.
 
 ---
@@ -898,7 +898,7 @@ Then use: `/deploy staging`
 
 ### Wrong base branch
 
-**Symptom:** `/mf-test` or `/mf-review` compares against wrong branch.
+**Symptom:** `/mf-build` or `/mf-review` compares against wrong branch.
 
 **Check:**
 ```bash
@@ -928,13 +928,13 @@ export FILE_GUARD_EXCLUDE="*.generated.swift,*.pb.go,*.min.js,*.snap"
 ## 12. FAQ
 
 **Q: Do I need specs for every tiny change?**
-A: No. Changes under 5 lines with no behavior change can skip the spec. Just `/mf-test` and `/mf-commit`. The spec-first rule is for meaningful behavior changes.
+A: No. Changes under 5 lines with no behavior change can skip the spec. Just `/mf-build` and `/mf-commit`. The spec-first rule is for meaningful behavior changes.
 
 **Q: Can I use mocks in tests?**
 A: Only for external services you can't run locally (third-party APIs, email services). Never mock your own code or database just to make tests pass faster.
 
 **Q: What if Claude writes a test that tests the wrong thing?**
-A: This usually means the spec is ambiguous. Clarify the spec first, then re-run `/mf-test`. Good specs produce good tests.
+A: This usually means the spec is ambiguous. Clarify the spec first, then re-run `/mf-build`. Good specs produce good tests.
 
 **Q: Can I use this with other AI coding tools?**
 A: The commands and hooks are Claude Code-specific. The specs, workflow, and `build-test.sh` work with any tool or manual workflow.

@@ -322,7 +322,7 @@ Show:
 - AS count
 - Directory structure created
 - Implementation order: which stories to implement first (by priority + dependency)
-- Next steps: "Implement stories in order. Use `/mf-test` to verify each story. For complex specs, run `/mf-challenge` first."
+- Next steps: "Implement stories in order. Use `/mf-build` to verify each story. For complex specs, run `/mf-challenge` first."
 
 ---
 

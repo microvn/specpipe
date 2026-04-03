@@ -226,7 +226,7 @@ Reviewers: N lenses
 Findings: X total → Y accepted, Z rejected
 Severity: N Critical, N High, N Medium
 Files modified: [list]
-Next: /mf-test to implement, or /mf-plan to regenerate if major changes.
+Next: /mf-build to implement, or /mf-plan to regenerate if major changes.
 ```
 
 If a reviewer returns > 7 findings, take only top 7 by severity. If a reviewer fails, proceed with remaining reviewers.

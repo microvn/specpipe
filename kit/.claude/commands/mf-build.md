@@ -1,4 +1,4 @@
-Write tests from spec acceptance scenarios, compile, run, fix until green.
+TDD delivery loop — write failing tests from spec AS, implement story by story, drive to GREEN.
 
 ## Phase 0: Build Context
 
@@ -115,7 +115,7 @@ If a test fails due to an edge case, error path, or boundary condition that is N
 
 1. State explicitly: **"This failure suggests a missing acceptance scenario."**
 2. Describe the gap: what behavior was tested, which story it belongs to, why no AS covers it.
-3. Prompt: **"Run `/mf-plan <spec-path> 'Add AS for <description>'` to add the missing scenario."**
+3. Prompt: **"Run `/mf-plan <spec-path> 'Add AS for <description>'` to add the missing scenario, then re-run `/mf-build`."**
 
 Do not silently fix the test and move on. A test that has no corresponding AS means the spec is incomplete — the spec must be updated first.
 

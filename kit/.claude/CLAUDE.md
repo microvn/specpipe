@@ -13,8 +13,8 @@ Every change follows this cycle: **SPEC (with acceptance scenarios) → CODE + T
 
 | Trigger | Commands | Details |
 |---------|----------|---------|
-| New feature | `/mf-plan` → `/mf-challenge` (optional) → code in chunks → `/mf-test` each chunk | Start with spec or description |
-| Update feature | `/mf-plan <spec-path> "changes"` → code → `/mf-test` | Do NOT manually edit spec before /mf-plan |
+| New feature | `/mf-plan` → `/mf-challenge` (optional) → code in chunks → `/mf-build` each chunk | Start with spec or description |
+| Update feature | `/mf-plan <spec-path> "changes"` → code → `/mf-build` | Do NOT manually edit spec before /mf-plan |
 | Bug fix | `/mf-fix "description"` | Test-first: write failing test → fix → green |
 | Remove feature | `/mf-plan <spec-path> "remove stories"` → delete code + tests → build pass | /mf-plan handles snapshot before removal |
 | Pre-merge check | `/mf-review` | Diff-based quality gate |

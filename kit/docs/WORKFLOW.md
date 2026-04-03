@@ -22,7 +22,7 @@ Step 2 → (Optional) /mf-challenge docs/specs/<feature>/<feature>.md
           Skip for simple CRUD or small features.
 
 Step 3 → Implement in chunks. After each chunk:
-          /mf-test
+          /mf-build
           Repeat until chunk is green.
 
 Step 4 → /mf-review (before merge)
@@ -41,7 +41,7 @@ Step 1 → /mf-plan docs/specs/<feature>/<feature>.md "description of changes"
           snapshot first, then applies changes. Manual edits bypass snapshot protection.
 
 Step 2 → Implement code changes.
-          /mf-test
+          /mf-build
           Fix until green.
 
 Step 4 → /mf-review → /mf-commit
@@ -99,7 +99,7 @@ Is this a brand new feature (no existing spec or code)?
     │       │   └─ No → Update Feature workflow. Start with /mf-plan.
     │       │
     │       └─ Is the change very small (< 5 lines, behavior unchanged)?
-    │           └─ Yes → Skip spec update. Just /mf-test and /mf-commit.
+    │           └─ Yes → Skip spec update. Just /mf-build and /mf-commit.
 ```
 
 ---
@@ -170,7 +170,7 @@ Files to delete: [list]
 
 | Workflow | Estimated Tokens | When |
 |----------|-----------------|------|
-| `/mf-test` (incremental) | 5–10k | Daily, after each code chunk |
+| `/mf-build` (incremental) | 5–10k | Daily, after each code chunk |
 | `/mf-fix` (single bug) | 3–5k | As bugs arise |
 | `/mf-commit` | 2–4k | Each commit |
 | `/mf-review` (diff-based) | 10–20k | Before merge |
@@ -178,7 +178,7 @@ Files to delete: [list]
 | `/mf-challenge` (adversarial) | 15–30k | After /mf-plan, for complex features |
 | Full audit (manual) | 100k+ | Before release, quarterly |
 
-**Rule of thumb:** Daily work uses templates + `/mf-test` → low token cost.
+**Rule of thumb:** Daily work uses templates + `/mf-build` → low token cost.
 Save `/mf-plan` and full audits for significant milestones.
 
 ---
