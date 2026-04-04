@@ -108,7 +108,8 @@ setup
 cli init "$PROJECT_DIR"
 
 # Skills
-assert_exists "skills: mf-plan/SKILL.md"      "$PROJECT_DIR/.claude/skills/mf-plan/SKILL.md"
+assert_exists "skills: mf-explore/SKILL.md"    "$PROJECT_DIR/.claude/skills/mf-explore/SKILL.md"
+assert_exists "skills: mf-plan/SKILL.md"       "$PROJECT_DIR/.claude/skills/mf-plan/SKILL.md"
 assert_exists "skills: mf-build/SKILL.md"      "$PROJECT_DIR/.claude/skills/mf-build/SKILL.md"
 assert_exists "skills: mf-challenge/SKILL.md"  "$PROJECT_DIR/.claude/skills/mf-challenge/SKILL.md"
 assert_exists "skills: mf-fix/SKILL.md"        "$PROJECT_DIR/.claude/skills/mf-fix/SKILL.md"
@@ -205,7 +206,7 @@ section "init — skill files have YAML frontmatter"
 setup
 
 cli init "$PROJECT_DIR"
-for skill in mf-plan mf-build mf-challenge mf-fix mf-review mf-commit; do
+for skill in mf-explore mf-plan mf-build mf-challenge mf-fix mf-review mf-commit; do
   CONTENT=$(head -1 "$PROJECT_DIR/.claude/skills/$skill/SKILL.md")
   assert_contains "$skill/SKILL.md starts with ---" "---" "$CONTENT"
 done
@@ -315,6 +316,7 @@ setup
 cli init --global
 
 # All 6 skills
+assert_exists "global skills: mf-explore"   "$TEST_HOME/.claude/skills/mf-explore/SKILL.md"
 assert_exists "global skills: mf-plan"      "$TEST_HOME/.claude/skills/mf-plan/SKILL.md"
 assert_exists "global skills: mf-build"     "$TEST_HOME/.claude/skills/mf-build/SKILL.md"
 assert_exists "global skills: mf-challenge" "$TEST_HOME/.claude/skills/mf-challenge/SKILL.md"
@@ -410,7 +412,7 @@ setup
 
 cli init --global
 
-for skill in mf-plan mf-build mf-challenge mf-fix mf-review mf-commit; do
+for skill in mf-explore mf-plan mf-build mf-challenge mf-fix mf-review mf-commit; do
   FIRST=$(head -1 "$TEST_HOME/.claude/skills/$skill/SKILL.md")
   assert_contains "global $skill starts with ---" "---" "$FIRST"
 done

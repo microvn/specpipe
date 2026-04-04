@@ -21,6 +21,7 @@ export const COMPONENTS = {
     '.claude/hooks/sensitive-guard.sh',
   ],
   skills: [
+    '.claude/skills/mf-explore/SKILL.md',
     '.claude/skills/mf-plan/SKILL.md',
     '.claude/skills/mf-build/SKILL.md',
     '.claude/skills/mf-challenge/SKILL.md',
