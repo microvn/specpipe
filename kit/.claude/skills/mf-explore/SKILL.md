@@ -126,22 +126,63 @@ Also note the **project domain** from CLAUDE.md (payment, booking, content, heal
 ## Phase 1 — Why, not what
 
 **If Phase 0 found existing code > 30%:**
-Open with:
-> "This feature already has [brief description of what exists]. Do you want to change the current behavior, extend it with new functionality, or rebuild from scratch?"
+Use AskUserQuestion:
+
+```json
+{
+  "questions": [{
+    "question": "This feature already has [brief description of what exists]. What do you want to do with it?",
+    "header": "Existing feature",
+    "multiSelect": false,
+    "options": [
+      {"label": "A) Change the current behavior — something isn't working right"},
+      {"label": "B) Extend it with new functionality — add to what's already there"},
+      {"label": "C) Rebuild from scratch — start fresh with a different approach"}
+    ]
+  }]
+}
+```
 
 Wait for the answer. It changes the entire direction of the conversation.
 
 **If virgin territory or spec not yet implemented:**
-Ask the first question:
-> "What specific problem is happening that requires this feature? Who is experiencing it, in which flow, at which step?"
+Use AskUserQuestion:
+
+```json
+{
+  "questions": [{
+    "question": "What specific problem is happening that requires this feature? Who is experiencing it, in which flow, at which step?",
+    "header": "Problem & context",
+    "multiSelect": false
+  }]
+}
+```
 
 Wait for the answer. Then depending on context:
 
-**If the answer is vague ("users need to export PDF")** → push for specificity:
-> "More specifically: what is the user trying to do and where are they stuck? How are they handling it today — workaround, manually, asking an admin, or they simply can't do it?"
+**If the answer is vague ("users need to export PDF")** → push for specificity with AskUserQuestion:
 
-**If the answer is specific enough** → paraphrase and continue:
-> "So [user role X] is [stuck at Y] and currently handles it by [Z]. How often does this happen — daily, weekly, or only on special events?"
+```json
+{
+  "questions": [{
+    "question": "More specifically: what is the user trying to do and where are they stuck? How are they handling it today — workaround, manually, asking an admin, or they simply can't do it?",
+    "header": "Specifics",
+    "multiSelect": false
+  }]
+}
+```
+
+**If the answer is specific enough** → paraphrase and confirm with AskUserQuestion:
+
+```json
+{
+  "questions": [{
+    "question": "So [user role X] is [stuck at Y] and currently handles it by [Z]. Is that right? Also: how often does this happen — daily, weekly, or only on special events?",
+    "header": "Paraphrase check",
+    "multiSelect": false
+  }]
+}
+```
 
 **Purpose:** Avoid building the wrong thing. "Export PDF" vs "share a report with someone who has no account" leads to completely different solutions.
 
