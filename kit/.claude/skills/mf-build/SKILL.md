@@ -34,6 +34,20 @@ TDD delivery loop — write failing tests from spec AS, implement story by story
 
 ---
 
+## Phase 0.5: Implementation Risk Check
+
+Run after Phase 0. Takes 2 minutes. Checks only what is visible at implementation time
+(mf-challenge already reviewed the spec adversarially — this catches code-level issues only).
+
+- **N+1:** For each story involving a list/loop — will implementation query DB inside the loop? Flag before writing the test.
+- **DRY:** Grep for similar logic in existing code. If found, reuse — don't duplicate.
+- **Error paths:** For each story — what can go wrong? (null, empty, network fail, invalid input) Note these upfront so they land in the Coverage Map, not as afterthoughts.
+- **Pattern:** What's the existing pattern for this type of operation in the codebase? Follow it unless there's a reason not to.
+
+Output: 2-3 line summary. Feeds into Phase 1.5 Coverage Map.
+
+---
+
 ## Phase 1: Decide What to Test
 
 Test behavior, not implementation. If the internals change but behavior stays the same, tests should still pass.
@@ -62,6 +76,12 @@ AI writes tests significantly faster than humans. When deciding test scope:
 | Bug fix | 4 hours | 15 min | ~20x |
 
 Rule: If writing additional tests costs `CC: ≤15m` — write them fully without asking. Only use AskUserQuestion when the gap affects design or costs `CC: >30m`.
+
+**Engineering instincts — apply when deciding test scope:**
+- **Systems over heroes:** Design tests for a tired dev at 3am, not your best engineer. If a test requires knowing internals to understand, it will fail the wrong person at the worst time.
+- **Blast radius instinct:** For each Coverage Map GAP — if this path breaks in prod, how many users/systems are affected? High blast radius → mandatory test, no deferral.
+- **Make the change easy, then make the easy change:** If writing a test is hard, the production code is tangled. Refactor structure first (separate commit), then add the test.
+- **Reversibility preference:** When two approaches have equal coverage, pick the one easier to delete when behavior changes. Brittle tests are technical debt disguised as coverage.
 
 ---
 
@@ -205,6 +225,12 @@ If tests fail:
 ---
 
 ## Phase 5: Summary
+
+Start with one of:
+- **DONE** — All stories green, implementation risks addressed, no signal needed.
+- **DONE_WITH_CONCERNS** — Green but: [P2 risks from Phase 0.5 / coverage gaps / spec signal]
+- **BLOCKED** — Cannot proceed: [what's blocking, what was tried, 3-attempt limit hit]
+- **NEEDS_CONTEXT** — Missing info to continue: [what's needed and why]
 
 ```
 Tests: X added, Y modified, Z unchanged

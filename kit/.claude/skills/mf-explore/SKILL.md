@@ -331,6 +331,13 @@ If notifications exist → clarify template:
 **Concurrency:**
 > "If two people act on the same record at the same time, how should the system handle it?"
 
+**Non-functional requirements:**
+> "A few technical questions that shape the implementation:
+> 1. Scale: how many users/records does this touch at peak? (tens? thousands? millions?)
+> 2. Performance SLA: any response time or processing time requirement?
+> 3. Security/compliance: does this touch PII, payment data, or need an audit trail?
+> 4. Availability: if this feature is down for 1 hour, what's the business impact?"
+
 ---
 
 ## Phase 5 — Edge cases
@@ -489,6 +496,13 @@ Timeout: [if role B does not act within X hours then...]
 
 **Complexity signal:** [low / medium / high]
 Based on: [number of new screens, data model changes, external integrations, edge case density, multi-role]
+
+**Non-functional requirements:**
+- Scale: [expected load — records, users, concurrent operations]
+- Performance SLA: [response time, throughput, processing window]
+- Security/compliance: [PII, payment, audit, encryption requirements]
+- Domain risks: [e.g., double-charge (payment), overbooking (scheduling)]
+- Availability impact: [what breaks if this feature is down]
 
 **Technical risks:**
 - [e.g. "Never integrated with service X before — needs a spike first"]
