@@ -329,9 +329,20 @@ assert_exit "block: code replaced with '/* ... */'" 2 \
 
 # Block: code replaced with suspiciously short comment (< 30% of original length)
 # Use \n literals inside the JSON string (not real newlines) so JSON.parse succeeds
-TRUNCATED_PAYLOAD='{"tool_input":{"file_path":"src/a.ts","old_string":"const a=1;\nconst b=2;\nconst c=3;\nconst d=4;\nconst e=5;\nconst f=6;\nconst g=7;\nconst h=8;\nconst i=9;\nconst j=10;","new_string":"// removed"}}'
-assert_exit "block: code truncated to short comment" 2 \
+# Must have 3+ comment lines to be "truncation" — single-line deletion notes are allowed
+# old=20 lines, new=4 comment lines: 4 < 20*0.3=6 AND 4 > 2 → blocked
+TRUNCATED_PAYLOAD='{"tool_input":{"file_path":"src/a.ts","old_string":"const a=1;\nconst b=2;\nconst c=3;\nconst d=4;\nconst e=5;\nconst f=6;\nconst g=7;\nconst h=8;\nconst i=9;\nconst j=10;\nconst k=11;\nconst l=12;\nconst m=13;\nconst n=14;\nconst o=15;\nconst p=16;\nconst q=17;\nconst r=18;\nconst s=19;\nconst t=20;","new_string":"// section removed\n// see refactor notes\n// check git history\n// for full context"}}'
+assert_exit "block: code truncated to multi-line comment block" 2 \
   "$(exit_node "$CG" "$TRUNCATED_PAYLOAD")"
+
+# Allow: single-line deletion note replacing large block — intentional removal, not truncation
+# Regression: false positive — "// Removed" replacing 10 lines was blocked by 30% ratio check
+assert_exit "allow: single-line deletion note (intentional removal)" 0 \
+  "$(exit_node "$CG" '{"tool_input":{"file_path":"src/a.ts","old_string":"const a=1;\nconst b=2;\nconst c=3;\nconst d=4;\nconst e=5;\nconst f=6;\nconst g=7;\nconst h=8;\nconst i=9;\nconst j=10;","new_string":"// Removed in v2 refactor"}}')"
+
+# Allow: two-line deletion note replacing large block
+assert_exit "allow: two-line deletion note (intentional removal)" 0 \
+  "$(exit_node "$CG" '{"tool_input":{"file_path":"src/a.ts","old_string":"const a=1;\nconst b=2;\nconst c=3;\nconst d=4;\nconst e=5;\nconst f=6;\nconst g=7;\nconst h=8;\nconst i=9;\nconst j=10;","new_string":"// Removed: deprecated API\n// Use newHelper() instead"}}')"
 
 # Allow: old_string is already all comments
 assert_exit "allow: editing comments" 0 \

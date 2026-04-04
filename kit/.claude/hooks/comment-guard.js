@@ -102,7 +102,10 @@ function main() {
   const oldLines = oldStr.split("\n").length;
   const newLines = newStr.split("\n").length;
 
-  if (newLines < oldLines * 0.3) {
+  // Allow 1-2 line replacements: a brief deletion note ("// Removed in v2") is
+  // intentional removal, not truncation. Only multi-line comment blocks that are
+  // still much shorter than the original suggest lazy placeholder replacement.
+  if (newLines > 2 && newLines < oldLines * 0.3) {
     // Suspiciously shorter and all comments — likely lazy replacement
     process.stderr.write(
       "Blocked: code block was replaced with a much shorter comment-only block. " +
