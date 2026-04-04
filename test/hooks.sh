@@ -184,6 +184,17 @@ assert_exit "allow: cargo build"               0 "$(exit_bash "$PG" '{"tool_inpu
 assert_exit "allow: rebuild/clean (no match)"  0 "$(exit_bash "$PG" '{"tool_input":{"command":"make rebuild"}}')"
 assert_exit "allow: bin/bash (not C# subdir)"  0 "$(exit_bash "$PG" '{"tool_input":{"command":"ls /usr/bin/bash"}}')"
 
+# ── Binary existence checks through blocked dirs (must NOT block) ─────────────
+# Regression: dist/ as intermediate path component in existence check was incorrectly blocked
+assert_exit "allow: -x check through dist/"   0 \
+  "$(exit_bash "$PG" '{"tool_input":{"command":"B=~/.claude/skills/gstack/browse/dist/browse\nif [ -x \"$B\" ]; then echo READY; fi"}}')"
+assert_exit "allow: -f check through dist/"   0 \
+  "$(exit_bash "$PG" '{"tool_input":{"command":"[ -f /usr/local/dist/bin/tool ] && echo ok"}}')"
+assert_exit "allow: path assign through dist/" 0 \
+  "$(exit_bash "$PG" '{"tool_input":{"command":"TOOL=~/.local/dist/mytool; \"$TOOL\" --version"}}')"
+assert_exit "allow: -x check through node_modules/.bin" 0 \
+  "$(exit_bash "$PG" '{"tool_input":{"command":"[ -x node_modules/.bin/webpack ] && echo ok"}}')"
+
 # ── Absolute path containing blocked dir ─────────────────────────────────────
 assert_exit "block: absolute path with node_modules" 2 \
   "$(exit_bash "$PG" '{"tool_input":{"command":"cat /home/user/project/node_modules/lodash/index.js"}}')"

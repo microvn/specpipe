@@ -87,6 +87,20 @@ if [[ -n "${PATH_GUARD_EXTRA:-}" ]]; then
     BLOCKED+="|$PATH_GUARD_EXTRA"
 fi
 
+# ─── Exploration-verb pre-check ─────────────────────────────────────
+# Only apply blocked-path rules when the command contains a file-reading
+# or directory-listing verb. This avoids false positives for commands that
+# merely REFERENCE a path through a blocked directory without exploring it
+# (e.g. variable assignments, [ -x "$B" ] binary existence checks, or
+# running a compiled binary whose path happens to include /dist/).
+#
+# Verbs that indicate directory/file exploration:
+EXPLORE_VERB_RE="(^|[[:space:]|;&\`(])(ls|ll|la|find|cat|head|tail|less|more|wc|stat|du|tree|bat|od|xxd|hexdump|nl)([[:space:]]|$)"
+
+if ! printf '%s\n' "$COMMAND" | grep -qE "$EXPLORE_VERB_RE"; then
+    exit 0
+fi
+
 # ─── Match and block ────────────────────────────────────────────────
 
 if printf '%s\n' "$COMMAND" | grep -qE "$BLOCKED"; then
