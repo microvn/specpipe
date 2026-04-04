@@ -38,15 +38,33 @@ Don't jump to code. Understand the bug first:
 
 **Required output:** `Root cause hypothesis: ...` — a specific, testable claim about what is wrong and why.
 
+**Required output 2: Bug Path Diagram**
+
+Draw a coverage diagram for the buggy function using the same format as mf-build:
+
+```
+CODE PATH COVERAGE
+===========================
+[+] src/services/affected.ts
+    │
+    └── affectedFn()
+        ├── [★★  TESTED] Normal path — affected.test.ts:12
+        ├── [GAP]         Edge case X (← bug lives here) — NO TEST
+        │   └── [GAP]     Downstream effect — NO TEST
+        └── [★★  TESTED] Other branch — affected.test.ts:20
+```
+
+If you cannot identify a specific `[GAP]` path → the hypothesis is not specific enough. Investigate further.
+
 If the bug is in a dependency/config/data (not project code), say so before proceeding.
 
 ---
 
 ## Phase 1: Write a Failing Test
 
-Write a test that reproduces the bug. It **MUST fail** with current code.
+**REGRESSION RULE:** If the bug exists because the diff changed existing behavior AND no test covered that path → this is a regression. A regression test is a **CRITICAL requirement.** Add the comment: `// Regression: <bug> — <file:line> broke this path`
 
-Add a comment: `// Regression: <bug description> — <expected> vs <actual>`
+Write a test that reproduces the bug. It **MUST fail** with current code.
 
 Run it:
 ```
@@ -64,9 +82,9 @@ bash scripts/build-test.sh --filter "<test name>"
       "header": "Test Passes Unexpectedly",
       "multiSelect": false,
       "options": [
-        {"label": "Provide different repro steps or environment details"},
-        {"label": "The bug may be environment-specific — describe the setup"},
-        {"label": "Skip test-first for this bug — fix directly"}
+        {"label": "Provide different repro steps or environment details (human: ~30m / CC: ~5m) | Completeness: 10/10"},
+        {"label": "The bug may be environment-specific — describe the setup (human: ~1h / CC: ~10m) | Completeness: 9/10"},
+        {"label": "Skip test-first for this bug — fix directly (human: ~15m / CC: ~5m) | Completeness: 5/10"}
       ]
     }
   ]

@@ -13,7 +13,10 @@ When: Building something that doesn't exist yet (no code, no spec).
 ```
 Step 1 → /mf-plan "description of feature"
           Generates: docs/specs/<feature>/<feature>.md (spec with acceptance scenarios)
-          Answers validation questions about assumptions.
+          Runs Scope Challenge: reuse check, complexity smell (8+ files = flag),
+          framework built-in search, distribution check.
+          Adds "What Already Exists" and "Not in Scope" sections to the spec.
+          Answers validation questions with effort scales (human: X / CC: Y).
           Review before proceeding.
 
 Step 2 → (Optional) /mf-challenge docs/specs/<feature>/<feature>.md
@@ -23,6 +26,8 @@ Step 2 → (Optional) /mf-challenge docs/specs/<feature>/<feature>.md
 
 Step 3 → Implement in chunks. After each chunk:
           /mf-build
+          Draws Coverage Map before writing tests: traces code paths + user flows,
+          marks [GAP], [GAP][→E2E], [GAP][→EVAL]. Regression rule enforced.
           Repeat until chunk is green.
 
 Step 4 → /mf-review (before merge)
@@ -53,6 +58,8 @@ When: Something is broken and needs fixing.
 
 ```
 Step 1 → /mf-fix "description of the bug"
+          Draws Bug Path Diagram to confirm hypothesis ([GAP] must be locatable).
+          Regression rule: if diff broke existing behavior with no test → CRITICAL test required.
           Writes failing test → fixes code → confirms green → runs full suite.
 
 Step 2 → /mf-commit

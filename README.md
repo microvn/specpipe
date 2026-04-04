@@ -293,10 +293,10 @@ This removes hooks, skills, settings, and build-test.sh. It preserves `CLAUDE.md
 **How it works:**
 
 1. **Phase 0: Codebase Awareness** — Scans existing code, `docs/specs/`, and project patterns before planning. Prevents specs that conflict with existing implementations.
-2. **Phase 1: Scope & Split Assessment** — Evaluates feature size. Features with >7 stories or >20 acceptance scenarios must be split into sub-specs.
+2. **Phase 1: Scope & Split + Scope Challenge** — Evaluates feature size (>7 stories or >20 AS → must split). Also runs a **Scope Challenge** before drafting: checks for existing code that already solves sub-problems (reuse vs rebuild), flags complexity smells (8+ files or 2+ new classes/services), searches for framework built-ins, checks for distribution needs (new artifact → CI/CD in scope?), and applies the Completeness Principle (complete version costs only `CC: ≤15m` more → recommend it directly).
 3. **Phase 2: Draft Spec** — Generates a structured spec with stories and acceptance scenarios (Given/When/Then). Depth scales by priority: P0 gets full GWT + test data, P1 gets GWT, P2 gets 1-2 line descriptions. Runs consistency checks (CC1-CC6) before showing draft.
-4. **Phase 3: Clarify Ambiguities** — Systematically finds gaps across behavioral, data, auth, non-functional, integration, and concurrency dimensions. Asks 3-5 targeted questions. Waits for user answers before continuing.
-5. **Phase 4: Summary** — Shows story counts, AS counts, implementation order, next steps.
+4. **Phase 3: Clarify Ambiguities** — Systematically finds gaps across behavioral, data, auth, non-functional, integration, and concurrency dimensions. Questions include `(human: ~X / CC: ~Y)` effort scales and `Completeness: X/10` scores for each option.
+5. **Phase 4: Summary** — Shows story counts, AS counts, implementation order, next steps. Every spec also gets a **"What Already Exists"** section (existing code that partially solves the problem) and a **"Not in Scope"** section (deferred work with rationale — prevents work from silently dropping).
 
 **Mode C (Update) adds:**
 - **Classification** — Walks through M1-M6 checklist to determine Major vs Minor change.
@@ -384,7 +384,7 @@ docs/specs/<feature>/
 
 7. **Apply** — Surgical edits only to accepted findings. Doesn't rewrite surrounding sections.
 
-**Finding format:** Each finding includes Title, Severity, Location, Flaw description, Evidence (direct quote from the plan), step-by-step Failure scenario, and Suggested fix.
+**Finding format:** Each finding includes Title, Severity, **Confidence score** (9-10 = verified; 7-8 = strong match; 5-6 = note caveat; ≤4 = omit unless Critical), Location, Flaw description, Evidence (direct quote from the plan), step-by-step Failure scenario, and Suggested fix.
 
 **6 non-negotiable rules:**
 1. Spawn reviewers in parallel (not sequential)
@@ -413,11 +413,12 @@ docs/specs/<feature>/
 **How it works:**
 
 1. **Phase 0: Build Context** — Finds changed files vs base branch, reads the spec (acceptance scenarios in `## Stories` section are the roadmap), reads existing tests for patterns, fixtures, and naming conventions. Doesn't duplicate what already exists.
-2. **Phase 1: Write Failing Tests** — Creates tests from acceptance scenarios (RED). Each test covers one AS, is independent, deterministic (no random, no time-dependent, no external calls), and has a clear name.
-3. **Phase 2: Compile First** — Runs typecheck/compile before executing tests. Catches syntax errors early.
-4. **Phase 3: Implement + Run** — Implements story code, executes tests, drives to GREEN story by story.
-5. **Phase 4: Fix Loop** — If tests fail, fixes **test code only** (max 3 attempts, then hard stop and report). If tests expect X but code does Y, asks you whether to fix production code or adjust the test.
-6. **Phase 5: Report** — Summary with test counts, results, coverage, and files touched.
+2. **Phase 1: Decide What to Test** — Determines test scope from acceptance scenarios. Applies the **Completeness Principle**: AI writes tests ~50x faster than humans, so if full coverage costs `CC: ≤15m`, it writes complete tests without asking.
+3. **Phase 1.5: Coverage Map** — Before writing a single test, traces every code path (if/else, switch, guard, try/catch) AND user flows (double-click, stale session, navigate away mid-op). Draws an ASCII diagram marking each path as `[★★★ TESTED]`, `[★★ TESTED]`, `[★ TESTED]`, or `[GAP]`. Gaps marked `[GAP] [→E2E]` need E2E tests; `[GAP] [→EVAL]` need evals. **Regression rule:** if the diff changes existing behavior with no covering test, a regression test is a CRITICAL requirement — no asking, no skipping.
+4. **Phase 2: Write Tests** — Writes tests for every `[GAP]` identified in the Coverage Map.
+5. **Phase 3: Build and Run** — Compiles/typechecks first, then runs tests.
+6. **Phase 4: Fix Loop** — If tests fail, fixes **test code only** (max 3 attempts, then hard stop and report). If tests expect X but code does Y, asks whether to fix production code or adjust the test — with effort scales `(human: ~X / CC: ~Y)`.
+7. **Phase 5: Report** — Summary with test counts, results, coverage, files touched, and any E2E/eval gaps to follow up on.
 
 **Rules:**
 - Never changes production code without asking first
@@ -436,12 +437,12 @@ docs/specs/<feature>/
 
 **How it works:**
 
-1. **Phase 0: Investigate** — Parses the bug report, locates relevant code, checks git history (`git log` + `git blame`), forms a hypothesis with evidence: *"I believe the bug is caused by [X] in [file:function] because [evidence]."* If the bug is in a dependency/config/data (not your code), reports that before proceeding.
-2. **Phase 1: Write Failing Test** — Creates a regression test that reproduces the bug. Test includes a comment: `// Regression: <bug description> — <expected> vs <actual>`.
-3. **Phase 2: Confirm Failure** — Runs the test to verify it fails for the right reason.
-4. **Phase 3: Fix** — Minimal change to production code. If other tests break, the fix is wrong — never weakens existing tests.
-5. **Phase 4: Root Cause Analysis** — Documents: Symptom, Root cause, Gap (why wasn't this caught earlier?), Prevention (suggests one: type constraint, validation, lint rule, spec update including acceptance scenarios). Non-optional for serious bugs; for trivial bugs, the fix summary is enough.
-6. **Phase 5: Full Suite** — Runs all tests to catch regressions.
+1. **Phase 0: Investigate** — Parses the bug report, locates relevant code, checks git history, and forms a root cause hypothesis. Then draws a **Bug Path Diagram** (same `[GAP]`/`[★★ TESTED]` format as `/mf-build`) for the buggy function — if no specific `[GAP]` path can be identified, the hypothesis isn't specific enough yet.
+2. **Phase 1: Write Failing Test** — **Regression rule first:** if the bug exists because the diff changed existing behavior with no test covering that path, a regression test is a CRITICAL requirement. Creates a test that reproduces the bug and **MUST fail** with current code.
+3. **Phase 2: Fix** — Minimal change only. Blast radius check: if fix touches >5 files, stops and asks before editing.
+4. **Phase 3: Verify** — Bug test must pass; full suite must show no new regressions.
+5. **Phase 4: Root Cause Analysis** — Documents: Symptom, Root cause, Gap (why wasn't this caught earlier?), Prevention (one of: type constraint, validation, lint rule, spec update). Non-optional for serious bugs.
+6. **Phase 5: Report** — Structured debug report with hypothesis, fix, evidence, and regression test reference.
 
 **Multiple bugs:** Triages by severity, fixes one at a time, commits each separately.
 
@@ -455,29 +456,19 @@ docs/specs/<feature>/
 
 **How it works:**
 
-1. **Phase 0: Understand Intent** — Reads commit messages and checks for related spec. Understands *why* the change was made before reviewing *how*.
-2. **Phase 1: Smart Focus** — Auto-detects what to focus on based on the diff:
+1. **Phase 0: Understand Intent** — Reads commit messages, checks for related spec, expands blast radius. Also notes **what already exists**: flags if the diff rebuilds something that already exists in the codebase.
+2. **Phase 1: Smart Focus** — Auto-detects what to focus on based on the diff (auth → security, SQL → injection, payments → idempotency, etc.). Spends 60% of analysis on the primary focus.
+3. **Phase 2: Review** — Security, correctness, spec-test alignment, code quality (including **diagram maintenance**: stale ASCII diagrams in comments are flagged), performance, and a **Failure Mode Grid** for each new codepath (3 dimensions: test covers it? error handling exists? user sees a clear error or silent failure? — all 3 missing = Critical gap).
+4. **Phase 3: Report** — Structured report. Every finding includes a **confidence score** `(confidence: N/10)`: 9-10 = verified in code; 7-8 = strong pattern match; 5-6 = possible false positive; <5 = appendix only. Includes a **"Not in scope"** section listing deferred work with rationale.
 
-   | Diff contains | Focus on |
-   |---------------|----------|
-   | Auth/session code | Security, token handling, permission checks |
-   | SQL/queries | Injection, parameterization, N+1 queries |
-   | API endpoints | Input validation, error responses, rate limiting |
-   | `.env`/config | Secrets exposure, environment handling |
-   | Tests only | Test quality, coverage gaps, flaky patterns |
-   | Payment/billing | Financial accuracy, idempotency, audit trails |
+**Proportional review:** A 5-line doc change gets a light review. A 500-line auth rewrite gets file-by-file deep analysis.
 
-3. **Phase 2: Review** — Checks security, correctness, null safety, spec-test alignment, and code quality. Spends 60% of analysis on the primary focus area. Looks for specific patterns: `${var}` in queries, `.innerHTML`, template literals in SQL, optionals without guards.
-4. **Phase 3: Report** — Structured report with severity tiers (Critical/High/Medium/Low).
-
-**Proportional review:** A 5-line doc change gets a light review. A 500-line auth rewrite gets file-by-file deep analysis. Diffs >500 lines get a note suggesting to split the commit.
-
-**Verdicts:** APPROVE / REQUEST CHANGES / NEEDS DISCUSSION (three options, not binary).
+**Verdicts:** APPROVE / REQUEST CHANGES / NEEDS DISCUSSION.
 
 **Rules:**
 - At least 1 positive note — reinforces good patterns, not just problems
 - Never auto-fixes code — report only
-- Checks spec-test alignment: code changed → spec/acceptance scenarios/tests also changed? Vague requirements without metrics ("fast", "secure") get flagged with a suggestion to add concrete numbers
+- Checks spec-test alignment: code changed → spec/acceptance scenarios/tests also changed?
 
 ### /mf-commit — Smart Git Commit
 

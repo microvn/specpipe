@@ -14,6 +14,7 @@ Pre-merge code review — security, correctness, spec alignment.
 2. Check for spec in `docs/specs/<feature>/<feature>.md` — review against INTENT.
 3. Read the diff: `git diff "$BASE"...HEAD`
 4. **Expand blast radius:** If `codebase-memory-mcp` is available, use `search_code("<changed function or type>")` to find files not in the diff that may be affected, and `get_architecture()` to check if changed files belong to a sensitive layer (auth, payment, core). Fallback: skip, review diff only.
+5. **What already exists:** List any code/flows that already partially solve the problem in this diff. Flag if the diff rebuilds something that already exists.
 
 If `$ARGUMENTS` provided → scope to those files only.
 If diff > 500 lines → review file-by-file, prioritize by smart focus below.
@@ -70,9 +71,35 @@ Spend 60% of analysis on the primary focus. Cover all categories, but proportion
 - Obvious duplication: copy-pasted blocks that should be shared?
 - Naming: consistent with codebase? Descriptive?
 - Complexity: functions > 40 lines or > 3 nesting levels?
+- **Diagram maintenance:** Diff touches code with ASCII diagrams in nearby comments? Check if those diagrams are still accurate. Stale diagrams are worse than no diagrams — they actively mislead. Flag even if outside immediate scope.
 
 ### Performance (Low)
 - Flag N+1 queries, unbounded collections, redundant computation in loops.
+
+### Failure Mode Grid
+For each new codepath in the diff, evaluate 3 dimensions:
+
+| Codepath | Test covers it? | Error handling? | User sees clear error? |
+|----------|----------------|-----------------|----------------------|
+| (path)   | ✓/✗            | ✓/✗             | clear / silent        |
+
+**Critical gap** = all 3 are ✗ → flag as High severity, non-optional.
+
+---
+
+## Confidence Calibration
+
+Every finding MUST include a confidence score:
+
+| Score | Meaning | Display rule |
+|-------|---------|-------------|
+| 9–10 | Verified by reading code directly. Concrete bug demonstrated. | Show normally |
+| 7–8 | High-confidence pattern match. Very likely correct. | Show normally |
+| 5–6 | Possible false positive. | Show with caveat: "verify this" |
+| 3–4 | Low confidence. | Appendix only |
+| 1–2 | Speculation. | Only report if severity Critical |
+
+**Finding format:** `**[C-1] (confidence: 9/10) file.ts:42 — description**`
 
 ---
 
@@ -86,11 +113,11 @@ Spend 60% of analysis on the primary focus. Cover all categories, but proportion
 **Verdict:** APPROVE / REQUEST CHANGES / NEEDS DISCUSSION
 
 ### Critical Issues
-**[C-1] file.ts:42 — SQL injection via unsanitized input**
+**[C-1] (confidence: 9/10) file.ts:42 — SQL injection via unsanitized input**
 `req.query.search` concatenated into SQL. Use parameterized query.
 
 ### High Priority
-**[H-1] file.ts:87 — Empty catch swallows DB errors**
+**[H-1] (confidence: 8/10) file.ts:87 — Empty catch swallows DB errors**
 Users see blank screen. Log with context, return safe error.
 
 ### Medium Priority
@@ -104,6 +131,9 @@ New logic at auth-service.ts:45-62 undocumented.
 (At least 1 — reinforce good patterns)
 - Clean middleware separation in auth-middleware.ts
 - Thorough edge case tests
+
+### Not in scope
+[Work considered but not in this diff — each item with one-line rationale. If nothing to defer, write "None identified."]
 
 ### Summary
 <1-2 sentences: quality + clear next action>

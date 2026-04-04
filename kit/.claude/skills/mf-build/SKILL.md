@@ -38,6 +38,83 @@ Test behavior, not implementation. If the internals change but behavior stays th
 - Is it deterministic? No random, no time-dependent, no external service calls.
 - Does the name describe the scenario? (`returns_error_when_input_is_empty`)
 
+**Completeness Principle:**
+
+AI writes tests significantly faster than humans. When deciding test scope:
+
+| Task type | Human | CC | Compression |
+|-----------|-------|----|-------------|
+| Boilerplate tests | 2 days | 15 min | ~100x |
+| Edge case + error paths | 1 day | 15 min | ~50x |
+| Feature | 1 week | 30 min | ~30x |
+| Bug fix | 4 hours | 15 min | ~20x |
+
+Rule: If writing additional tests costs `CC: ≤15m` — write them fully without asking. Only use AskUserQuestion when the gap affects design or costs `CC: >30m`.
+
+---
+
+## Phase 1.5: Coverage Map
+
+Before writing tests, trace all paths and draw a diagram to see gaps upfront — not after.
+
+**Step 1 — Trace code paths:** For each changed function/component, follow data through every branch: if/else, switch, guard clause, early return, try/catch, error boundary. Trace into helper functions if they have untested branches.
+
+**Step 2 — Trace user flows:** For multi-step features, trace the user journey. Edge cases: double-click/rapid resubmit, navigate away mid-op, submit stale data (session expired), slow connection, concurrent actions (2 tabs open).
+
+**Step 3 — Draw the diagram:**
+
+```
+CODE PATH COVERAGE
+===========================
+[+] src/services/example.ts
+    │
+    ├── processX()
+    │   ├── [★★★ TESTED] Happy path + error — example.test.ts:42
+    │   ├── [GAP]         Network timeout — NO TEST
+    │   └── [GAP]         Invalid input — NO TEST
+    │
+    └── helperY()
+        ├── [★★  TESTED] Normal case — example.test.ts:89
+        └── [★   TESTED] Smoke check only — example.test.ts:101
+
+USER FLOW COVERAGE
+===========================
+[+] Checkout flow
+    │
+    ├── [★★★ TESTED] Complete purchase — checkout.e2e.ts:15
+    ├── [GAP] [→E2E] Double-click submit — needs E2E, not unit
+    ├── [GAP]         Navigate away mid-op — unit sufficient
+    └── [GAP] [→EVAL] Prompt template change — needs eval
+
+─────────────────────────────────
+COVERAGE: 3/7 paths tested (43%)
+  Code paths: 2/4 (50%)
+  User flows: 1/3 (33%)
+QUALITY:  ★★★: 1  ★★: 1  ★: 1
+GAPS: 4 paths need tests (1 need E2E, 1 need eval)
+─────────────────────────────────
+```
+
+**Legend:**
+- `[★★★ TESTED]` = test covers edge cases AND error paths; include `file:line`
+- `[★★  TESTED]` = test covers happy path only; include `file:line`
+- `[★   TESTED]` = smoke test / trivial assertion; include `file:line`
+- `[GAP]` = no test — **MUST write in Phase 2**
+- `[GAP] [→E2E]` = needs E2E test: flow spans 3+ components, auth/payment/data-destruction
+- `[GAP] [→EVAL]` = needs eval: prompt template or LLM output changed
+
+**E2E Decision Matrix:**
+
+| Use E2E `[→E2E]` when | Use unit test when |
+|---|---|
+| Flow spans 3+ components/services | Pure function, clear inputs/outputs |
+| Mocking hides real failures (API→queue→worker→DB) | Internal helper, no side effects |
+| Auth / payment / data destruction | Single-function edge case (null, empty) |
+
+**Fast path:** All paths already covered → "Coverage Map: All paths covered ✓" → proceed to Phase 2.
+
+**REGRESSION RULE:** If the diff changes existing behavior AND no test covers that path → a regression test is a **CRITICAL requirement. No asking. No skipping.**
+
 ---
 
 ## Phase 2: Write Tests
@@ -87,8 +164,8 @@ If tests fail:
       "header": "Test vs Code Mismatch",
       "multiSelect": false,
       "options": [
-        {"label": "Fix production code — the test is correct"},
-        {"label": "Adjust the test — the code behavior is intentional"}
+        {"label": "Fix production code — the test is correct (human: ~30m / CC: ~10m) | Completeness: 10/10"},
+        {"label": "Adjust the test — the code behavior is intentional (human: ~10m / CC: ~5m) | Completeness: 7/10"}
       ]
     }
   ]
@@ -112,6 +189,8 @@ Result: All passing ✓ / N failing ✗
 Coverage: [critical uncovered paths if any]
 Files: [test files touched]
 Stories: [AS-001 ✓, AS-002 ✓, AS-005 new]
+E2E needed: [→E2E gaps from Coverage Map, or "none"]
+Eval needed: [→EVAL gaps from Coverage Map, or "none"]
 ```
 
 ### Spec Update Signal

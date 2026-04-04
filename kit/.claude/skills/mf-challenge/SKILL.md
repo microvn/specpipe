@@ -68,6 +68,7 @@ For EACH flaw found, output exactly:
 
 ### Finding: <title>
 - **Severity:** Critical | High | Medium
+- **Confidence:** N/10 — (9-10: verified in code; 7-8: strong pattern match; 5-6: possible false positive, note caveat; ≤4: omit unless Critical)
 - **Location:** <exact section or heading in the plan>
 - **Flaw:** <what's wrong — be specific>
 - **Evidence:** "<direct quote from the plan>"
@@ -187,8 +188,8 @@ Then present the decision using the `AskUserQuestion` tool:
       "header": "Apply Findings",
       "multiSelect": false,
       "options": [
-        {"label": "A) Apply all accepted — bulk-apply all fixes at once | Trade-off: fast vs. no per-finding control"},
-        {"label": "B) Review each — walk through one by one, accept/reject/modify | Trade-off: precise control vs. slower"}
+        {"label": "A) Apply all accepted — bulk-apply all fixes at once | (human: ~30m / CC: ~10m) | Completeness: 8/10 | Trade-off: fast vs. no per-finding control"},
+        {"label": "B) Review each — walk through one by one, accept/reject/modify | (human: ~1h / CC: ~20m) | Completeness: 10/10 | Trade-off: precise control vs. slower"}
       ]
     }
   ]

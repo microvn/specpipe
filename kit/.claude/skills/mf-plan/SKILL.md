@@ -17,27 +17,28 @@ When presenting questions to the user with multiple options, use the `AskUserQue
       "header": "<short label>",
       "multiSelect": false,
       "options": [
-        {"label": "A) <option> — <1-line rationale> | Fit: X/10 | Trade-off: <gain vs. lose>"},
-        {"label": "B) <option> — <1-line rationale> | Fit: X/10 | Trade-off: <gain vs. lose>"},
-        {"label": "C) <option> — <1-line rationale> | Fit: X/10 | Trade-off: <gain vs. lose>"}
+        {"label": "A) <option> — <1-line rationale> | (human: ~X / CC: ~Y) | Completeness: X/10 | Trade-off: <gain vs. lose>"},
+        {"label": "B) <option> — <1-line rationale> | (human: ~X / CC: ~Y) | Completeness: X/10 | Trade-off: <gain vs. lose>"},
+        {"label": "C) <option> — <1-line rationale> | (human: ~X / CC: ~Y) | Completeness: X/10 | Trade-off: <gain vs. lose>"}
       ]
     }
   ]
 }
 ```
 
-**Fit scoring calibration:**
-- **9-10:** Covers the requirement fully, no meaningful downside.
-- **7-8:** Solid choice, minor trade-offs that are acceptable for most projects.
+**Completeness scoring calibration:**
+- **9-10:** Covers the requirement fully, all edge cases handled, no meaningful downside.
+- **7-8:** Solid choice, happy path covered, minor trade-offs acceptable.
 - **5-6:** Workable but defers significant decisions or adds friction.
 - **3-4:** Shortcut — gets past the question but creates debt.
 - **1-2:** Placeholder only, must be revisited.
 
 Rules:
 - 2-4 options per question. Never more than 4.
-- Every option must have a Fit score AND a Trade-off. No score without rationale.
+- Every option must have a Completeness score AND a Trade-off. No score without rationale.
 - RECOMMENDATION is mandatory in the question text. Pick one. State why.
 - If two options score within 1 point, flag it: "Close call — A and B are both strong. Leaning A because [reason]."
+- If the more complete option only costs `CC: ≤15m` more → recommend it directly in the question text without offering the shortcut.
 - Pass all questions in a single `AskUserQuestion` call (not one-by-one) unless the answer to Q1 changes what Q2 should be.
 
 ---
@@ -123,6 +124,16 @@ Mode C does not run Phase 1 — it uses its own flow (see Mode C section).
 "SHOULD" = suggest split, present using **Question Format** with split vs. keep-together as options.
 "DO NOT" = keep together, unless user requests split.
 
+**Scope Challenge — run before drafting the spec:**
+
+1. **Reuse check:** From Phase 0 findings, what code already solves this sub-problem? Reuse vs rebuild? If rebuild → justify with AskUserQuestion.
+2. **Complexity smell:** Plan touches 8+ files or introduces 2+ new classes/services → flag and propose a minimal version via AskUserQuestion before continuing.
+3. **Search check:** Does the framework/runtime have a built-in for this? Is the chosen approach current best practice?
+4. **Distribution check:** Does the plan introduce a new artifact (binary, package, container)? → Is the CI/CD pipeline in scope? Code without distribution is code nobody can use. If deferred → capture explicitly in "Not in Scope".
+5. **Completeness check:** Is the plan doing the complete version or a shortcut? If the complete version only costs `CC: ≤15m` more → recommend it directly without asking.
+
+If the complexity check triggers → use AskUserQuestion to propose scope reduction before proceeding.
+
 If splitting:
 - Create the feature directory, place sub-specs in the same directory.
 - Each sub-spec must be self-contained (own overview, relevant data model, constraints).
@@ -197,6 +208,12 @@ AS-004: <short description>
 ## Constraints & Invariants
 [rules that must ALWAYS hold]
 
+## What Already Exists
+[existing code/flows that partially solve sub-problems — reusing or rebuilding?]
+
+## Not in Scope
+[work considered but deferred — each item with one-line rationale]
+
 ## Change Log
 
 | Date | Change | Ref |
@@ -222,8 +239,6 @@ Match depth to complexity. Simple CRUD = 3 stories. Complex auth = full template
 
 ### Writing Instructions
 
-When generating stories and acceptance scenarios:
-
 **DO:**
 - Write AS that test one specific behavior each. If it fails, the developer knows exactly what broke.
 - Use concrete values in Given/When/Then — `Given: user with balance $50` not `Given: user with some balance`.
@@ -240,14 +255,12 @@ When generating stories and acceptance scenarios:
 
 ### Spec Section Guidelines
 
-Include only sections that apply. Skip sections that add no value:
+Include only sections that apply:
 - **Data Model** — skip if feature has no persistent data or entities.
 - **Constraints & Invariants** — skip if no rules must always hold.
-- Don't generate filler for sections that don't apply.
+- **What Already Exists** and **Not in Scope** — always include.
 
 ### Consistency Check (after drafting)
-
-Before showing the draft, verify:
 
 | # | Check | On failure → |
 |---|-------|-------------|
@@ -292,9 +305,9 @@ Identify the top 3-5 ambiguities (most impactful first). Present all at once usi
       "header": "Auth Strategy",
       "multiSelect": false,
       "options": [
-        {"label": "A) Session-based auth (cookie) — traditional, simple server-side | Fit: 8/10 | Trade-off: simple setup vs. harder to scale across services"},
-        {"label": "B) JWT (stateless tokens) — API-friendly, no server session | Fit: 7/10 | Trade-off: scalable vs. token revocation complexity"},
-        {"label": "C) Defer — add auth story later when auth requirements are clearer | Fit: 5/10 | Trade-off: unblocks now vs. may require spec rewrite later"}
+        {"label": "A) Session-based auth (cookie) — traditional, simple server-side | (human: ~1d / CC: ~10m) | Completeness: 8/10 | Trade-off: simple setup vs. harder to scale across services"},
+        {"label": "B) JWT (stateless tokens) — API-friendly, no server session | (human: ~1d / CC: ~15m) | Completeness: 7/10 | Trade-off: scalable vs. token revocation complexity"},
+        {"label": "C) Defer — add auth story later when auth requirements are clearer | (human: ~0 / CC: ~0) | Completeness: 5/10 | Trade-off: unblocks now vs. may require spec rewrite later"}
       ]
     }
   ]
@@ -327,6 +340,12 @@ Show:
 - Directory structure created
 - Implementation order: which stories to implement first (by priority + dependency)
 - Next steps: "Implement stories in order. Use `/mf-build` to verify each story. For complex specs, run `/mf-challenge` first."
+
+**Required outputs (add to every spec):**
+
+**"What Already Exists"** — List code/flows that already partially solve sub-problems in this spec. Is the plan reusing or rebuilding them? If rebuilding → justify why. Write under `## What Already Exists` in the spec.
+
+**"Not in Scope"** — List work that was considered but deliberately deferred, each with a one-line rationale. Prevents work from silently dropping. Write under `## Not in Scope` in the spec.
 
 ---
 
@@ -444,9 +463,9 @@ Present the decision using the `AskUserQuestion` tool:
       "header": "Apply Changes",
       "multiSelect": false,
       "options": [
-        {"label": "A) Apply all — accept the full change report as shown | Fit: N/10 | Trade-off: fast vs. no per-item control"},
-        {"label": "B) Review each — walk through changes one by one, accept/reject/modify | Fit: N/10 | Trade-off: precise control vs. slower"},
-        {"label": "C) Reject all — discard and start over | Fit: N/10 | Trade-off: clean slate vs. loses work"}
+        {"label": "A) Apply all — accept the full change report as shown | (human: ~5m / CC: ~2m) | Completeness: 9/10 | Trade-off: fast vs. no per-item control"},
+        {"label": "B) Review each — walk through changes one by one, accept/reject/modify | (human: ~15m / CC: ~5m) | Completeness: 10/10 | Trade-off: precise control vs. slower"},
+        {"label": "C) Reject all — discard and start over | (human: ~0m / CC: ~0m) | Completeness: 3/10 | Trade-off: clean slate vs. loses work"}
       ]
     }
   ]
