@@ -49,7 +49,7 @@ All questions to the user go through the AskUserQuestion tool — never ask inli
 **Rules:**
 - `options` is **required** — every question must have 2–4 options. There is no open-ended format.
 - Each option requires both `label` and `description`.
-- `header` must be **≤ 12 characters**.
+- `header` is a chip label — **HARD LIMIT: ≤ 12 characters**. Count before submitting. "Remove/Strip" = 13 ❌. "Strip" = 5 ✓. "Rule type" = 9 ✓.
 - Do NOT add an "Other" option — it is added automatically by the UI.
 - For open-ended questions (free-form expected), use the most likely answers as options. The user can type freely via the automatic "Other" option.
 
@@ -57,7 +57,7 @@ All questions to the user go through the AskUserQuestion tool — never ask inli
 {
   "questions": [{
     "question": "<context> — <question>?",
-    "header": "<≤12 chars>",
+    "header": "<≤12 chars>",  // COUNT THE CHARACTERS BEFORE USING
     "multiSelect": false,
     "options": [
       {"label": "A) [option]", "description": "[1-line implication]"},
