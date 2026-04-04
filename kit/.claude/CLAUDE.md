@@ -13,6 +13,7 @@ Every change follows this cycle: **SPEC (with acceptance scenarios) → CODE + T
 
 | Trigger | Commands | Details |
 |---------|----------|---------|
+| Feature unclear / complex | `/mf-explore` → `/mf-plan` | Clarify requirements before writing spec |
 | New feature | `/mf-plan` → `/mf-challenge` (optional) → code in chunks → `/mf-build` each chunk | Start with spec or description |
 | Update feature | `/mf-plan <spec-path> "changes"` → code → `/mf-build` | Do NOT manually edit spec before /mf-plan |
 | Bug fix | `/mf-fix "description"` | Test-first: write failing test → fix → green |

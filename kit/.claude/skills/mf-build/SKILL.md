@@ -16,9 +16,21 @@ TDD delivery loop — write failing tests from spec AS, implement story by story
 
 2. **Read the spec** at `docs/specs/<feature>/<feature>.md` — the `## Stories` section with acceptance scenarios is your roadmap. The `## Overview` and `## Constraints` sections tell you the INTENT behind the code.
 
-3. **Locate related code:** If `codebase-memory-mcp` is available, use `search_code` to find all files touching this feature, and `trace_call_path` to understand dependency chain before writing tests — faster and more accurate than manual grep. Fallback: Grep for the main function/type names in the changed files.
+3. **Check build progress:** Look for `docs/specs/<feature>/.build-progress`.
+   - If found → read it, find the first line marked `pending` → resume from that story.
+     Log: "Resuming from S-00X (previous session progress found)."
+   - If not found → start from S-001 as normal.
 
-4. **Read existing tests** for the changed files — find patterns, fixtures, naming conventions. Don't duplicate.
+   File format:
+   ```
+   S-001 done
+   S-002 done
+   S-003 pending
+   ```
+
+4. **Locate related code:** If `codebase-memory-mcp` is available, use `search_code` to find all files touching this feature, and `trace_call_path` to understand dependency chain before writing tests — faster and more accurate than manual grep. Fallback: Grep for the main function/type names in the changed files.
+
+5. **Read existing tests** for the changed files — find patterns, fixtures, naming conventions. Don't duplicate.
 
 ---
 
@@ -126,6 +138,17 @@ bash scripts/build-test.sh --filter "$ARGUMENTS"
 
 ---
 
+**After each story's tests pass:** update `.build-progress` — mark that story `done`, next story `pending`:
+```bash
+# Example after S-002 passes:
+# S-001 done
+# S-002 done
+# S-003 pending
+```
+Write the full file each time (overwrite, not append) to keep state clean.
+
+---
+
 ## Phase 3: Build and Run
 
 Compile/typecheck first (tsc --noEmit, cargo check, go vet, swift build, etc.).
@@ -192,6 +215,10 @@ Stories: [AS-001 ✓, AS-002 ✓, AS-005 new]
 E2E needed: [→E2E gaps from Coverage Map, or "none"]
 Eval needed: [→EVAL gaps from Coverage Map, or "none"]
 ```
+
+**Progress file cleanup:**
+- All stories done → delete `docs/specs/<feature>/.build-progress`
+- Stories still remaining → leave file in place. Log: "Progress saved — resume with `/mf-build`"
 
 ### Spec Update Signal
 

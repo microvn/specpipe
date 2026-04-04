@@ -88,6 +88,7 @@ Before writing anything, run this checklist:
 |---|--------|-----|
 | P0-1 | **Keyword scan** | Grep the codebase for 3-5 keywords from the feature description. Note matching files, functions, types. |
 | P0-2 | **Related specs** | List `docs/specs/` directories. Read the main spec of any related feature. Is there overlap? |
+| P0-2b | **Explore doc** | Derive feature name from `$ARGUMENTS` as kebab-case (same convention as `docs/specs/<feature>/`). Check `docs/explore/<feature-name>.md`. If no exact match, list `docs/explore/` and fuzzy-match by keywords. If found → read it. Log: "Explore findings found for '<feature>' — using as primary input. Skipping P0-3, P0-4 (already covered)." Continue with P0-5, P0-6, P0-7. Map explore fields to spec sections: **Feature + Happy path** → Overview + Stories (happy path AS); **Unhappy paths** → Stories (error path AS); **Business rules** → Constraints & Invariants; **Data impact** → Data Model; **Out of scope** → Not in Scope; **Permissions** → Story descriptions; **Technical risks** → What Already Exists (note conflicts). |
 | P0-3 | **Dependency scan** | In the feature area, check imports/dependencies. What modules does this code touch? |
 | P0-4 | **Reusable utilities** | Look for existing helpers, validators, formatters, shared types that the new feature could reuse. List candidates. |
 | P0-5 | **Project patterns** | Identify test framework, naming conventions, directory structure from existing code. |

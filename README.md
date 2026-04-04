@@ -145,6 +145,7 @@ your-project/
 │   │   ├── sensitive-guard.sh ← Blocks access to secrets
 │   │   └── self-review.sh     ← Quality checklist on stop
 │   └── skills/
+│       ├── mf-explore/SKILL.md      ← /mf-explore skill
 │       ├── mf-plan/SKILL.md         ← /mf-plan skill
 │       ├── mf-challenge/SKILL.md    ← /mf-challenge skill
 │       ├── mf-build/SKILL.md        ← /mf-build skill
@@ -201,6 +202,26 @@ This removes hooks, skills, settings, and build-test.sh. It preserves `CLAUDE.md
 ---
 
 ## 4. Daily Workflows
+
+### Explore Before Planning
+
+> When: Requirements are unclear, you're debating between approaches, or it's a brownfield feature with existing code to understand first.
+
+```
+1. /mf-explore "feature description"
+   → Asks questions as a Client Technical Lead — one topic at a time.
+   → Clarifies: why, behavior, boundaries, business rules, edge cases, permissions, UI.
+   → Output: docs/explore/<feature>.md
+
+2. /mf-plan "feature description"
+   → Auto-detects docs/explore/<feature>.md, skips redundant discovery.
+   → Continue with the normal New Feature flow.
+```
+
+**Example:**
+```
+/mf-explore "cancel order request"
+```
 
 ### New Feature
 
@@ -275,6 +296,35 @@ This removes hooks, skills, settings, and build-test.sh. It preserves `CLAUDE.md
 ---
 
 ## 5. Commands Reference
+
+### /mf-explore — Feature Discovery as Client Technical Lead
+
+**Usage:**
+```
+/mf-explore "cancel order request"
+/mf-explore "user notification preferences"
+```
+
+**When to use:** Requirements are unclear, you're debating between approaches, or you want to clarify a feature deeply before committing to a spec. Runs before `/mf-plan`.
+
+**How it works:**
+
+1. **Phase 0: Codebase scan** — Silently checks for existing code, related specs, and existing explore docs before asking anything.
+2. **Phase 1: Why, not what** — Asks what problem requires this feature, who faces it, and how they handle it today. Prevents building the wrong thing.
+3. **Phase 2: Desired behavior** — Walks through the flow step by step, identifies trigger and final result, checks for multi-role approval chains.
+4. **Phase 2.5: UI/UX expectation** — Clarifies interface type (table, form, wizard, dashboard). Offers sensible defaults when the client is unsure. Suggests simpler approaches when expectations are complex.
+5. **Phase 3: Boundaries** — Impact on existing screens, data changes, migration needs, out of scope, permissions.
+6. **Phase 3.5: Scope optimization** — Identifies what can ship fast vs what can defer to phase 2.
+7. **Phase 4: Business rules & validation** — Conditions, formulas (with real numbers), input validation, notifications, time constraints, concurrency.
+8. **Phase 5: Edge cases** — Empty states, error messages, double submit, network loss, limits, sensitive data, domain-specific cases (payment double-charge, booking overbooking, etc.).
+9. **Phase 6: Scenario confirmation** — Presents concrete happy path + unhappy paths with fake data. Confirms with user before proceeding.
+10. **Phase 7: Handoff summary** — Compiles everything into a structured doc, confirms with user, writes to `docs/explore/<feature>.md`.
+
+**Output:** `docs/explore/<feature>.md` — auto-detected by `/mf-plan`, which skips redundant discovery and maps explore findings directly to spec sections.
+
+**Token cost:** 10–20k
+
+---
 
 ### /mf-plan — Generate Spec with Acceptance Scenarios
 
@@ -412,7 +462,7 @@ docs/specs/<feature>/
 
 **How it works:**
 
-1. **Phase 0: Build Context** — Finds changed files vs base branch, reads the spec (acceptance scenarios in `## Stories` section are the roadmap), reads existing tests for patterns, fixtures, and naming conventions. Doesn't duplicate what already exists.
+1. **Phase 0: Build Context** — Finds changed files vs base branch, reads the spec (acceptance scenarios in `## Stories` section are the roadmap), checks `docs/specs/<feature>/.build-progress` to resume from a previous interrupted session, reads existing tests for patterns, fixtures, and naming conventions. Doesn't duplicate what already exists.
 2. **Phase 1: Decide What to Test** — Determines test scope from acceptance scenarios. Applies the **Completeness Principle**: AI writes tests ~50x faster than humans, so if full coverage costs `CC: ≤15m`, it writes complete tests without asking.
 3. **Phase 1.5: Coverage Map** — Before writing a single test, traces every code path (if/else, switch, guard, try/catch) AND user flows (double-click, stale session, navigate away mid-op). Draws an ASCII diagram marking each path as `[★★★ TESTED]`, `[★★ TESTED]`, `[★ TESTED]`, or `[GAP]`. Gaps marked `[GAP] [→E2E]` need E2E tests; `[GAP] [→EVAL]` need evals. **Regression rule:** if the diff changes existing behavior with no covering test, a regression test is a CRITICAL requirement — no asking, no skipping.
 4. **Phase 2: Write Tests** — Writes tests for every `[GAP]` identified in the Coverage Map.

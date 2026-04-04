@@ -6,6 +6,23 @@
 
 ## 1. Four Workflow Types
 
+### Explore Before Planning
+
+When: Requirements are unclear, multiple approaches are possible, or it's a brownfield feature with existing code to understand first.
+
+```
+Step 1 → /mf-explore "feature description"
+          Clarifies: why the feature is needed, desired behavior, boundaries,
+          edge cases, business rules, permissions, UI expectations.
+          Asks questions as a Client Technical Lead — one topic at a time.
+          Output: docs/explore/<feature>.md
+
+Step 2 → /mf-plan "feature description"
+          Auto-detects docs/explore/<feature>.md → skips redundant codebase
+          discovery, uses explore findings as direct input for the spec.
+          Continue with the normal New Feature flow from Step 2.
+```
+
 ### New Feature
 
 When: Building something that doesn't exist yet (no code, no spec).
@@ -93,10 +110,14 @@ Use this to decide which workflow to follow:
 
 ```
 Is this a brand new feature (no existing spec or code)?
-├─ Yes → New Feature workflow. Start with /mf-plan.
-│   └─ Is the feature complex (auth, data pipeline, multi-service)?
-│       ├─ Yes → Run /mf-challenge after /mf-plan, before coding.
-│       └─ No → Skip /mf-challenge, go straight to implementation.
+├─ Yes
+│   ├─ Are requirements clear and approach decided?
+│   │   ├─ Yes → New Feature workflow. Start with /mf-plan.
+│   │   │   └─ Is the feature complex (auth, data pipeline, multi-service)?
+│   │   │       ├─ Yes → Run /mf-challenge after /mf-plan, before coding.
+│   │   │       └─ No → Skip /mf-challenge, go straight to implementation.
+│   │   └─ No → Explore Before Planning. Start with /mf-explore.
+│   │           Then /mf-plan using the explore output.
 └─ No
     ├─ Is this a bug fix?
     │   ├─ Yes → Bug Fix workflow. Start with /mf-fix.
@@ -177,6 +198,7 @@ Files to delete: [list]
 
 | Workflow | Estimated Tokens | When |
 |----------|-----------------|------|
+| `/mf-explore` | 10–20k | Before /mf-plan when requirements are unclear |
 | `/mf-build` (incremental) | 5–10k | Daily, after each code chunk |
 | `/mf-fix` (single bug) | 3–5k | As bugs arise |
 | `/mf-commit` | 2–4k | Each commit |
