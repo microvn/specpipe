@@ -46,30 +46,23 @@ Non-critical edge cases don't need to be resolved now — log them as Open quest
 
 All questions to the user go through the AskUserQuestion tool — never ask inline in text.
 
-**Open-ended** — use when you want the client to describe freely, without suggesting a direction:
+**Rules:**
+- `options` is **required** — every question must have 2–4 options. There is no open-ended format.
+- Each option requires both `label` and `description`.
+- `header` must be **≤ 12 characters**.
+- Do NOT add an "Other" option — it is added automatically by the UI.
+- For open-ended questions (free-form expected), use the most likely answers as options. The user can type freely via the automatic "Other" option.
 
 ```json
 {
   "questions": [{
-    "question": "<1-line context> — <question>",
-    "header": "<2-4 word label>",
-    "multiSelect": false
-  }]
-}
-```
-
-**Decision with options** — use when there are 2-3 clear choices (UI type, phasing, scope split):
-
-```json
-{
-  "questions": [{
-    "question": "<context>. DEFAULT: [X] — [short reason]",
-    "header": "<2-4 word label>",
+    "question": "<context> — <question>?",
+    "header": "<≤12 chars>",
     "multiSelect": false,
     "options": [
-      {"label": "A) [option] — [1-line implication]"},
-      {"label": "B) [option] — [1-line implication]"},
-      {"label": "C) Other — describe"}
+      {"label": "A) [option]", "description": "[1-line implication]"},
+      {"label": "B) [option]", "description": "[1-line implication]"},
+      {"label": "C) [option]", "description": "[1-line implication]"}
     ]
   }]
 }
@@ -132,12 +125,12 @@ Use AskUserQuestion:
 {
   "questions": [{
     "question": "This feature already has [brief description of what exists]. What do you want to do with it?",
-    "header": "Existing feature",
+    "header": "Existing",
     "multiSelect": false,
     "options": [
-      {"label": "A) Change the current behavior — something isn't working right"},
-      {"label": "B) Extend it with new functionality — add to what's already there"},
-      {"label": "C) Rebuild from scratch — start fresh with a different approach"}
+      {"label": "A) Change behavior", "description": "Something isn't working right"},
+      {"label": "B) Extend it", "description": "Add new functionality to what's already there"},
+      {"label": "C) Rebuild from scratch", "description": "Start fresh with a different approach"}
     ]
   }]
 }
@@ -152,8 +145,13 @@ Use AskUserQuestion:
 {
   "questions": [{
     "question": "What specific problem is happening that requires this feature? Who is experiencing it, in which flow, at which step?",
-    "header": "Problem & context",
-    "multiSelect": false
+    "header": "Problem",
+    "multiSelect": false,
+    "options": [
+      {"label": "Users are blocked", "description": "A specific role hits a blocker in an existing flow"},
+      {"label": "Manual workaround", "description": "Users do something manually that should be automated"},
+      {"label": "Missing capability", "description": "Something can't be done at all today"}
+    ]
   }]
 }
 ```
@@ -167,7 +165,12 @@ Wait for the answer. Then depending on context:
   "questions": [{
     "question": "More specifically: what is the user trying to do and where are they stuck? How are they handling it today — workaround, manually, asking an admin, or they simply can't do it?",
     "header": "Specifics",
-    "multiSelect": false
+    "multiSelect": false,
+    "options": [
+      {"label": "Manual workaround", "description": "User does it by hand each time"},
+      {"label": "Asks an admin", "description": "User has to escalate or request help"},
+      {"label": "Can't do it at all", "description": "No workaround exists — user is fully blocked"}
+    ]
   }]
 }
 ```
@@ -177,9 +180,14 @@ Wait for the answer. Then depending on context:
 ```json
 {
   "questions": [{
-    "question": "So [user role X] is [stuck at Y] and currently handles it by [Z]. Is that right? Also: how often does this happen — daily, weekly, or only on special events?",
-    "header": "Paraphrase check",
-    "multiSelect": false
+    "question": "So [user role X] is [stuck at Y] and currently handles it by [Z]. Is that right?",
+    "header": "Paraphrase",
+    "multiSelect": false,
+    "options": [
+      {"label": "Yes, correct", "description": "Understanding is accurate — proceed"},
+      {"label": "Partially right", "description": "Some details need correction"},
+      {"label": "Not quite", "description": "Significant misunderstanding — clarify"}
+    ]
   }]
 }
 ```
@@ -383,12 +391,12 @@ After presenting the scenarios, confirm via AskUserQuestion:
 {
   "questions": [{
     "question": "I've just described [N] scenarios for this feature. Is anything wrong or missing?",
-    "header": "Confirm scenarios",
+    "header": "Scenarios",
     "multiSelect": false,
     "options": [
-      {"label": "A) All correct — proceed to summary"},
-      {"label": "B) Something needs fixing — point out what"},
-      {"label": "C) Need to add another scenario — describe it"}
+      {"label": "All correct", "description": "Proceed to handoff summary"},
+      {"label": "Needs fixing", "description": "Point out what's wrong"},
+      {"label": "Add a scenario", "description": "Describe an additional scenario to cover"}
     ]
   }]
 }
@@ -494,12 +502,12 @@ After writing the summary, confirm via AskUserQuestion:
 {
   "questions": [{
     "question": "Is this summary complete enough to hand off to /mf-plan?",
-    "header": "Confirm handoff",
+    "header": "Handoff",
     "multiSelect": false,
     "options": [
-      {"label": "A) Yes — save and hand off to /mf-plan"},
-      {"label": "B) Needs additions — point out what's missing"},
-      {"label": "C) Still have unresolved Open questions — work through them first"}
+      {"label": "Yes, save & hand off", "description": "Write to docs/explore/ and pass to /mf-plan"},
+      {"label": "Needs additions", "description": "Point out what's missing before saving"},
+      {"label": "Open questions first", "description": "Work through unresolved questions first"}
     ]
   }]
 }
