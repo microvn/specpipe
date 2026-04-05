@@ -194,6 +194,10 @@ assert_exit "allow: path assign through dist/" 0 \
   "$(exit_bash "$PG" '{"tool_input":{"command":"TOOL=~/.local/dist/mytool; \"$TOOL\" --version"}}')"
 assert_exit "allow: -x check through node_modules/.bin" 0 \
   "$(exit_bash "$PG" '{"tool_input":{"command":"[ -x node_modules/.bin/webpack ] && echo ok"}}')"
+assert_exit "allow: executing node_modules/.bin binary with piped head" 0 \
+  "$(exit_bash "$PG" '{"tool_input":{"command":"node_modules/.bin/playwright test --list 2>&1 | head -20"}}')"
+assert_exit "allow: npx-style .bin binary piped to tail" 0 \
+  "$(exit_bash "$PG" '{"tool_input":{"command":"node_modules/.bin/jest --listTests 2>&1 | tail -10"}}')"
 
 # ── Absolute path containing blocked dir ─────────────────────────────────────
 assert_exit "block: absolute path with node_modules" 2 \

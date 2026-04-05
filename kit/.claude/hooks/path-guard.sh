@@ -103,7 +103,12 @@ fi
 
 # ─── Match and block ────────────────────────────────────────────────
 
-if printf '%s\n' "$COMMAND" | grep -qE "$BLOCKED"; then
+# Strip node_modules/.bin/<binary> references before checking blocked paths.
+# Executing an installed binary (e.g. node_modules/.bin/playwright) is not
+# directory exploration — only the binary itself is referenced, not the tree.
+COMMAND_FOR_CHECK=$(printf '%s\n' "$COMMAND" | sed -E "s|node_modules[/\\]\.bin[/\\][^[:space:]]*||g")
+
+if printf '%s\n' "$COMMAND_FOR_CHECK" | grep -qE "$BLOCKED"; then
     # Extract which pattern matched for a useful error message
     MATCHED=$(printf '%s\n' "$COMMAND" | grep -oE "$BLOCKED" | head -1)
     echo "Blocked: command references '$MATCHED' — this directory is typically large and exploring it wastes tokens. Use Glob or Grep tools instead." >&2
