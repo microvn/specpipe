@@ -198,7 +198,7 @@ Then present the decision using the `AskUserQuestion` tool:
 
 Score: if most findings are High/Critical, recommend B. If mostly Medium with clear fixes, recommend A.
 
-If user picks B: for each finding, use `AskUserQuestion`:
+If user picks B: for each finding, use `AskUserQuestion`. Append `(Recommended)` to option A if the Phase 5 adjudication = Accept, or to option C if adjudication = Reject:
 
 ```json
 {
@@ -208,7 +208,7 @@ If user picks B: for each finding, use `AskUserQuestion`:
       "header": "Finding C-1",
       "multiSelect": false,
       "options": [
-        {"label": "A) Accept — apply the suggested fix"},
+        {"label": "A) Accept — apply the suggested fix (Recommended)"},
         {"label": "B) Modify — accept with changes (describe your modification)"},
         {"label": "C) Reject — skip this finding"}
       ]
@@ -216,6 +216,8 @@ If user picks B: for each finding, use `AskUserQuestion`:
   ]
 }
 ```
+
+*(Example above shows adjudication = Accept. If adjudication = Reject, move `(Recommended)` to option C instead.)*
 
 ## Phase 7: Apply
 
