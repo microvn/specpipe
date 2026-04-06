@@ -97,7 +97,7 @@ Run silently. The client does not need to know about this step.
 | S2 | List `docs/specs/` and `docs/explore/` | Does a spec or explore doc already exist? Any related spec? If an explore doc already exists for this feature → ask: "An explore doc already exists for this feature. Start fresh or update it?" Wait for answer before continuing. |
 | S3 | Grep `$ARGUMENTS` keywords in the codebase | Existing related code — how much already exists? |
 | S4 | List related screens/routes | Understand the system surface area |
-| S5 | If `codebase-memory-mcp` is available → use `search_code` and `get_architecture` | Faster and more thorough than grep |
+| S5 | If `codebase-memory-mcp` is connected → prefer `search_code` and `get_architecture` | Indexed search + architecture visibility more reliable than grep — use this before S3 if connected |
 
 **Fallback — if scan yields nothing useful** (no CLAUDE.md, messy codebase, MCP unavailable): skip scan results, ask the user directly at the start of Phase 1:
 > "Does this feature have any existing code, or is it completely new? If it exists, where is it in the system?"

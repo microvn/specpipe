@@ -28,7 +28,7 @@ TDD delivery loop — write failing tests from spec AS, implement story by story
    S-003 pending
    ```
 
-4. **Locate related code:** If `codebase-memory-mcp` is available, use `search_code` to find all files touching this feature, and `trace_call_path` to understand dependency chain before writing tests — faster and more accurate than manual grep. Fallback: Grep for the main function/type names in the changed files.
+4. **Locate related code:** If `codebase-memory-mcp` is connected, prefer `search_code` to find all files touching this feature, `trace_call_path` to understand the dependency chain, and `get_architecture` to check if the feature belongs to a sensitive layer — indexed search and call graph visibility more reliable than ad-hoc grep. Fallback: Grep for the main function/type names in the changed files.
 
 5. **Read existing tests** for the changed files — find patterns, fixtures, naming conventions. Don't duplicate.
 

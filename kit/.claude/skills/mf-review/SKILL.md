@@ -13,7 +13,7 @@ Pre-merge code review — security, correctness, spec alignment.
    ```
 2. Check for spec in `docs/specs/<feature>/<feature>.md` — review against INTENT.
 3. Read the diff: `git diff "$BASE"...HEAD`
-4. **Expand blast radius:** If `codebase-memory-mcp` is available, use `search_code("<changed function or type>")` to find files not in the diff that may be affected, and `get_architecture()` to check if changed files belong to a sensitive layer (auth, payment, core). Fallback: skip, review diff only.
+4. **Expand blast radius:** If `codebase-memory-mcp` is connected, prefer `search_code("<changed function or type>")` to find files not in the diff that may be affected, and `get_architecture()` to check if changed files belong to a sensitive layer (auth, payment, core) — more reliable than manual grep. Fallback: skip, review diff only.
 5. **What already exists:** List any code/flows that already partially solve the problem in this diff. Flag if the diff rebuilds something that already exists.
 
 If `$ARGUMENTS` provided → scope to those files only.

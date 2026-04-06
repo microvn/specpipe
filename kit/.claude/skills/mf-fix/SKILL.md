@@ -21,7 +21,7 @@ Fixing symptoms creates whack-a-mole debugging. Every fix that doesn't address t
 Don't jump to code. Understand the bug first:
 
 1. **Parse the report.** Symptom? Expected vs actual? Repro steps? If context is missing → ask ONE question via AskUserQuestion before proceeding.
-2. **Locate the code.** If `codebase-memory-mcp` is available, use `search_code("<error message or function name>")` to find related files faster, and `trace_call_path` to map callers and impact radius. Fallback: Grep for keywords from the bug (error messages, function names).
+2. **Locate the code.** If `codebase-memory-mcp` is connected, prefer `search_code("<error message or function name>")` to find related files and `trace_call_path` to map callers and impact radius — indexed search and call graph visibility that grep cannot match. Fallback: Grep for keywords from the bug (error messages, function names).
 3. **Check history.** `git log --oneline -20 -- <affected-files>` — was this working before? What changed? Regression = root cause is in the diff.
 4. **Pattern check.** Match the symptom against known bug patterns:
 
@@ -35,6 +35,8 @@ Don't jump to code. Understand the bug first:
 | Stale cache | Shows old data, fixes on cache clear | Redis, CDN, browser cache |
 
 5. **Reproduce deterministically.** If you can't trigger the bug reliably → gather more evidence. Do NOT guess.
+
+> If `codebase-memory-mcp` is connected, prefer it for steps 2 and 4 — `search_code` for finding affected files, `trace_call_path` for blast radius, `get_architecture` to check if the bug lives in a sensitive layer (auth, payment, core). These are more reliable than ad-hoc grep.
 
 **Required output:** `Root cause hypothesis: ...` — a specific, testable claim about what is wrong and why.
 
