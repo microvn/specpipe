@@ -1,11 +1,13 @@
 #!/usr/bin/env node
 // file-guard.js — PostToolUse hook for Claude Code
 //
-// Warns when a Write/Edit operation produces a file exceeding a line threshold.
+// Warns when a Write/Edit operation produces a source code file exceeding a line threshold.
+// Only checks source code files — docs (.md), configs (.json/.yaml/.toml), and templates
+// are intentionally excluded since they are naturally long.
 // Non-blocking: always exits 0 and injects advisory context.
 //
 // Environment:
-//   FILE_GUARD_THRESHOLD  — max lines before warning (default: 200)
+//   FILE_GUARD_THRESHOLD  — max lines before warning (default: 350)
 //   FILE_GUARD_EXCLUDE    — comma-separated globs to skip (e.g. "*.generated.swift,*.pb.go")
 
 "use strict";
@@ -13,7 +15,93 @@
 const fs = require("fs");
 const path = require("path");
 
-const THRESHOLD = parseInt(process.env.FILE_GUARD_THRESHOLD, 10) || 200;
+const THRESHOLD = parseInt(process.env.FILE_GUARD_THRESHOLD, 10) || 350;
+
+// Only warn for source code files — docs, configs, and templates are naturally long
+const SOURCE_EXTENSIONS = new Set([
+  // JavaScript / TypeScript
+  ".js", ".mjs", ".cjs", ".jsx",
+  ".ts", ".tsx", ".mts", ".cts",
+  // Frontend frameworks
+  ".vue", ".svelte", ".astro",
+  // Python
+  ".py", ".pyw", ".pyi", ".pyx", ".pxd",
+  // PHP
+  ".php", ".php3", ".php4", ".php5", ".php7", ".php8", ".phtml",
+  // Ruby
+  ".rb", ".rbw",
+  // Rust
+  ".rs",
+  // Go
+  ".go",
+  // Swift
+  ".swift",
+  // Kotlin
+  ".kt", ".kts",
+  // Java
+  ".java",
+  // C#
+  ".cs", ".csx",
+  // C / C++
+  ".c", ".h", ".cc", ".cpp", ".cxx", ".c++", ".hpp", ".hh", ".hxx", ".h++",
+  // Objective-C
+  ".m", ".mm",
+  // Dart
+  ".dart",
+  // Elixir
+  ".ex", ".exs",
+  // Scala
+  ".scala", ".sc",
+  // Groovy
+  ".groovy",
+  // Clojure
+  ".clj", ".cljs", ".cljc",
+  // Haskell
+  ".hs", ".lhs",
+  // F#
+  ".fs", ".fsx", ".fsi",
+  // OCaml
+  ".ml", ".mli", ".mll", ".mly",
+  // Erlang
+  ".erl", ".hrl",
+  // Lua
+  ".lua",
+  // R
+  ".r",
+  // Julia
+  ".jl",
+  // Nim
+  ".nim", ".nims",
+  // Zig
+  ".zig",
+  // Crystal
+  ".cr",
+  // Perl
+  ".pl", ".pm",
+  // Solidity
+  ".sol",
+  // PowerShell
+  ".ps1", ".psm1", ".psd1",
+  // PureScript
+  ".purs",
+  // Elm
+  ".elm",
+  // ReScript / ReasonML
+  ".res", ".resi",
+  // Lisp / Scheme / Racket
+  ".lisp", ".lsp", ".cl", ".el", ".scm", ".ss", ".rkt",
+  // Prolog
+  ".pro",
+  // Fortran
+  ".f", ".f90", ".f95", ".f03", ".f08",
+  // Pascal / Delphi
+  ".pas", ".pp",
+  // VB.NET
+  ".vb",
+  // Arduino
+  ".ino",
+]);
+
 const EXCLUDE = (process.env.FILE_GUARD_EXCLUDE || "")
   .split(",")
   .map((g) => g.trim())
@@ -63,6 +151,10 @@ function main() {
   const projectDir = process.cwd() + path.sep;
   const resolvedFile = path.resolve(filePath);
   if (!resolvedFile.startsWith(projectDir) && resolvedFile !== process.cwd()) process.exit(0);
+
+  // Skip non-source-code files (docs, configs, templates are naturally long)
+  const ext = path.extname(filePath).toLowerCase();
+  if (!SOURCE_EXTENSIONS.has(ext)) process.exit(0);
 
   // Skip excluded patterns
   if (matchesExclude(filePath)) process.exit(0);

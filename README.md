@@ -343,7 +343,7 @@ This removes hooks, skills, settings, and build-test.sh. It preserves `CLAUDE.md
 **How it works:**
 
 1. **Phase 0: Codebase Awareness** — Scans existing code, `docs/specs/`, and project patterns before planning. Prevents specs that conflict with existing implementations.
-2. **Phase 1: Scope & Split + Scope Challenge** — Evaluates feature size (>7 stories or >20 AS → must split). Also runs a **Scope Challenge** before drafting: checks for existing code that already solves sub-problems (reuse vs rebuild), flags complexity smells (8+ files or 2+ new classes/services), searches for framework built-ins, checks for distribution needs (new artifact → CI/CD in scope?), and applies the Completeness Principle (complete version costs only `CC: ≤15m` more → recommend it directly).
+2. **Phase 1: Scope & Split + Scope Challenge** — Evaluates feature size (>7 stories or >20 AS → must split). When a feature is large, applies **Sizing & Phasing**: Phase 1 (minimum viable — smallest slice with value), Phase 2 (core experience — happy path), Phase 3 (edge cases, polish), Phase 4 (optimization, monitoring) — each phase mergeable independently. Also runs a **Scope Challenge** before drafting: checks for existing code that already solves sub-problems (reuse vs rebuild), flags complexity smells (8+ files or 2+ new classes/services), searches for framework built-ins, checks for distribution needs (new artifact → CI/CD in scope?), and applies the Completeness Principle (complete version costs only `CC: ≤15m` more → recommend it directly).
 3. **Phase 2: Draft Spec** — Generates a structured spec with stories and acceptance scenarios (Given/When/Then). Depth scales by priority: P0 gets full GWT + test data, P1 gets GWT, P2 gets 1-2 line descriptions. Runs consistency checks (CC1-CC6) before showing draft.
 4. **Phase 3: Clarify Ambiguities** — Systematically finds gaps across behavioral, data, auth, non-functional, integration, and concurrency dimensions. Questions include `(human: ~X / CC: ~Y)` effort scales and `Completeness: X/10` scores for each option.
 5. **Phase 4: Summary** — Shows story counts, AS counts, implementation order, next steps. Every spec also gets a **"What Already Exists"** section (existing code that partially solves the problem) and a **"Not in Scope"** section (deferred work with rationale — prevents work from silently dropping).
@@ -463,9 +463,9 @@ docs/specs/<feature>/
 **How it works:**
 
 1. **Phase 0: Build Context** — Finds changed files vs base branch, reads the spec (acceptance scenarios in `## Stories` section are the roadmap), checks `docs/specs/<feature>/.build-progress` to resume from a previous interrupted session, reads existing tests for patterns, fixtures, and naming conventions. Doesn't duplicate what already exists.
-2. **Phase 1: Decide What to Test** — Determines test scope from acceptance scenarios. Applies the **Completeness Principle**: AI writes tests ~50x faster than humans, so if full coverage costs `CC: ≤15m`, it writes complete tests without asking.
-3. **Phase 1.5: Coverage Map** — Before writing a single test, traces every code path (if/else, switch, guard, try/catch) AND user flows (double-click, stale session, navigate away mid-op). Draws an ASCII diagram marking each path as `[★★★ TESTED]`, `[★★ TESTED]`, `[★ TESTED]`, or `[GAP]`. Gaps marked `[GAP] [→E2E]` need E2E tests; `[GAP] [→EVAL]` need evals. **Regression rule:** if the diff changes existing behavior with no covering test, a regression test is a CRITICAL requirement — no asking, no skipping.
-4. **Phase 2: Write Tests** — Writes tests for every `[GAP]` identified in the Coverage Map.
+2. **Phase 1: Decide What to Test** — Determines test scope from acceptance scenarios. Applies the **Completeness Principle**: AI writes tests ~50x faster than humans, so if full coverage costs `CC: ≤15m`, it writes complete tests without asking. Always checks 8 mandatory edge case categories: null/undefined, empty arrays/strings, invalid types, boundary values (min/max), error paths (network failures, DB errors), race conditions, large data (10k+ items), and special characters (Unicode, SQL chars).
+3. **Phase 1.5: Coverage Map** — Before writing a single test, traces every code path (if/else, switch, guard, try/catch) AND user flows (double-click, stale session, navigate away mid-op). Draws an ASCII diagram marking each path as `[★★★ TESTED]`, `[★★ TESTED]`, `[★ TESTED]`, or `[GAP]`. Gaps marked `[GAP] [→E2E]` need E2E tests; `[GAP] [→EVAL]` need evals — when flagged, defines capability + regression evals before implementing and reports pass@1/pass@3. **Regression rule:** if the diff changes existing behavior with no covering test, a regression test is a CRITICAL requirement — no asking, no skipping.
+4. **Phase 2: Write Tests** — Writes tests for every `[GAP]` identified in the Coverage Map. Before moving to Phase 3, verifies: all public functions have unit tests, all API endpoints have integration tests, edge cases covered, error paths tested, tests independent, assertions specific.
 5. **Phase 3: Build and Run** — Compiles/typechecks first, then runs tests.
 6. **Phase 4: Fix Loop** — If tests fail, fixes **test code only** (max 3 attempts, then hard stop and report). If tests expect X but code does Y, asks whether to fix production code or adjust the test — with effort scales `(human: ~X / CC: ~Y)`.
 7. **Phase 5: Report** — Summary with test counts, results, coverage, files touched, and any E2E/eval gaps to follow up on.
@@ -508,7 +508,7 @@ docs/specs/<feature>/
 
 1. **Phase 0: Understand Intent** — Reads commit messages, checks for related spec, expands blast radius. Also notes **what already exists**: flags if the diff rebuilds something that already exists in the codebase.
 2. **Phase 1: Smart Focus** — Auto-detects what to focus on based on the diff (auth → security, SQL → injection, payments → idempotency, etc.). Spends 60% of analysis on the primary focus.
-3. **Phase 2: Review** — Security, correctness, spec-test alignment, code quality (including **diagram maintenance**: stale ASCII diagrams in comments are flagged), performance, and a **Failure Mode Grid** for each new codepath (3 dimensions: test covers it? error handling exists? user sees a clear error or silent failure? — all 3 missing = Critical gap).
+3. **Phase 2: Review** — Security, correctness, **API/Backend patterns** (unvalidated input, missing rate limiting, missing timeouts, missing CORS, error message leakage), spec-test alignment, code quality (including **diagram maintenance**: stale ASCII diagrams in comments are flagged), performance, a **Failure Mode Grid** for each new codepath (3 dimensions: test covers it? error handling exists? user sees a clear error or silent failure? — all 3 missing = Critical gap), and an **AI-generated code addendum** when reviewing AI-written changes (behavioral regressions, trust boundaries, architecture drift, model cost escalation).
 4. **Phase 3: Report** — Structured report. Every finding includes a **confidence score** `(confidence: N/10)`: 9-10 = verified in code; 7-8 = strong pattern match; 5-6 = possible false positive; <5 = appendix only. Includes a **"Not in scope"** section listing deferred work with rationale.
 
 **Proportional review:** A 5-line doc change gets a light review. A 500-line auth rewrite gets file-by-file deep analysis.
@@ -551,13 +551,16 @@ Hooks run automatically — you don't invoke them. They provide passive protecti
 ### File Guard (`file-guard.js`)
 
 **Trigger:** After every Write or Edit operation.
-**Action:** If the modified file exceeds 200 lines, injects a warning suggesting modularization.
+**Action:** If a modified **source code file** exceeds 350 lines, injects a warning suggesting modularization. Docs, configs, and templates are intentionally excluded — they are naturally long.
 **Blocking:** No — warns only, does not prevent the edit.
+
+**Checked extensions:** `.ts`, `.tsx`, `.js`, `.jsx`, `.py`, `.php`, `.rb`, `.rs`, `.go`, `.swift`, `.kt`, `.java`, `.cs`, `.cpp`, `.c`, `.dart`, `.vue`, `.svelte`, `.astro`, and more.
+**Not checked:** `.md`, `.json`, `.yaml`, `.toml`, `.html`, `.css`, `.sh`, and other non-source files.
 
 **Configuration:**
 ```bash
-# Change the line threshold (default: 200)
-export FILE_GUARD_THRESHOLD=300
+# Change the line threshold (default: 350)
+export FILE_GUARD_THRESHOLD=500
 
 # Exclude files from checking (comma-separated globs)
 export FILE_GUARD_EXCLUDE="*.generated.swift,*.pb.go,*.min.js"

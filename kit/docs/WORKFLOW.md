@@ -43,11 +43,16 @@ Step 2 → (Optional) /mf-challenge docs/specs/<feature>/<feature>.md
 
 Step 3 → Implement in chunks. After each chunk:
           /mf-build
+          Checks 8 edge case categories (null, empty, invalid types, boundary,
+          error paths, race conditions, large data, special chars).
           Draws Coverage Map before writing tests: traces code paths + user flows,
-          marks [GAP], [GAP][→E2E], [GAP][→EVAL]. Regression rule enforced.
+          marks [GAP], [GAP][→E2E], [GAP][→EVAL] (with pass@1/pass@3 guidance).
+          Regression rule enforced.
           Repeat until chunk is green.
 
 Step 4 → /mf-review (before merge)
+          Checks API/Backend patterns (rate limiting, timeouts, CORS, error leakage).
+          Extra layer for AI-generated code: regressions, trust boundaries, cost escalation.
 
 Step 5 → /mf-commit
 ```

@@ -535,7 +535,7 @@ assert_not_contains "no warning: small file" "Warning" "$OUT_SMALL"
 
 # Large file: warning injected into JSON output
 LARGE="$TMPTEST/large.ts"
-seq 1 250 | awk '{print "const x" $1 " = " $1 ";"}' > "$LARGE"
+seq 1 400 | awk '{print "const x" $1 " = " $1 ";"}' > "$LARGE"
 OUT_LARGE=$(stdout_node "$FG" "{\"tool_input\":{\"file_path\":\"$LARGE\"}}")
 assert_contains "warning: large file (250 lines)"   "Warning"           "$OUT_LARGE"
 assert_contains "warning includes threshold info"    "lines (threshold:" "$OUT_LARGE"
@@ -550,7 +550,7 @@ MEDIUM="$TMPTEST/medium.ts"
 seq 1 50 | awk '{print "const x" $1 " = " $1 ";"}' > "$MEDIUM"
 OUT_DEFAULT=$(stdout_node "$FG" "{\"tool_input\":{\"file_path\":\"$MEDIUM\"}}")
 OUT_LOW=$(stdout_node "$FG"     "{\"tool_input\":{\"file_path\":\"$MEDIUM\"}}" FILE_GUARD_THRESHOLD=30)
-assert_not_contains "no warning at default threshold (50 < 200)"  "Warning" "$OUT_DEFAULT"
+assert_not_contains "no warning at default threshold (50 < 350)"  "Warning" "$OUT_DEFAULT"
 assert_contains     "warning at low threshold (50 > 30)"          "Warning" "$OUT_LOW"
 
 # Empty input: exits 0
@@ -566,20 +566,20 @@ rm -f "$OUTSIDE"
 # ── Threshold boundary conditions ─────────────────────────────────────────────
 section "file-guard.js — boundary and exclusion tests"
 
-# Exactly at threshold (200 lines default) → NO warning
-# split("\n") counts: file needs to produce exactly 200 elements, so NO trailing newline
+# Exactly at threshold (350 lines default) → NO warning
+# split("\n") counts: file needs to produce exactly 350 elements, so NO trailing newline
 AT_THRESHOLD="$TMPTEST/at-threshold.ts"
-seq 1 199 | awk '{print "const x" $1 " = " $1 ";"}' > "$AT_THRESHOLD"
-printf 'export {}' >> "$AT_THRESHOLD"  # 200th line, no trailing newline → split gives 200 elements
+seq 1 349 | awk '{print "const x" $1 " = " $1 ";"}' > "$AT_THRESHOLD"
+printf 'export {}' >> "$AT_THRESHOLD"  # 350th line, no trailing newline → split gives 350 elements
 OUT_AT=$(stdout_node "$FG" "{\"tool_input\":{\"file_path\":\"$AT_THRESHOLD\"}}")
-assert_not_contains "no warning: at threshold (200 lines)" "Warning" "$OUT_AT"
+assert_not_contains "no warning: at threshold (350 lines)" "Warning" "$OUT_AT"
 
-# One over threshold (201 lines) → SHOULD warn
+# One over threshold (351 lines) → SHOULD warn
 ONE_OVER="$TMPTEST/one-over.ts"
-seq 1 200 | awk '{print "const x" $1 " = " $1 ";"}' > "$ONE_OVER"
-printf 'export {};\n' >> "$ONE_OVER"  # 201st line with newline → split gives 202 elements
+seq 1 350 | awk '{print "const x" $1 " = " $1 ";"}' > "$ONE_OVER"
+printf 'export {};\n' >> "$ONE_OVER"  # 351st line with newline → split gives 352 elements
 OUT_OVER=$(stdout_node "$FG" "{\"tool_input\":{\"file_path\":\"$ONE_OVER\"}}")
-assert_contains "warning: one over threshold (201 lines)" "Warning" "$OUT_OVER"
+assert_contains "warning: one over threshold (351 lines)" "Warning" "$OUT_OVER"
 
 # FILE_GUARD_EXCLUDE: excluded file gets no warning even if large
 EXCL_FILE="$TMPTEST/schema.generated.ts"

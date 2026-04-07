@@ -58,6 +58,16 @@ Test behavior, not implementation. If the internals change but behavior stays th
 - Trivial getters/setters (unless they have validation)
 - Implementation details (HOW it works — test WHAT it does)
 
+**Edge cases you MUST test:**
+1. **Null/Undefined** input
+2. **Empty** arrays/strings
+3. **Invalid types** passed
+4. **Boundary values** (min/max)
+5. **Error paths** (network failures, DB errors)
+6. **Race conditions** (concurrent operations)
+7. **Large data** (performance with 10k+ items)
+8. **Special characters** (Unicode, SQL chars)
+
 **Quality check for each test:**
 - Does it test one concept? If it fails, do you know exactly what broke?
 - Is it independent? No test depends on another running first.
@@ -133,7 +143,7 @@ GAPS: 4 paths need tests (1 need E2E, 1 need eval)
 - `[★   TESTED]` = smoke test / trivial assertion; include `file:line`
 - `[GAP]` = no test — **MUST write in Phase 2**
 - `[GAP] [→E2E]` = needs E2E test: flow spans 3+ components, auth/payment/data-destruction
-- `[GAP] [→EVAL]` = needs eval: prompt template or LLM output changed
+- `[GAP] [→EVAL]` = needs eval: prompt template or LLM output changed. When flagged: define capability + regression evals before implementing, run baseline and capture failure signatures, implement minimum passing change, re-run and report pass@1 and pass@3. Release-critical paths should target pass@3 stability before merge.
 
 **E2E Decision Matrix:**
 
@@ -157,6 +167,14 @@ bash scripts/build-test.sh --filter "$ARGUMENTS"
 ```
 
 ---
+
+**Before moving to Phase 3, verify:**
+- [ ] All public functions have unit tests
+- [ ] All API endpoints have integration tests
+- [ ] Edge cases covered (null, empty, invalid, boundary)
+- [ ] Error paths tested (not just happy path)
+- [ ] Tests are independent (no shared state)
+- [ ] Assertions are specific and meaningful
 
 **After each story's tests pass:** update `.build-progress` — mark that story `done`, next story `pending`:
 ```bash

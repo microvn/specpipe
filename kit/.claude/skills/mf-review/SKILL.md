@@ -55,6 +55,14 @@ Spend 60% of analysis on the primary focus. Cover all categories, but proportion
 - **Concurrency:** Shared state without locks? Read-then-write without atomicity? Non-atomic DB updates?
 - **Null safety:** Optionals used without guards? `object!.property` without nil check?
 
+### API/Backend (High)
+
+- **Unvalidated input** — request body/params used without schema validation
+- **Missing rate limiting** — public endpoints without throttling
+- **Missing timeouts** — external HTTP calls without timeout configuration
+- **Missing CORS configuration** — APIs accessible from unintended origins
+- **Error message leakage** — stack traces, file paths, DB schemas in responses
+
 ### Spec-Test Alignment (Medium)
 - Source changed but no spec update in `docs/specs/<feature>/`? → flag
 - Source changed but no test update? → flag
@@ -75,6 +83,14 @@ Spend 60% of analysis on the primary focus. Cover all categories, but proportion
 
 ### Performance (Low)
 - Flag N+1 queries, unbounded collections, redundant computation in loops.
+
+### When Reviewing AI-Generated Code
+
+Prioritize these concerns above standard checklist:
+- **Behavioral regressions** — does changed code break edge cases the AI didn't consider?
+- **Trust boundaries** — does the AI code implicitly trust external input it shouldn't?
+- **Architecture drift** — does it introduce hidden coupling or deviate from existing patterns?
+- **Model cost escalation** — flag workflows that escalate to higher-cost models without clear reasoning; recommend lower-cost tiers for deterministic operations.
 
 ### Failure Mode Grid
 For each new codepath in the diff, evaluate 3 dimensions:

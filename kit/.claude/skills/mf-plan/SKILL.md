@@ -125,6 +125,17 @@ Mode C does not run Phase 1 — it uses its own flow (see Mode C section).
 "SHOULD" = suggest split, present using **Question Format** with split vs. keep-together as options.
 "DO NOT" = keep together, unless user requests split.
 
+**Sizing & Phasing — when a feature is large, break it into independently deliverable phases:**
+
+| Phase | Goal |
+|-------|------|
+| Phase 1 | Minimum viable — smallest slice that provides value |
+| Phase 2 | Core experience — complete happy path |
+| Phase 3 | Edge cases — error handling, polish |
+| Phase 4 | Optimization — performance, monitoring |
+
+Each phase must be mergeable independently. Avoid plans that require all phases to complete before anything works.
+
 **Scope Challenge — run before drafting the spec:**
 
 1. **Reuse check:** From Phase 0 findings, what code already solves this sub-problem? Reuse vs rebuild? If rebuild → justify with AskUserQuestion.
