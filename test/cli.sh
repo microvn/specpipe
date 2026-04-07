@@ -298,6 +298,22 @@ assert_exists "docs/specs preserved"  "$PROJECT_DIR/docs/specs/.gitkeep"
 
 teardown
 
+# ── remove: custom skills are preserved ───────────────────────────────────────
+section "remove (per-project — custom skills preserved)"
+setup
+
+cli init "$PROJECT_DIR"
+# Simulate a user-added custom skill (not tracked in manifest)
+mkdir -p "$PROJECT_DIR/.claude/skills/my-custom-skill"
+echo "# custom" > "$PROJECT_DIR/.claude/skills/my-custom-skill/SKILL.md"
+
+cli remove "$PROJECT_DIR"
+
+assert_absent "devkit skill removed"   "$PROJECT_DIR/.claude/skills/mf-plan/SKILL.md"
+assert_exists "custom skill preserved" "$PROJECT_DIR/.claude/skills/my-custom-skill/SKILL.md"
+
+teardown
+
 # ── remove: no manifest → exit 1 ─────────────────────────────────────────────
 section "remove (no manifest — exits 1)"
 setup

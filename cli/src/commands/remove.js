@@ -113,11 +113,30 @@ export async function removeCommand(path, opts = {}) {
     }
   }
 
-  // Skills are nested dirs — use recursive rm
+  // Remove only skill dirs that were tracked in the manifest
+  // (preserves any custom skills the user added outside of devkit)
+  const trackedSkillDirs = new Set();
+  for (const file of Object.keys(manifest.files)) {
+    const match = file.match(/^\.claude\/skills\/([^/]+)\//);
+    if (match) trackedSkillDirs.add(match[1]);
+  }
+
+  for (const skillName of trackedSkillDirs) {
+    const skillDir = join(targetDir, '.claude', 'skills', skillName);
+    if (existsSync(skillDir)) {
+      await rm(skillDir, { recursive: true, force: true });
+      log.del(`.claude/skills/${skillName}/`);
+    }
+  }
+
+  // Remove skills dir itself only if now empty
   const skillsDir = join(targetDir, '.claude/skills');
   if (existsSync(skillsDir)) {
-    await rm(skillsDir, { recursive: true, force: true });
-    log.del('.claude/skills/');
+    try {
+      await rmdir(skillsDir);
+    } catch {
+      // Not empty — user has custom skills, leave it
+    }
   }
 
   log.blank();
