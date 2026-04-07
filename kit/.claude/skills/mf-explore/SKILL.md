@@ -409,7 +409,38 @@ After presenting the scenarios, confirm via AskUserQuestion:
 }
 ```
 
-If B or C → fix and confirm again. Do not proceed to Phase 7 until the user selects A.
+If B or C → fix and confirm again. Do not proceed to Phase 6.5 until the user selects A.
+
+---
+
+## Phase 6.5 — Self-audit (blind spot sweep)
+
+**Purpose:** Before writing the handoff summary, step back and think like a senior dev who just received this spec. What would they immediately ask? This step catches the 80% of obvious questions that phase-by-phase discovery misses because it was too focused on following the script. The more thorough this step is, the fewer surprises during implementation.
+
+**How it works:**
+
+1. **Silently generate a list of 5-8 questions** that a senior developer, QA engineer, or domain expert would ask within the first 5 minutes of reading this spec. Think from all 8 angles:
+
+   | # | Angle | What to ask |
+   |---|-------|-------------|
+   | 1 | **Algorithm correctness** | What can go wrong with the core approach? False positives? False negatives? Race conditions? Data corruption? Off-by-one? |
+   | 2 | **User safety** | What's the worst thing that happens if the feature malfunctions? Data loss? Financial loss? Security breach? Can the user undo? |
+   | 3 | **Platform/environment** | What OS, hardware, permission, or dependency constraints could break this? Sandboxing? File system quirks? |
+   | 4 | **Scale & performance** | What if there are 10x more items than expected? What if the operation takes 10x longer? What's the expected wait time? |
+   | 5 | **Dependencies** | What external services, APIs, system features does this rely on? What if they change or are unavailable? |
+   | 6 | **UI interaction conflicts** | Are there conflicting behaviors on the same element? Click, hover, drag on the same area doing 2 different things? Gesture overlap? |
+   | 7 | **Lifecycle/trigger** | When does each main operation fire? On appear? On user action? On schedule? On data change? If unclear → ask. |
+   | 8 | **Existing pattern fit** | This feature reuses which components/patterns from the codebase? Does each one fit the new data characteristics (range, density, format)? Which existing UI features (search, filter, sort, bulk actions) should be kept, dropped, or adapted? |
+
+2. **Filter out** questions already answered in previous phases. Keep only the unanswered ones.
+
+3. **If any unanswered questions remain** → ask the user via AskUserQuestion (max 2 per call, as usual). Do NOT skip this — these are the questions that would become bugs or spec rewrites later.
+
+4. **If all questions are already answered** → proceed to Phase 7. State: "I did a blind spot check — all critical questions are already covered."
+
+**Exit condition:** Every question from the self-audit is either answered by the user or explicitly logged as an Open question. Do not proceed to Phase 7 with unasked questions.
+
+**Trap to avoid:** Do not generate vague questions ("have you thought about edge cases?"). Every question must be specific to THIS feature, referencing concrete details from the discovery so far.
 
 ---
 
