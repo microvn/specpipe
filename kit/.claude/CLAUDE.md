@@ -25,7 +25,7 @@ For detailed workflow steps, templates, and decision trees, see `docs/WORKFLOW.m
 
 ## Testing
 
-- **Run tests:** `bash scripts/build-test.sh [--filter PATTERN]`
+- **Run tests:** `bash scripts/build-test.sh [--filter PATTERN]` (per-project) or `bash ~/.claude/scripts/build-test.sh [--filter PATTERN]` (global). Use whichever exists.
 - **Auto-detects:** Swift, Node, Python, Rust, Go, Java, C#, Ruby
 - **Compile/typecheck BEFORE running tests.** Catch syntax errors early.
 - **Max 3 fix loops** for test failures. If tests still fail after 3 attempts, stop and report.
