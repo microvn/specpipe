@@ -171,10 +171,33 @@ Rule: If a view/template contains conditional logic (if/else, loops with filteri
 
 ---
 
+## Test Command
+
+Resolve once before running tests. Check in order:
+1. `scripts/build-test.sh` exists in project root → `bash scripts/build-test.sh`
+2. `~/.claude/scripts/build-test.sh` exists (global install) → `bash ~/.claude/scripts/build-test.sh`
+3. Auto-detect from project markers:
+
+| Marker | Run all | Run filtered |
+|--------|---------|-------------|
+| vitest config / vitest in package.json | `npx vitest run` | `npx vitest run -t "<pattern>"` |
+| jest config / jest in package.json | `npx jest --no-cache` | `npx jest --no-cache -t "<pattern>"` |
+| pyproject.toml / pytest.ini | `python3 -m pytest -x` | `python3 -m pytest -x -k "<pattern>"` |
+| Cargo.toml | `cargo test` | `cargo test "<pattern>"` |
+| go.mod | `go test ./...` | `go test ./... -run "<pattern>"` |
+| build.gradle | `./gradlew test` | `./gradlew test --tests "<pattern>"` |
+| *.sln | `dotnet test` | `dotnet test --filter "<pattern>"` |
+| Package.swift | `swift test` | `swift test --filter "<pattern>"` |
+| Gemfile | `bundle exec rspec` | `bundle exec rspec -e "<pattern>"` |
+
+All test commands below use `TEST_CMD` to mean the resolved command. For filtered runs, append `--filter "<pattern>"` (build-test.sh) or use the framework's native filter flag from the table above.
+
+---
+
 ## Phase 2: Story Loop (RED → GREEN → REFACTOR)
 
 Work through stories one at a time from the spec's `## Stories` section.
-Follow the project's existing test patterns. If using `$ARGUMENTS` as a filter, use `--filter` when running.
+Follow the project's existing test patterns.
 
 **For each story:**
 
@@ -182,9 +205,9 @@ Follow the project's existing test patterns. If using `$ARGUMENTS` as a filter, 
 
 Write tests for the story's acceptance scenarios.
 
-Run the new tests:
+Run the new tests (filtered):
 ```
-bash scripts/build-test.sh --filter "<story test name>"
+TEST_CMD --filter "<story test name>"
 ```
 
 - **FAILS** → correct. The test describes behavior that doesn't exist yet. Continue to Step 2.
@@ -194,9 +217,9 @@ bash scripts/build-test.sh --filter "<story test name>"
 
 Write the minimum production code needed to make the failing tests pass. No more, no less.
 
-Run:
+Run (filtered):
 ```
-bash scripts/build-test.sh --filter "<story test name>"
+TEST_CMD --filter "<story test name>"
 ```
 
 - **PASSES** → continue to Step 3.
@@ -237,23 +260,10 @@ This runs the full test suite after all stories are complete. Individual story t
 
 Compile/typecheck first (tsc --noEmit, cargo check, go vet, swift build, etc.).
 
-Then run tests:
+Then run all tests:
 ```
-bash scripts/build-test.sh
+TEST_CMD
 ```
-
-If `scripts/build-test.sh` doesn't exist, detect and run directly:
-| Marker | Command |
-|--------|---------|
-| vitest config / vitest in package.json | `npx vitest run` |
-| jest config / jest in package.json | `npx jest --no-cache` |
-| pyproject.toml / pytest.ini | `python3 -m pytest -x` |
-| Cargo.toml | `cargo test` |
-| go.mod | `go test ./...` |
-| build.gradle | `./gradlew test` |
-| *.sln | `dotnet test` |
-| Package.swift | `swift test` |
-| Gemfile | `bundle exec rspec` |
 
 ---
 

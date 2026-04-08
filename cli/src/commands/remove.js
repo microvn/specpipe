@@ -36,6 +36,15 @@ export async function removeGlobal() {
     log.skip('~/.claude/hooks/ (not found)');
   }
 
+  // Remove ~/.claude/scripts/
+  const globalScriptsDir = join(homedir(), '.claude', 'scripts');
+  if (existsSync(globalScriptsDir)) {
+    await rm(globalScriptsDir, { recursive: true, force: true });
+    log.del('~/.claude/scripts/');
+  } else {
+    log.skip('~/.claude/scripts/ (not found)');
+  }
+
   // Remove devkit hook entries from ~/.claude/settings.json
   await removeGlobalHooksFromSettings();
   log.del('hook entries from ~/.claude/settings.json');

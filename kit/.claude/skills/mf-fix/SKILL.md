@@ -64,15 +64,38 @@ If the bug is in a dependency/config/data (not project code), say so before proc
 
 ---
 
+## Test Command
+
+Resolve once before running tests. Check in order:
+1. `scripts/build-test.sh` exists in project root → `bash scripts/build-test.sh`
+2. `~/.claude/scripts/build-test.sh` exists (global install) → `bash ~/.claude/scripts/build-test.sh`
+3. Auto-detect from project markers:
+
+| Marker | Run all | Run filtered |
+|--------|---------|-------------|
+| vitest config / vitest in package.json | `npx vitest run` | `npx vitest run -t "<pattern>"` |
+| jest config / jest in package.json | `npx jest --no-cache` | `npx jest --no-cache -t "<pattern>"` |
+| pyproject.toml / pytest.ini | `python3 -m pytest -x` | `python3 -m pytest -x -k "<pattern>"` |
+| Cargo.toml | `cargo test` | `cargo test "<pattern>"` |
+| go.mod | `go test ./...` | `go test ./... -run "<pattern>"` |
+| build.gradle | `./gradlew test` | `./gradlew test --tests "<pattern>"` |
+| *.sln | `dotnet test` | `dotnet test --filter "<pattern>"` |
+| Package.swift | `swift test` | `swift test --filter "<pattern>"` |
+| Gemfile | `bundle exec rspec` | `bundle exec rspec -e "<pattern>"` |
+
+All test commands below use `TEST_CMD` to mean the resolved command. For filtered runs, append `--filter "<pattern>"` (build-test.sh) or use the framework's native filter flag from the table above.
+
+---
+
 ## Phase 1: Write a Failing Test
 
 **REGRESSION RULE:** If the bug exists because the diff changed existing behavior AND no test covered that path → this is a regression. A regression test is a **CRITICAL requirement.** Add the comment: `// Regression: <bug> — <file:line> broke this path`
 
 Write a test that reproduces the bug. It **MUST fail** with current code.
 
-Run it:
+Run it (filtered):
 ```
-bash scripts/build-test.sh --filter "<test name>"
+TEST_CMD --filter "<test name>"
 ```
 
 - **FAILS** → reproduced. Continue.
@@ -118,8 +141,8 @@ Make the **minimal change** needed.
 
 ## Phase 3: Verify
 
-1. Run the bug test: `bash scripts/build-test.sh --filter "<test name>"` → must PASS.
-2. Run full suite: `bash scripts/build-test.sh` → no regressions.
+1. Run the bug test: `TEST_CMD --filter "<test name>"` → must PASS.
+2. Run full suite: `TEST_CMD` → no regressions.
 
 If other tests break → the fix caused a regression. Investigate. Do NOT weaken existing tests.
 

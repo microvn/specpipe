@@ -348,6 +348,10 @@ assert_exists "global hooks: glob-guard.js"       "$TEST_HOME/.claude/hooks/glob
 assert_exists "global hooks: file-guard.js"       "$TEST_HOME/.claude/hooks/file-guard.js"
 assert_exists "global hooks: self-review.sh"      "$TEST_HOME/.claude/hooks/self-review.sh"
 
+# Scripts
+assert_exists     "global scripts: build-test.sh"          "$TEST_HOME/.claude/scripts/build-test.sh"
+assert_executable "global: build-test.sh executable"       "$TEST_HOME/.claude/scripts/build-test.sh"
+
 # Executable permissions
 assert_executable "global: path-guard.sh executable"      "$TEST_HOME/.claude/hooks/path-guard.sh"
 assert_executable "global: sensitive-guard.sh executable"  "$TEST_HOME/.claude/hooks/sensitive-guard.sh"
@@ -443,8 +447,9 @@ setup
 
 cli init --global
 OUT_UG=$(cli_out upgrade --global)
-assert_contains "global upgrade no changes: skills unchanged" "unchanged" "$OUT_UG"
-assert_contains "global upgrade no changes: hooks unchanged"  "unchanged" "$OUT_UG"
+assert_contains "global upgrade no changes: skills unchanged"  "unchanged" "$OUT_UG"
+assert_contains "global upgrade no changes: hooks unchanged"   "unchanged" "$OUT_UG"
+assert_contains "global upgrade no changes: scripts unchanged" "scripts"   "$OUT_UG"
 
 teardown
 
@@ -508,9 +513,10 @@ setup
 cli init --global
 cli remove --global
 
-assert_absent "global skills dir removed"   "$TEST_HOME/.claude/skills"
-assert_absent "global hooks dir removed"    "$TEST_HOME/.claude/hooks"
-assert_absent "global manifest removed"     "$TEST_HOME/.claude/.devkit-manifest.json"
+assert_absent "global skills dir removed"    "$TEST_HOME/.claude/skills"
+assert_absent "global hooks dir removed"     "$TEST_HOME/.claude/hooks"
+assert_absent "global scripts dir removed"   "$TEST_HOME/.claude/scripts"
+assert_absent "global manifest removed"      "$TEST_HOME/.claude/.devkit-manifest.json"
 S=$(cat "$TEST_HOME/.claude/settings.json")
 assert_not_contains "settings.json: devkit entries removed" "path-guard.sh" "$S"
 
