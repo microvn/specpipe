@@ -56,6 +56,8 @@ CODE PATH COVERAGE
         └── [★★  TESTED] Other branch — affected.test.ts:20
 ```
 
+If the bug is in a view/template layer (UI render, layout, data binding, styling) — mark the view path `[→MANUAL]` and test the logic layer backing it (ViewModel, Presenter, helper) instead. If there is no logic layer to test, the fix is `[→MANUAL]` only — note what to visually verify.
+
 If you cannot identify a specific `[GAP]` path → the hypothesis is not specific enough. Investigate further.
 
 If the bug is in a dependency/config/data (not project code), say so before proceeding.
@@ -146,10 +148,12 @@ DEBUG REPORT
 Bug:             <description>
 Hypothesis:      <what you predicted> → <confirmed or actual cause>
 Root cause:      <what was actually wrong>
+Files changed:   [all production files touched]
 Fix:             <file:line — what changed>
 Evidence:        <test output>
 Regression test: <file:test name>
 Full suite:      All passing ✓
+Manual needed:   [→MANUAL gaps, or "none"]
 Status:          DONE | DONE_WITH_CONCERNS | BLOCKED
 ════════════════════════════════════════
 ```

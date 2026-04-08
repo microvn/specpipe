@@ -143,6 +143,7 @@ GAPS: 4 paths need tests (1 need E2E, 1 need eval)
 - `[★   TESTED]` = smoke test / trivial assertion; include `file:line`
 - `[GAP]` = no test — **MUST write in Phase 2**
 - `[GAP] [→E2E]` = needs E2E test: flow spans 3+ components, auth/payment/data-destruction
+- `[→MANUAL]` = Non-testable layer (view, template, styling). Note the visual check needed (e.g., "confirm error banner appears on invalid input"). Always test the logic backing it.
 - `[GAP] [→EVAL]` = needs eval: prompt template or LLM output changed. When flagged: define capability + regression evals before implementing, run baseline and capture failure signatures, implement minimum passing change, re-run and report pass@1 and pass@3. Release-critical paths should target pass@3 stability before merge.
 
 **E2E Decision Matrix:**
@@ -153,18 +154,70 @@ GAPS: 4 paths need tests (1 need E2E, 1 need eval)
 | Mocking hides real failures (API→queue→worker→DB) | Internal helper, no side effects |
 | Auth / payment / data destruction | Single-function edge case (null, empty) |
 
+**Testability Classification — classify by what the code does, not what framework it uses:**
+
+| Code category | Examples | Strategy | Tag |
+|---|---|---|---|
+| Logic | Service, ViewModel, Presenter, Utils, Parser, Validator | Unit test directly — inputs, outputs, state transitions | (default) |
+| View / Template | UI render, layout, data binding, template markup | Extract logic to testable layer; mark view code `[→MANUAL]` | `[→MANUAL]` |
+| Pure presentation | Styling, spacing, animation, theming | Visual verification only | `[→MANUAL]` |
+| Glue / Wiring | Dependency injection, route registration, config binding | Test through integration or E2E | `[→E2E]` or skip |
+
+Rule: If a view/template contains conditional logic (if/else, loops with filtering, computed display values) — extract that logic into the testable layer (ViewModel, Presenter, helper) and unit test there. The view becomes a thin binding with no logic to test.
+
 **Fast path:** All paths already covered → "Coverage Map: All paths covered ✓" → proceed to Phase 2.
 
 **REGRESSION RULE:** If the diff changes existing behavior AND no test covers that path → a regression test is a **CRITICAL requirement. No asking. No skipping.**
 
 ---
 
-## Phase 2: Write Tests
+## Phase 2: Story Loop (RED → GREEN → REFACTOR)
 
-Follow the project's existing test patterns. If using `$ARGUMENTS` as a filter, use `--filter` when running:
+Work through stories one at a time from the spec's `## Stories` section.
+Follow the project's existing test patterns. If using `$ARGUMENTS` as a filter, use `--filter` when running.
+
+**For each story:**
+
+### Step 1 — RED: Write test, verify it fails
+
+Write tests for the story's acceptance scenarios.
+
+Run the new tests:
 ```
-bash scripts/build-test.sh --filter "$ARGUMENTS"
+bash scripts/build-test.sh --filter "<story test name>"
 ```
+
+- **FAILS** → correct. The test describes behavior that doesn't exist yet. Continue to Step 2.
+- **PASSES** → the behavior already exists. Either the test is wrong (assertions too weak) or the code already handles this case. Investigate before continuing. If already covered, mark story `done` and move to the next story.
+
+### Step 2 — GREEN: Implement minimal production code
+
+Write the minimum production code needed to make the failing tests pass. No more, no less.
+
+Run:
+```
+bash scripts/build-test.sh --filter "<story test name>"
+```
+
+- **PASSES** → continue to Step 3.
+- **FAILS** → fix production code (not the test). Max 3 attempts, then stop and report per Phase 4.
+
+### Step 3 — REFACTOR (optional)
+
+If the implementation introduced duplication, unclear naming, or violated existing patterns — refactor now while tests are green. Run tests after refactoring to confirm nothing broke.
+
+### Step 4 — Update progress
+
+Mark the story `done` in `.build-progress`:
+```bash
+# Example after S-002 passes:
+# S-001 done
+# S-002 done
+# S-003 pending
+```
+Write the full file each time (overwrite, not append) to keep state clean.
+
+**Then proceed to the next story.**
 
 ---
 
@@ -176,18 +229,11 @@ bash scripts/build-test.sh --filter "$ARGUMENTS"
 - [ ] Tests are independent (no shared state)
 - [ ] Assertions are specific and meaningful
 
-**After each story's tests pass:** update `.build-progress` — mark that story `done`, next story `pending`:
-```bash
-# Example after S-002 passes:
-# S-001 done
-# S-002 done
-# S-003 pending
-```
-Write the full file each time (overwrite, not append) to keep state clean.
-
 ---
 
 ## Phase 3: Build and Run
+
+This runs the full test suite after all stories are complete. Individual story tests were already verified in Phase 2.
 
 Compile/typecheck first (tsc --noEmit, cargo check, go vet, swift build, etc.).
 
@@ -254,10 +300,13 @@ Start with one of:
 Tests: X added, Y modified, Z unchanged
 Result: All passing ✓ / N failing ✗
 Coverage: [critical uncovered paths if any]
-Files: [test files touched]
+Files changed: [production files touched]
+Files tested: [test files touched]
 Stories: [AS-001 ✓, AS-002 ✓, AS-005 new]
+TDD evidence: [S-001: RED(3 fails) → GREEN ✓, S-002: RED(2 fails) → GREEN ✓]
 E2E needed: [→E2E gaps from Coverage Map, or "none"]
 Eval needed: [→EVAL gaps from Coverage Map, or "none"]
+Manual needed: [→MANUAL gaps from Coverage Map, or "none"]
 ```
 
 **Progress file cleanup:**
