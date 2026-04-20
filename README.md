@@ -53,29 +53,111 @@ Every code change — feature, fix, or removal — follows this cycle. The spec 
 
 ## 2. Quick Start
 
-**Time needed: 5 minutes.**
+**Time needed: 5 minutes.** Below is a realistic transcript — user input, what each skill actually asks, what it actually outputs. Nothing embellished.
 
 ```bash
-# 1. Install dev-kit into your project
-npx claude-devkit-cli init .
-
-# 2. Open your project in Claude Code
-claude
-
-# 3. Create your first spec
-/mf-plan "describe your feature here"
-
-# 4. Write code, then test
-/mf-build
-
-# 5. Review before merging
-/mf-review
-
-# 6. Commit
-/mf-commit
+npx claude-devkit-cli init .   # one-time install
+claude                          # open Claude Code
 ```
 
-That's it. The CLI auto-detects your project type and configures everything.
+### Step 1 — Spec the feature (`/mf-plan`)
+
+```text
+You: /mf-plan "add tag filter to the todo list screen"
+
+Claude → running /mf-plan
+  Phase 0: Codebase scan — found docs/specs/todo-list/todo-list.md (exists)
+  Phase 1: Scope Challenge — TodoList already supports text search; tag
+           filter can reuse the same query pipeline. Flagging: reuse vs rebuild.
+
+AskUserQuestion: "Extend existing search, or add a separate tag filter UI?"
+  A) Extend search       — one input, parsed (text + "tag:work")   [lowest cost]
+  B) Separate tag chips  — chips below the search box              [clearer UX]
+  C) Both                 — chips drive the same query             [most work]
+
+You: B
+
+Claude: Drafting spec…
+  docs/specs/todo-list/todo-list.md  (Mode C update, snapshot created)
+
+  ## Stories (added)
+  ### S-007: Filter todos by tag (P0)
+    AS-014: Given todos tagged [work, home], when user taps "work" chip,
+            then only work-tagged todos show.
+    AS-015: Given no todos match the selected tags, when filter applied,
+            then empty state shows "No todos match these tags".
+
+  What Already Exists: TodoRepository.query() handles predicates — reuse.
+  Not in Scope: saving favorite tag combinations (deferred).
+```
+
+> **Complex spec?** Run `/mf-challenge docs/specs/<feature>/<feature>.md` before coding.
+> It spawns parallel hostile reviewers (Security Adversary, Failure Mode Analyst,
+> Assumption Destroyer, Scope & YAGNI Critic) that quote the spec and propose surgical
+> edits — e.g. "AS-014 doesn't define tag case-sensitivity → add constraint or AS".
+> Skip for simple CRUD like this tag filter.
+
+### Step 2 — Implement + build (`/mf-build`)
+
+```text
+You: (edit TodoListView.swift, TagFilterChip.swift) — now /mf-build
+
+Claude → running /mf-build
+  Phase 1.5: Coverage Map
+    [+] TodoListView.swift
+        └── applyTagFilter(selected:)
+            ├── [★★  TESTED] empty selection → returns all   (new test)
+            ├── [★★  TESTED] single tag match                 (new test)
+            ├── [GAP]         no-match empty state            (← AS-015)
+            └── [★★  TESTED] multi-tag AND semantics          (new test)
+
+  Writing test for [GAP]… building… running.
+  ✓ 14 tests passed (3 new, 0 regressions)
+```
+
+### Step 3 — Bug found? (`/mf-fix`)
+
+```text
+You: /mf-fix "selecting two tags shows OR results, should be AND"
+
+Claude → running /mf-fix
+  Phase 0: Bug Path Diagram
+    applyTagFilter(selected: ["work","urgent"])
+      └── [BUG] predicate uses .contains(anyOf:) — should be .contains(allOf:)
+
+  Phase 1: writing failing test (AS-014 variant: 2 tags, AND)… FAILS ✓
+  Phase 2: changing .anyOf → .allOf in TodoRepository.swift:88 (1 line)
+  Phase 3: test now PASSES, full suite green.
+
+  DEBUG REPORT
+    Root cause: wrong set operator, regression from S-005 search refactor
+    Prevention: add AS for multi-tag AND to spec (auto-signaled)
+```
+
+### Step 4 — Review + commit (`/mf-review` → `/mf-commit`)
+
+```text
+You: /mf-review
+
+Claude → Smart Focus: UI state + query predicate
+  Failure Mode Grid: all paths have tests ✓ error states covered ✓
+  Finding (confidence 8/10): selected-tags state not persisted across
+    navigation. Not in current spec — logged under "Not in Scope".
+  Verdict: APPROVE
+
+You: /mf-commit
+
+Claude → secret scan: clean. debug-code scan: clean.
+  Staging 4 files. Conventional message:
+    feat(todo): filter list by selected tags with AND semantics
+  ✓ commit a1b2c3d (not pushed — run `git push` when ready)
+```
+
+> **Complex bug?** Insert `/mf-investigate "<bug>"` before `/mf-fix`. It's read-only,
+> writes `docs/investigate/<slug>-<date>.md` with hypotheses + blast radius, then
+> `/mf-fix` auto-picks it up. Skip for trivial bugs.
+
+That's the 5 minutes. The CLI auto-detected your project (Swift + XCTest here) — no config touched.
 
 ---
 
