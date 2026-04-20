@@ -25,6 +25,7 @@ export const COMPONENTS = {
     '.claude/skills/mf-plan/SKILL.md',
     '.claude/skills/mf-build/SKILL.md',
     '.claude/skills/mf-challenge/SKILL.md',
+    '.claude/skills/mf-investigate/SKILL.md',
     '.claude/skills/mf-fix/SKILL.md',
     '.claude/skills/mf-review/SKILL.md',
     '.claude/skills/mf-commit/SKILL.md',
