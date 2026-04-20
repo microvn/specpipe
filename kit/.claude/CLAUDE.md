@@ -16,6 +16,7 @@ Every change follows this cycle: **SPEC (with acceptance scenarios) → CODE + T
 | Feature unclear / complex | `/mf-explore` → `/mf-plan` | Clarify requirements before writing spec |
 | New feature | `/mf-plan` → `/mf-challenge` (optional) → code in chunks → `/mf-build` each chunk | Start with spec or description |
 | Update feature | `/mf-plan <spec-path> "changes"` → code → `/mf-build` | Do NOT manually edit spec before /mf-plan |
+| Bug (complex/outage) | `/mf-investigate "description"` → `/mf-fix <investigation-file>` | OPTIONAL: diagnose root cause + blast radius before fixing |
 | Bug fix | `/mf-fix "description"` | Test-first: write failing test → fix → green |
 | Remove feature | `/mf-plan <spec-path> "remove stories"` → delete code + tests → build pass | /mf-plan handles snapshot before removal |
 | Pre-merge check | `/mf-review` | Diff-based quality gate |

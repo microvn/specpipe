@@ -79,7 +79,16 @@ Step 4 → /mf-review → /mf-commit
 When: Something is broken and needs fixing.
 
 ```
-Step 1 → /mf-fix "description of the bug"
+Step 0 → (OPTIONAL) /mf-investigate "description of the bug"
+          Use ONLY when: bug is complex, ambiguous, production outage, data
+          corruption, regression with unclear cause, or user wants diagnosis
+          before any code change. Skip for trivial/obvious bugs.
+          Read-only: traces data flow, maps blast radius, lists hypotheses
+          with confidence levels. Writes docs/investigate/<slug>-<date>.md.
+          No code changes — hands off the report to /mf-fix.
+
+Step 1 → /mf-fix "description" (or /mf-fix docs/investigate/<slug>-<date>.md)
+          Auto-detects investigation file if passed → skips redundant discovery.
           Draws Bug Path Diagram to confirm hypothesis ([GAP] must be locatable).
           Regression rule: if diff broke existing behavior with no test → CRITICAL test required.
           Writes failing test → fixes code → confirms green → runs full suite.
@@ -125,7 +134,10 @@ Is this a brand new feature (no existing spec or code)?
 │   │           Then /mf-plan using the explore output.
 └─ No
     ├─ Is this a bug fix?
-    │   ├─ Yes → Bug Fix workflow. Start with /mf-fix.
+    │   ├─ Yes → Bug Fix workflow.
+    │   │   ├─ Complex / outage / ambiguous cause / data corruption?
+    │   │   │   ├─ Yes → /mf-investigate first, then /mf-fix.
+    │   │   │   └─ No  → /mf-fix directly.
     │   └─ No
     │       ├─ Are you removing/deprecating code?
     │       │   ├─ Yes → Remove Feature workflow.
@@ -205,6 +217,7 @@ Files to delete: [list]
 |----------|-----------------|------|
 | `/mf-explore` | 10–20k | Before /mf-plan when requirements are unclear |
 | `/mf-build` (incremental) | 5–10k | Daily, after each code chunk |
+| `/mf-investigate` (complex bug) | 8–15k | OPTIONAL before /mf-fix — complex/outage only |
 | `/mf-fix` (single bug) | 3–5k | As bugs arise |
 | `/mf-commit` | 2–4k | Each commit |
 | `/mf-review` (diff-based) | 10–20k | Before merge |

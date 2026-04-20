@@ -20,6 +20,8 @@ Fixing symptoms creates whack-a-mole debugging. Every fix that doesn't address t
 
 Don't jump to code. Understand the bug first:
 
+0. **Investigation handoff check.** If `$ARGUMENTS` references a file under `docs/investigate/`, read it first — it contains pre-built root cause hypothesis, blast radius, and recommended actions from `/mf-investigate`. Skip redundant discovery; jump to Phase 1 using its findings. If no such file and the bug is complex/ambiguous/production-critical → suggest the user run `/mf-investigate "<bug>"` first; otherwise proceed.
+
 1. **Parse the report.** Symptom? Expected vs actual? Repro steps? If context is missing → ask ONE question via AskUserQuestion before proceeding.
 2. **Locate the code.** If `codebase-memory-mcp` is connected, prefer `search_code("<error message or function name>")` to find related files and `trace_call_path` to map callers and impact radius — indexed search and call graph visibility that grep cannot match. Fallback: Grep for keywords from the bug (error messages, function names).
 3. **Check history.** `git log --oneline -20 -- <affected-files>` — was this working before? What changed? Regression = root cause is in the diff.

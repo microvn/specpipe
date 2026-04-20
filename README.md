@@ -149,6 +149,7 @@ your-project/
 │       ├── mf-plan/SKILL.md         ← /mf-plan skill
 │       ├── mf-challenge/SKILL.md    ← /mf-challenge skill
 │       ├── mf-build/SKILL.md        ← /mf-build skill
+│       ├── mf-investigate/SKILL.md  ← /mf-investigate skill (optional, read-only)
 │       ├── mf-fix/SKILL.md          ← /mf-fix skill
 │       ├── mf-review/SKILL.md       ← /mf-review skill
 │       └── mf-commit/SKILL.md       ← /mf-commit skill
@@ -266,7 +267,13 @@ This removes hooks, skills, settings, and build-test.sh. It preserves `CLAUDE.md
 > When: Something is broken.
 
 ```
-1. /mf-fix "description of the bug"
+0. (OPTIONAL) /mf-investigate "description of the bug"
+   → Use for complex bugs, outages, data corruption, or when the cause is unclear.
+   → Read-only: hypothesis + blast radius + evidence, no code changes.
+   → Writes docs/investigate/<slug>-<date>.md for /mf-fix to consume.
+   → Skip for trivial/obvious bugs — go straight to /mf-fix.
+
+1. /mf-fix "description of the bug"  (or /mf-fix docs/investigate/<slug>-<date>.md)
    → Writes failing test → fixes code → runs full suite.
 
 2. /mf-commit
@@ -477,6 +484,36 @@ docs/specs/<feature>/
 - Max 3 fix attempts — then stops and reports the issue
 
 **What NOT to test:** Private/internal methods, framework behavior, trivial getters/setters, implementation details.
+
+### /mf-investigate — Read-Only Root Cause Investigation (Optional)
+
+**Usage:**
+```
+/mf-investigate "production 500s after deploy on /api/orders"
+/mf-investigate "intermittent data corruption in nightly sync"
+```
+
+**When to use:** OPTIONAL branch before `/mf-fix`. Use for complex bugs, production outages, data corruption, unclear regressions, or when the user wants a diagnosis report without any code change. Skip for trivial/obvious bugs — go straight to `/mf-fix`.
+
+**What it does NOT do:** Never edits source code, tests, or config. The only write it performs is the investigation report at `docs/investigate/<slug>-<date>.md`.
+
+**How it works (adaptive depth, auto-scales):**
+
+1. **Phase 1: Understand the Report** — Extract symptom, expected, actual from `$ARGUMENTS`. Asks ONE clarifying question via AskUserQuestion if required fields are missing.
+2. **Phase 2: Locate** — Entry-point search (error/stack/function/feature), recurring-bug check (3+ fix commits on same pattern → architectural smell), data-flow trace, git history (regression signal).
+3. **Phase 3: Pattern Match** — 12 known bug patterns (nil propagation, race, state corruption, off-by-one, type coercion, stale cache, config drift, silent error swallow, ordering/timing, resource leak, merge conflict, API contract). Skipped if Phase 2 already produced a HIGH-confidence hypothesis.
+4. **Phase 4: Form Hypothesis** — Specific, testable, falsifiable. Location + mechanism + causal chain + disproof condition + confidence (HIGH/MEDIUM/LOW). 3-strike rule: if 3 hypotheses all stay below MEDIUM → escalate via AskUserQuestion.
+5. **Phase 5: Map Blast Radius** — Investigation scope, bug path diagram (skipped if ISOLATED), impact scope (direct/indirect/data/user-facing), similar-risk scan (5-min timebox).
+6. **Phase 6: Recommend Next Steps** — CRITICAL/HIGH/MEDIUM actions, test strategy, fix approach (minimal / targeted refactor / architectural).
+7. **Output** — Writes structured Investigation Report to `docs/investigate/<slug>-<date>.md`. Signals `/mf-fix <file>` for handoff.
+
+**Status values:** `ROOT_CAUSE_FOUND | PROBABLE_CAUSE | INSUFFICIENT_EVIDENCE | BLOCKED`
+
+**Iron Law:** Follow evidence, never start with a theory. Every claim references file:line or git commit. INSUFFICIENT_EVIDENCE is a valid outcome — don't inflate confidence to ship a report.
+
+**Token cost:** 8–15k
+
+---
 
 ### /mf-fix — Test-First Bug Fix
 
@@ -912,6 +949,7 @@ Then use: `/deploy staging`
 | Activity | Tokens | Frequency |
 |----------|--------|-----------|
 | `/mf-build` (incremental, 1-3 files) | 5–10k | Every code chunk |
+| `/mf-investigate` (complex bug) | 8–15k | OPTIONAL before /mf-fix — complex/outage only |
 | `/mf-fix` (single bug) | 3–5k | As needed |
 | `/mf-commit` | 2–4k | Every commit |
 | `/mf-review` (diff-based) | 10–20k | Before merge |
