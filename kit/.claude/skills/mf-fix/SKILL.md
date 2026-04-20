@@ -85,6 +85,17 @@ Resolve once before running tests. Check in order:
 
 All test commands below use `TEST_CMD` to mean the resolved command. For filtered runs, append `--filter "<pattern>"` (build-test.sh) or use the framework's native filter flag from the table above.
 
+**Filter pattern verification (MANDATORY):** A filter matching 0 tests exits 0 on many frameworks — false green. Before trusting any filtered run, confirm match count ≥1:
+
+- vitest: `npx vitest list -t "<pattern>"`
+- jest: add `--passWithNoTests=false`
+- pytest: `-k "<pattern>" --collect-only -q`
+- cargo: `cargo test "<pattern>" -- --list`
+- go: `go test -run "<pattern>" -list ".*" ./...`
+- gradle / dotnet / swift / rspec / other: if no equivalent listing command is known, fall back to `grep -r "<test name>" <test-dir>` — string must exist. Log `FILTER_VERIFY: fallback-grep` in Phase 5 report.
+
+0 matches → test name / file location wrong. Fix before proceeding. Never interpret 0-match as PASS. **Max 3 retry attempts** on filter-match failure; if still 0 after 3, stop and report BLOCKED.
+
 ---
 
 ## Phase 1: Write a Failing Test
@@ -93,12 +104,15 @@ All test commands below use `TEST_CMD` to mean the resolved command. For filtere
 
 Write a test that reproduces the bug. It **MUST fail** with current code.
 
-Run it (filtered):
+Verify filter match first (see "Filter pattern verification" in the Test Command section). Then run:
 ```
 TEST_CMD --filter "<test name>"
 ```
 
+**Capture the raw failure output** (stack trace / assertion diff). Paste it into the Phase 5 DEBUG REPORT `Evidence:` field verbatim — a summary like "test fails" is not evidence.
+
 - **FAILS** → reproduced. Continue.
+- **0 TESTS MATCHED** → filter/test name issue, not reproduction. Fix before proceeding.
 - **PASSES** → hypothesis may be wrong. Use `AskUserQuestion`:
 
 ```json
@@ -111,7 +125,7 @@ TEST_CMD --filter "<test name>"
       "options": [
         {"label": "Provide different repro steps or environment details (human: ~30m / CC: ~5m) | Completeness: 10/10"},
         {"label": "The bug may be environment-specific — describe the setup (human: ~1h / CC: ~10m) | Completeness: 9/10"},
-        {"label": "Skip test-first for this bug — fix directly (human: ~15m / CC: ~5m) | Completeness: 5/10"}
+        {"label": "Stop and report BLOCKED — cannot reproduce, need human investigation (Completeness: N/A — no fix applied)"}
       ]
     }
   ]
@@ -136,6 +150,14 @@ Make the **minimal change** needed.
 
 **Blast radius check:** If the fix requires touching >5 files → stop and use AskUserQuestion before editing anything:
 "This fix touches N files — that's a large blast radius for a bug fix. A) Proceed — root cause genuinely spans these files, B) Split — fix critical path now, defer the rest, C) Rethink — there may be a more targeted approach"
+
+**Similar-risk scan (MANDATORY after fix, before Phase 3):** Grep for the same pattern that caused this bug, scoped to:
+1. The same file as the fix (all sibling functions in the fixed file).
+2. Direct callers of the fixed function (one level up — use grep, trace_call_path, or IDE refs).
+
+Do NOT auto-fix findings — the minimal-fix rule stands. Record each under Phase 5 `SIMILAR_RISK:` as `<file:line> — same pattern, unguarded`.
+
+**Timebox:** 5 minutes max. If the pattern is too generic to grep cleanly (e.g., fix is a common idiom), record `SIMILAR_RISK: scan skipped — pattern too generic, reason: <why>` and move on. Do NOT let this phase block the fix from landing. Silent skipping without a reason note is not acceptable.
 
 ---
 
@@ -173,9 +195,10 @@ Hypothesis:      <what you predicted> → <confirmed or actual cause>
 Root cause:      <what was actually wrong>
 Files changed:   [all production files touched]
 Fix:             <file:line — what changed>
-Evidence:        <test output>
+Evidence:        <paste raw failing-then-passing test output, verbatim>
 Regression test: <file:test name>
 Full suite:      All passing ✓
+Similar risk:    [SIMILAR_RISK findings from Phase 2 scan, or "none"]
 Manual needed:   [→MANUAL gaps, or "none"]
 Status:          DONE | DONE_WITH_CONCERNS | BLOCKED
 ════════════════════════════════════════

@@ -14,6 +14,16 @@ TDD delivery loop — write failing tests from spec AS, implement story by story
    If `$ARGUMENTS` provided → scope to that file or feature only.
    If no changes → "No source changes found. Specify a file or feature."
 
+   **Regression auto-detect:** List lines removed or modified from existing code (not pure additions):
+   ```
+   git diff "$BASE"...HEAD -- <src> | grep -E "^-[^-]" | head -50
+   ```
+   For each modified function identified, evaluate whether behavior changed. Classify each change:
+   - **Behavior changed** → regression test REQUIRED covering the old behavior path (see REGRESSION RULE in Phase 1.5).
+   - **Pure refactor** (rename, format, extract helper, comment, type-only) → no new test required; add 1-line note in summary `REFACTOR_ONLY: <file:line> — <why no behavior change>`.
+
+   Do not skip this classification silently. If unsure whether a change is behavior-changing, treat it as behavior-changing.
+
 2. **Read the spec** at `docs/specs/<feature>/<feature>.md` — the `## Stories` section with acceptance scenarios is your roadmap. The `## Overview` and `## Constraints` sections tell you the INTENT behind the code.
 
 3. **Check build progress:** Look for `docs/specs/<feature>/.build-progress`.
@@ -85,7 +95,24 @@ AI writes tests significantly faster than humans. When deciding test scope:
 | Feature | 1 week | 30 min | ~30x |
 | Bug fix | 4 hours | 15 min | ~20x |
 
-Rule: If writing additional tests costs `CC: ≤15m` — write them fully without asking. Only use AskUserQuestion when the gap affects design or costs `CC: >30m`.
+Rule: Default to writing the complete test set. AskUserQuestion only when the gap genuinely affects design choice (not effort). Do NOT use self-estimated effort as a justification to skip — LLMs under-estimate when motivated to move on.
+
+**Edge Case Compliance Table (MANDATORY per story):**
+
+For each story, fill this table in the Phase 5 summary. Every row must be `✓` or `N/A + reason`. Blank rows are not allowed.
+
+| Edge case | Status | Test name / Reason if N/A |
+|-----------|--------|---------------------------|
+| Null/Undefined input | | |
+| Empty array/string | | |
+| Invalid types | | |
+| Boundary values | | |
+| Error paths | | |
+| Race conditions | | |
+| Large data | | |
+| Special characters | | |
+
+`N/A` is valid only with a 1-line reason (e.g., "N/A — function takes enum, invalid type impossible at type layer"). `N/A — not applicable` with no reason is not accepted.
 
 **Engineering instincts — apply when deciding test scope:**
 - **Systems over heroes:** Design tests for a tired dev at 3am, not your best engineer. If a test requires knowing internals to understand, it will fail the wrong person at the worst time.
@@ -165,7 +192,9 @@ GAPS: 4 paths need tests (1 need E2E, 1 need eval)
 
 Rule: If a view/template contains conditional logic (if/else, loops with filtering, computed display values) — extract that logic into the testable layer (ViewModel, Presenter, helper) and unit test there. The view becomes a thin binding with no logic to test.
 
-**Fast path:** All paths already covered → "Coverage Map: All paths covered ✓" → proceed to Phase 2.
+**Diagram is mandatory.** Even when all paths are covered, you must still produce the diagram with `[★★★ TESTED]` / `[★★ TESTED]` / `[★ TESTED]` entries including `file:line` references for each. Do not replace it with "All paths covered ✓". The diagram is the evidence — a one-line claim is not.
+
+If every path is already covered, the diagram will have zero `[GAP]` rows — that is fine. Write it anyway and proceed to Phase 2.
 
 **REGRESSION RULE:** If the diff changes existing behavior AND no test covers that path → a regression test is a **CRITICAL requirement. No asking. No skipping.**
 
@@ -192,6 +221,19 @@ Resolve once before running tests. Check in order:
 
 All test commands below use `TEST_CMD` to mean the resolved command. For filtered runs, append `--filter "<pattern>"` (build-test.sh) or use the framework's native filter flag from the table above.
 
+**Filter pattern verification (MANDATORY before trusting a filtered run):**
+
+A filtered run that matches zero tests will exit 0 on many frameworks — that is a false green. Before trusting any `TEST_CMD --filter "<pattern>"` result, confirm the pattern matched ≥1 test case:
+
+- vitest: `npx vitest list -t "<pattern>"` → output must list ≥1 test
+- jest: add `--passWithNoTests=false` → exits 1 if no tests match
+- pytest: `-k "<pattern>" --collect-only -q` → output must list ≥1 test
+- cargo: `cargo test "<pattern>" -- --list` → output must list ≥1 test
+- go: `go test -run "<pattern>" -list ".*" ./...` → output must list ≥1 test
+- gradle / dotnet / swift / rspec / other: if no equivalent listing command is known, fall back to verifying by `grep -r "<test name>" <test-dir>` — the test string must exist in source. Log `FILTER_VERIFY: fallback-grep` in the summary.
+
+If the verification shows 0 matches → the test you just wrote did not register (wrong name, wrong file location, framework did not pick it up). Fix before proceeding. Do NOT interpret 0-match as "PASSES". **Max 3 retry attempts** on filter-match failure; if still 0 after 3, stop and report BLOCKED (test infrastructure issue, not a TDD issue).
+
 ---
 
 ## Phase 2: Story Loop (RED → GREEN → REFACTOR)
@@ -205,17 +247,25 @@ Follow the project's existing test patterns.
 
 Write tests for the story's acceptance scenarios.
 
-Run the new tests (filtered):
+First, verify the filter pattern matches the new test (see "Filter pattern verification" in the Test Command section). Then run:
 ```
 TEST_CMD --filter "<story test name>"
 ```
 
+**Capture and paste the raw failure output** (stack trace / assertion diff / first 20 lines) into your notes — this is the evidence for the `RED → GREEN` claim in Phase 5. A summary like "3 fails" without the raw text is not sufficient evidence.
+
 - **FAILS** → correct. The test describes behavior that doesn't exist yet. Continue to Step 2.
 - **PASSES** → the behavior already exists. Either the test is wrong (assertions too weak) or the code already handles this case. Investigate before continuing. If already covered, mark story `done` and move to the next story.
+- **0 TESTS MATCHED** → filter pattern did not register. Fix test name / file location. Do NOT proceed.
 
 ### Step 2 — GREEN: Implement minimal production code
 
 Write the minimum production code needed to make the failing tests pass. No more, no less.
+
+> **TDD GREEN vs "NEVER fix production code" (Phase 4) — disambiguation:**
+> - Writing NEW production code to satisfy a NEW failing TDD test: **REQUIRED** (this is GREEN).
+> - Modifying EXISTING production code because an EXISTING test started failing in Phase 3/4: **requires AskUserQuestion first** (this is the "NEVER" rule).
+> The difference is: TDD writes code toward a test written moments ago. Fix Loop touches code that was already green. Don't confuse the two.
 
 Run (filtered):
 ```
@@ -239,6 +289,15 @@ Mark the story `done` in `.build-progress`:
 # S-003 pending
 ```
 Write the full file each time (overwrite, not append) to keep state clean.
+
+**Test count assertion (MANDATORY):** Confirm tests were actually added by diff-counting:
+```
+git diff --stat <test-dir>
+```
+Record for the Phase 5 summary: `S-00X added N tests: <list exact test names>`. Test names must be grep-able in the test file.
+
+- **N ≥ 1** → normal case. Story is `done`.
+- **N = 0** → only acceptable if the story is a pure refactor AND existing tests already cover the changed path. Record: `S-00X added 0 tests: REFACTOR_ONLY — covered by existing <file:test name>`. Otherwise, story is NOT `done` — add tests first.
 
 **Then proceed to the next story.**
 
@@ -290,8 +349,8 @@ If tests fail:
 ```
 3. Fix test code only. Re-run. Max 3 attempts, then stop and report.
 
-**NEVER:**
-- Fix production code without asking
+**NEVER (applies to Fix Loop — existing tests that regressed; does NOT apply to TDD GREEN in Phase 2):**
+- Fix existing production code without asking
 - Delete or weaken existing tests
 - Add `skip`/`xit`/`@disabled` to hide failures
 - Use mocks solely to avoid a real failure
@@ -313,7 +372,8 @@ Coverage: [critical uncovered paths if any]
 Files changed: [production files touched]
 Files tested: [test files touched]
 Stories: [AS-001 ✓, AS-002 ✓, AS-005 new]
-TDD evidence: [S-001: RED(3 fails) → GREEN ✓, S-002: RED(2 fails) → GREEN ✓]
+TDD evidence: [S-001: RED (paste 1st failing assertion raw) → GREEN ✓ | tests added: <names>, S-002: RED (raw output) → GREEN ✓ | tests added: <names>]
+Edge Case Compliance: [per-story table from Phase 1 — every row ✓ or N/A+reason]
 E2E needed: [→E2E gaps from Coverage Map, or "none"]
 Eval needed: [→EVAL gaps from Coverage Map, or "none"]
 Manual needed: [→MANUAL gaps from Coverage Map, or "none"]
