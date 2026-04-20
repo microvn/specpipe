@@ -301,7 +301,6 @@ assert_exit "allow: command no sensitive references" 0 "$(exit_bash "$SG" '{"too
 section "sensitive-guard.sh — .agentignore"
 
 AGENTDIR=$(mktemp -d "$PWD/.test-agentignore-XXXXXXXX")
-trap 'rm -rf "$AGENTDIR"' EXIT
 printf 'internal-config.dat\nreports/\n# comment line\n\nsecrets.bin\n' > "$AGENTDIR/.agentignore"
 
 # Run hook FROM the dir that has .agentignore so the hook finds it at cwd
@@ -525,7 +524,7 @@ FG="$HOOKS_DIR/file-guard.js"
 
 # Must be inside the repo so file-guard.js doesn't skip it (it skips files outside process.cwd())
 TMPTEST=$(mktemp -d "$PWD/.test-hooks-XXXXXXXX")
-trap 'rm -rf "$TMPTEST"' EXIT
+trap 'rm -rf "$AGENTDIR" "$TMPTEST"' EXIT
 
 # Small file: no warning
 SMALL="$TMPTEST/small.ts"
