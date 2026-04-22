@@ -58,6 +58,49 @@ Output: 2-3 line summary. Feeds into Phase 1.5 Coverage Map.
 
 ---
 
+## Phase 0.6: Spec Checklist
+
+Derive a checklist from the spec — each "promise" in this build's scope becomes one line. The checklist mirrors the spec; it does not invent new requirements.
+
+**Sources (all in `docs/specs/<feature>/<feature>.md`):**
+- Each noun/field/behavior in the Then clause of each AS → 1 line
+- Each item in Constraints → 1 line
+- Each Not-in-Scope row (to prevent accidental ticking) → 1 line marked `[N/A]`
+
+**Granularity rule (so two devs produce the same checklist):**
+- 1 line per **observable output field** (appears in Then result, independently assertable)
+- 1 line per **side effect** (write to DB, emit event, external call)
+- 1 line per **error path** declared in a Then clause
+- Do NOT split adjectives (sorted/deduped/trimmed) into separate lines — roll them into the field line
+
+Example: Then "returns sorted list of {file, confidence, edges}" → 3 lines (one per field), not 4.
+
+**Stored at:** `docs/specs/<feature>/.build-checklist` (alongside `.build-progress`)
+
+**Format** (owner column resolves multi-story AS):
+```
+[ ] AS-012.T1 — affected_tests includes convention-matched files     | owner: S-003
+[ ] AS-012.T2 — affected_tests includes TESTED_BY edges              | owner: S-003
+[ ] AS-012.T3 — output sorted by confidence                          | owner: S-004
+[ ] C-003     — query completes under 50ms                           | owner: S-005
+[N/A] AS-015  — out of scope (M3)                                    | owner: —
+```
+
+Owner = the story in this build planned to cover that line. If an AS spans multiple stories, each line gets its own owner. Use `owner: ?` when unknown upfront, resolve when reaching that story.
+
+**Three checkbox states:**
+- `[x]` — done: there is a test assertion AND production code emitting the behavior
+- `[~]` — partial: carve-out with a concrete destination (story ID that exists in the plan, OR Known-Gap row in the spec). References like "future work", "later", "TODO.md", "Phase X (does not exist)" are NOT accepted
+- `[ ]` — untouched: will be covered by a later story in this build, or out-of-scope already declared
+
+**If checklist already exists** (resume build):
+- Re-derive from the current spec. Diff against the old checklist.
+- New line in spec, missing from checklist → append `[ ]`
+- Line in checklist, no longer in spec → mark `[STALE]` (do not delete — keep audit trail)
+- Line present in both BUT Then clause text has changed → reset to `[ ]` with note `RESET: spec text changed <date>`, re-verify. The old `[x]` may be stale — the previous assertion may no longer match.
+
+---
+
 ## Phase 1: Decide What to Test
 
 Test behavior, not implementation. If the internals change but behavior stays the same, tests should still pass.
@@ -299,6 +342,51 @@ Record for the Phase 5 summary: `S-00X added N tests: <list exact test names>`. 
 - **N ≥ 1** → normal case. Story is `done`.
 - **N = 0** → only acceptable if the story is a pure refactor AND existing tests already cover the changed path. Record: `S-00X added 0 tests: REFACTOR_ONLY — covered by existing <file:test name>`. Otherwise, story is NOT `done` — add tests first.
 
+**Checklist update (MANDATORY):** Open `.build-checklist` and tick the lines this story covers:
+
+```
+[x] AS-012.T1 — covered by affected_tests_test.rs:test_convention_match
+[~] AS-012.T2 — PARTIAL: query wired, emit deferred → M3 S-008
+```
+For `[x]`, record `file:test-name`. For `[~]`, record the destination.
+
+**Carve-out scan on the story diff:**
+```
+git diff <story-files> | grep -nE "TODO|FIXME|XXX|HACK"
+```
+Each match not already in the checklist → add a new `[~]` line with destination. Matches without a concrete destination → the story is NOT `done`; either (a) create a new story in the plan, or (b) add a Known-Gap row to the spec, before closing.
+
+**Concrete destination** = one of these grep-able sources (priority order):
+1. Story ID in `docs/specs/<feature>/<feature>.md` (section `## Stories` — grep `S-NNN` or `M<X> S-NNN`)
+2. Row in `<feature>.md` Known-Gaps / Not-in-Scope section
+3. Issue tracker ID if the project declares one (GitHub `#NNN`, JIRA `ABC-NNN`) — verify with `gh issue view` or URL regex; no online check required if the author confirms
+4. External plan file if the project declares `plan_file: <path>` in CLAUDE.md
+
+Not accepted: TODO.md, free-form code comments, "future work", "later", "Phase X" without a corresponding row.
+
+**If the project does not use a formal spec/plan** (bug fix single story, no /mf-plan): skip the destination rule for this build, replace with a lighter rule "each TODO in diff must have a 1-line justification in the summary" — log in Phase 5 output as `CARVE_OUT_RELAXED: no spec context`.
+
+**Reverse-map check (catch orphans — code exists, spec does not):**
+
+For each "artifact" newly appearing in the story diff (not only TODOs):
+- New file under `src/` production (not tests)
+- New publicly exported function/class/type
+- New DDL/schema object (table/index/enum) — detect in a language-agnostic way by grepping the declarative keywords this project uses
+- New public API endpoint / CLI command
+- New config key / feature flag
+
+For each artifact → ask: "which checklist line (AS/Constraint) requires this artifact to exist?"
+
+- Maps to ≥1 checklist line → OK
+- No mapping → FLAG ORPHAN. Three ways to handle:
+  (a) Artifact is genuinely required → add a checklist line sourced from the AS/Constraint that requires it. If no AS requires it → the spec is missing coverage; add a Known-Gap or run `/mf-plan` to add an AS
+  (b) Artifact is infrastructure for a later story → convert to `[~] <artifact> — deferred use → <future story/gap>`
+  (c) Orphan (legacy/experiment) → remove or justify in the spec
+
+This rule is **language-agnostic**: the dev decides what counts as an "artifact" based on the diff. The skill does not grep DDL or parse ASTs. It only requires "everything new has a documented reason".
+
+**Ordering gate:** tick the checklist BEFORE marking the story `done` in `.build-progress`. If a checklist line with `owner: <this-story>` is not yet ticked or converted to `[~]`/`[N/A]` → story is NOT `done`. One-way sync: progress = f(checklist).
+
 **Then proceed to the next story.**
 
 ---
@@ -357,11 +445,35 @@ If tests fail:
 
 ---
 
+## Phase 4.5: Pre-Summary Review
+
+Walk `.build-checklist` before writing the summary. This is in-place verification — it prevents the user from having to re-run the skill just to audit.
+
+**For each line not marked `[x]`:**
+
+1. **`[~]` partial:** verify the destination still exists.
+   - Story ID → `grep "<story-id>"` in the plan/spec → must match
+   - Known-Gap row → grep in `<feature>.md` → must match
+   - No match → FAIL: destination has vanished (moved/deleted), must re-bind before closing the build.
+
+2. **`[ ]` untouched but this build was supposed to cover it** (lines with `owner: S-NNN` belonging to closed stories):
+   - This is NOT vague "self-investigation". Concrete evidence is required:
+     - Grep the owner story's test file → any assertion matching the Then clause?
+     - Grep the owner story's production diff → any code emitting this output?
+   - Both absent → the owner story shipped incomplete. **Reopen the story** (revert to `pending` in `.build-progress`), add test+code, OR convert to `[~]` with a concrete destination.
+   - A dev may NOT convert `[ ]` → `[~] scope drift` without commit SHA / diff evidence showing the requirement changed mid-build. "scope drift" without evidence = miss.
+
+3. **`[N/A]`** needs no action (declared out-of-scope upfront).
+
+**The output of this phase flows straight into Phase 5 Summary** (see format below).
+
+---
+
 ## Phase 5: Summary
 
 Start with one of:
-- **DONE** — All stories green, implementation risks addressed, no signal needed.
-- **DONE_WITH_CONCERNS** — Green but: [P2 risks from Phase 0.5 / coverage gaps / spec signal]
+- **DONE** — All stories green, implementation risks addressed, no signal needed, **AND checklist is 100% `[x]` or `[N/A]`**.
+- **DONE_WITH_CONCERNS** — Green but: [P2 risks from Phase 0.5 / coverage gaps / spec signal / **any `[~]` carve-outs in checklist**]
 - **BLOCKED** — Cannot proceed: [what's blocking, what was tried, 3-attempt limit hit]
 - **NEEDS_CONTEXT** — Missing info to continue: [what's needed and why]
 
@@ -373,6 +485,7 @@ Files changed: [production files touched]
 Files tested: [test files touched]
 Stories: [AS-001 ✓, AS-002 ✓, AS-005 new]
 TDD evidence: [S-001: RED (paste 1st failing assertion raw) → GREEN ✓ | tests added: <names>, S-002: RED (raw output) → GREEN ✓ | tests added: <names>]
+Checklist: X/Y [x], A/Y [~] (destinations: <story-id list or Known-Gap refs>), B/Y [ ] (reasons), C/Y [N/A]
 Edge Case Compliance: [per-story table from Phase 1 — every row ✓ or N/A+reason]
 E2E needed: [→E2E gaps from Coverage Map, or "none"]
 Eval needed: [→EVAL gaps from Coverage Map, or "none"]
@@ -380,10 +493,22 @@ Manual needed: [→MANUAL gaps from Coverage Map, or "none"]
 ```
 
 **Progress file cleanup:**
-- All stories done → delete `docs/specs/<feature>/.build-progress`
-- Stories still remaining → leave file in place. Log: "Progress saved — resume with `/mf-build`"
+- All stories done AND checklist is 100% `[x]`/`[N/A]` → delete `docs/specs/<feature>/.build-progress` and `.build-checklist`
+- Stories remaining OR any `[~]` carve-outs → leave both files. Log: "Progress + checklist saved — resume with `/mf-build`"
 
 ### Spec Update Signal
+
+**Relationship with Phase 0.6 Checklist:**
+- Checklist is an **evidence artifact** (what got done / deferred).
+- S1/S2/S3 are **action signals** (user must run `/mf-plan`).
+- Both fire when their conditions are met — they do not suppress each other.
+
+Mapping:
+- Checklist `[~]` with destination = new Known-Gap row → also fires **S3** (new constraint not yet documented)
+- Checklist `[ ]` on a closed owner story, plus any `[STALE]` lines = code drift from spec → fires **S2**
+- A new test with no matching AS in the checklist (caught by reverse-map in Phase 2 Step 4) → fires **S1**
+
+The summary must show both the checklist stats AND the signal block — do not merge them.
 
 After every build, check against these conditions. If ANY is true → **must** signal.
 
