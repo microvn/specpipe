@@ -285,7 +285,7 @@ export async function initCommand(path, opts) {
   console.log('  .claude/CLAUDE.md          — Project rules (review and customize)');
   console.log('  .claude/settings.json      — Hook configuration');
   console.log('  .claude/hooks/             — 6 guards (file, path, glob, comment, sensitive, self-review)');
-  console.log('  .claude/skills/            — /mf-plan, /mf-challenge, /mf-build, /mf-fix, /mf-review, /mf-commit');
+  console.log('  .claude/skills/            — /mf-plan, /mf-challenge, /mf-build, /mf-fix, /mf-review, /mf-commit, /mf-voices');
   console.log('  scripts/build-test.sh      — Universal test runner');
   console.log('  docs/WORKFLOW.md           — Workflow reference');
   log.blank();

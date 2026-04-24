@@ -234,7 +234,8 @@ your-project/
 │       ├── mf-investigate/SKILL.md  ← /mf-investigate skill (optional, read-only)
 │       ├── mf-fix/SKILL.md          ← /mf-fix skill
 │       ├── mf-review/SKILL.md       ← /mf-review skill
-│       └── mf-commit/SKILL.md       ← /mf-commit skill
+│       ├── mf-commit/SKILL.md       ← /mf-commit skill
+│       └── mf-voices/SKILL.md       ← /mf-voices skill (multi-LLM review)
 ├── scripts/
 │   └── build-test.sh          ← Universal test runner
 └── docs/

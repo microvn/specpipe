@@ -29,6 +29,7 @@ export const COMPONENTS = {
     '.claude/skills/mf-fix/SKILL.md',
     '.claude/skills/mf-review/SKILL.md',
     '.claude/skills/mf-commit/SKILL.md',
+    '.claude/skills/mf-voices/SKILL.md',
   ],
   config: [
     '.claude/settings.json',
