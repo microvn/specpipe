@@ -1,6 +1,6 @@
 ---
 description: Pre-merge code review — security, correctness, spec alignment
-allowed-tools: Read, Bash, Glob, Grep
+allowed-tools: Read, Bash, Glob, Grep, AskUserQuestion
 ---
 Pre-merge code review — security, correctness, spec alignment.
 
@@ -119,46 +119,126 @@ Every finding MUST include a confidence score:
 
 ---
 
-## Phase 3: Output
+## Phase 3: TL;DR Output
 
-```markdown
-## Code Review: <branch or description>
+Print ONLY this block to terminal — concise, no full finding bodies yet. Keep all finding detail internal for Phase 5.
 
-**Scope:** X files, +Y/-Z lines
-**Focus:** <auto-detected>
-**Verdict:** APPROVE / REQUEST CHANGES / NEEDS DISCUSSION
+```
+## Code Review: <branch>
+Scope: X files, +Y/-Z lines | Focus: <detected> | Verdict: APPROVE | REQUEST CHANGES | NEEDS DISCUSSION
+Counts: N Critical · N High · N Medium · N Low  (total: N)
 
-### Critical Issues
-**[C-1] (confidence: 9/10) file.ts:42 — SQL injection via unsanitized input**
-`req.query.search` concatenated into SQL. Use parameterized query.
+Top blockers (Critical + High only, one-liner each — cap 5):
+- [C-1] file.ts:42 — SQL injection (conf 9/10)
+- [H-1] api.ts:15 — empty catch swallows DB errors (conf 8/10)
 
-### High Priority
-**[H-1] (confidence: 8/10) file.ts:87 — Empty catch swallows DB errors**
-Users see blank screen. Log with context, return safe error.
-
-### Medium Priority
-**[M-1] Spec-test gap — rate limiting not in spec**
-New logic at auth-service.ts:45-62 undocumented.
-
-### Low Priority
-**[L-1] Consider caching config lookup (called 3x per request)**
-
-### Positive Notes
-(At least 1 — reinforce good patterns)
-- Clean middleware separation in auth-middleware.ts
-- Thorough edge case tests
-
-### Not in scope
-[Work considered but not in this diff — each item with one-line rationale. If nothing to defer, write "None identified."]
-
-### Summary
-<1-2 sentences: quality + clear next action>
+Positive: <1 line — reinforce one good pattern from the diff>
+Not in scope: <1 line, or "None identified.">
 ```
 
+If total findings = 0 → print TL;DR with "No findings." and STOP. Skip Phase 4–6.
+
+---
+
+## Phase 4: Bulk triage
+
+Use `AskUserQuestion`. Recommendation logic for the question text:
+- Any Critical or High present → recommend **A (Review each)**
+- Only Medium/Low, majority confidence ≥7 → recommend **B (Accept all)**
+- Majority confidence ≤6 → recommend **C (Reject all)**
+
+Append `(Recommended)` to the matching option.
+
+```json
+{
+  "questions": [
+    {
+      "question": "<N> findings (<C>C / <H>H / <M>M / <L>L). How to triage? RECOMMENDATION: Choose <X> — <one-line reason based on severity/confidence mix>.",
+      "header": "Triage Mode",
+      "multiSelect": false,
+      "options": [
+        {"label": "A) Review each — walk through finding by finding with full details"},
+        {"label": "B) Accept all — add every finding to action list, skip per-item review"},
+        {"label": "C) Reject all — dismiss all findings, verdict stands, no action list"},
+        {"label": "D) Exit — keep the TL;DR above, stop here"}
+      ]
+    }
+  ]
+}
+```
+
+Routing: A → Phase 5. B → mark all Accepted, jump to Phase 6. C → mark all Rejected, jump to Phase 6. D → stop.
+
+---
+
+## Phase 5: Per-finding loop (only if A chosen)
+
+Iterate findings in order: Critical → High → Medium → Low. For EACH, print the full detail block:
+
+```
+[<ID>] <severity> | confidence: <N>/10 | <file:line>
+Title: <title>
+Description: <what's wrong — concrete>
+Evidence: <code snippet or direct quote from diff>
+Failure scenario: <step-by-step how this hits production>
+Suggested fix: <specific, actionable>
+```
+
+Then ask. Append `(Recommended)` to the matching option:
+- **Accept** if: severity ≥ High AND confidence ≥ 7
+- **Reject** if: confidence ≤ 6
+- **Defer** if: severity Medium/Low AND confidence ≥ 7
+
+```json
+{
+  "questions": [
+    {
+      "question": "Finding [<ID>]: <title>\n<1-line flaw summary>\nRECOMMENDATION: Choose <X> — <rationale: severity × confidence>.",
+      "header": "Finding <ID>",
+      "multiSelect": false,
+      "options": [
+        {"label": "A) Accept — add to action list"},
+        {"label": "B) Reject — false positive, dismiss"},
+        {"label": "C) Defer — note in PR description, don't fix now"}
+      ]
+    }
+  ]
+}
+```
+
+*(Move `(Recommended)` to whichever option matches the rule above.)*
+
+Escape hatch: if user hits Reject 3 times in a row on High/Critical items, ask once: "Skip remaining per-finding prompts? A) Continue B) Reject all remaining C) Accept all remaining" — avoids fatigue on noisy reviews.
+
+---
+
+## Phase 6: Summary
+
+Print final tally:
+
+```
+Triage complete.
+Accepted: N | Rejected: N | Deferred: N
+
+Action list (accepted):
+- [<ID>] file:line — <title>  →  /mf-fix "<title>"
+- ...
+
+Deferred (note in PR description):
+- [<ID>] file:line — <title>
+```
+
+If accepted = 0 → print "No action items. Verdict stands: <verdict>." and stop.
+Do **NOT** spawn `/mf-fix` automatically — user runs it per item.
+
+---
+
 ## Rules
-1. **Never auto-fix.** Report only.
+1. **Never auto-fix.** Report only — triage classifies, doesn't edit code.
 2. **Specific.** Every finding has `file:line` and concrete description.
 3. **Severity matches impact.** Style nits = Low. Injection = Critical.
 4. **Positive notes mandatory.** Reviews aren't just about problems.
 5. **Review against intent.** Not just "clean code?" but "does this match spec/commits?"
 6. **Proportional.** 5-line doc change ≠ 500-line auth rewrite.
+7. **TL;DR first, details on demand.** Never dump all finding bodies to terminal upfront — reveal detail only inside Phase 5.
+8. **Recommendation mandatory.** Every `AskUserQuestion` includes `RECOMMENDATION:` in question text AND `(Recommended)` suffix on the matching option.
