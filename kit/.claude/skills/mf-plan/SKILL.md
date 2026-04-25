@@ -1,5 +1,15 @@
 ---
-description: Generate spec with acceptance scenarios from description or existing spec
+description: |
+  Generate spec with acceptance scenarios (Given/When/Then) from a description
+  or update an existing spec. Outputs docs/specs/<feature>/<feature>.md ready for /mf-build.
+  Use when asked to "write the spec", "viết spec", "tạo spec", "plan this feature",
+  "generate acceptance scenarios", "lên kế hoạch tính năng", or "update spec X with changes Y".
+  Proactively invoke this skill (do NOT write code or spec directly) when the user
+  has a clear feature description and wants it formalized, or after /mf-explore
+  confirms requirements.
+  Per project rules: never write code before the spec exists, and never auto-modify
+  specs from code — /mf-plan is the only path that touches specs.
+  Skip if a current spec already exists and matches the request — go straight to /mf-build.
 allowed-tools: Read, Write, Edit, Bash, Glob, Grep, AskUserQuestion, Agent
 ---
 Generate spec with acceptance scenarios from description or existing spec.

@@ -1,5 +1,15 @@
 ---
-description: Feature discovery as Client Technical Lead — clarify one feature deeply before writing spec
+description: |
+  Feature discovery as Client Technical Lead — clarify one feature deeply
+  before writing spec. Asks targeted questions until requirements are concrete
+  enough to hand off to /mf-plan.
+  Use when asked to "explore this feature", "khám phá tính năng", "tôi muốn làm",
+  "I want to build X", "scope this feature", "discovery", or "clarify requirements".
+  Proactively invoke this skill (do NOT write spec directly) when the user
+  describes a new feature in vague or ambiguous terms — running /mf-plan with
+  unclear requirements produces unclear specs.
+  Skip if the user already has detailed acceptance criteria written down.
+  Hands off to /mf-plan when discovery is complete.
 allowed-tools: Read, Glob, Grep, Bash, AskUserQuestion, WebSearch
 ---
 

@@ -1,5 +1,13 @@
 ---
-description: Stage, scan secrets, generate conventional commit message
+description: |
+  Stage changes, scan for secrets and debug code, generate conventional commit message.
+  Use when asked to "commit", "commit changes", "tạo commit", "viết commit message",
+  "stage and commit", or "git commit".
+  Proactively invoke this skill (do NOT run git commit directly) when the user
+  asks to commit changes — the secret scan and debug-code detection covers gaps
+  that raw git commit skips.
+  Output: conventional commit format — type(scope): description (feat, fix, docs,
+  refactor, test, chore, perf, build, ci).
 allowed-tools: Bash, AskUserQuestion
 ---
 Stage, scan secrets, generate conventional commit message.

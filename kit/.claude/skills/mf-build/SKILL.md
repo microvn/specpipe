@@ -1,5 +1,14 @@
 ---
-description: TDD delivery loop — write failing tests from spec, implement story by story, drive to GREEN
+description: |
+  TDD delivery loop — write failing tests from spec, implement story by story,
+  drive to GREEN. One story → red → green → next story.
+  Use when asked to "build this", "implement the spec", "code the feature",
+  "triển khai", "làm tính năng", "code theo spec", or "TDD this".
+  Proactively invoke this skill (do NOT write code directly) when the user has
+  a spec ready in docs/specs/ and wants it implemented, or asks to start coding
+  a planned feature.
+  Requires a spec from /mf-plan or equivalent — if no spec exists, run /mf-plan
+  first instead of jumping into code.
 allowed-tools: Read, Write, Edit, Bash, Glob, Grep, AskUserQuestion
 ---
 TDD delivery loop — write failing tests from spec AS, implement story by story, drive to GREEN.

@@ -1,5 +1,12 @@
 ---
-description: Adversarial review — spawn hostile reviewers to break the plan before coding
+description: |
+  Adversarial review — spawn hostile reviewers to break the plan before coding.
+  Stress-tests assumptions, attacks decisions, finds blind spots in a spec.
+  Use when asked to "challenge this plan", "phản biện", "stress test the spec",
+  "tìm lỗ hổng", "break this", "red team this", or "attack this design".
+  Proactively suggest after /mf-plan produces a spec but before /mf-build —
+  catches design issues while they are still cheap to fix.
+  Skip for trivial spec changes or pure bug fixes.
 allowed-tools: Read, Bash, Glob, Grep, AskUserQuestion, Agent
 ---
 Adversarial review — spawn hostile reviewers to break the plan before coding.

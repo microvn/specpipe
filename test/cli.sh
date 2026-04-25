@@ -212,7 +212,7 @@ for skill in mf-explore mf-plan mf-build mf-challenge mf-investigate mf-fix mf-r
   CONTENT=$(head -1 "$PROJECT_DIR/.claude/skills/$skill/SKILL.md")
   assert_contains "$skill/SKILL.md starts with ---" "---" "$CONTENT"
 done
-PLAN_FM=$(head -5 "$PROJECT_DIR/.claude/skills/mf-plan/SKILL.md")
+PLAN_FM=$(awk '/^---$/{c++; if(c==2) exit} {print}' "$PROJECT_DIR/.claude/skills/mf-plan/SKILL.md")
 assert_contains "mf-plan: has description frontmatter" "description:" "$PLAN_FM"
 assert_contains "mf-plan: has allowed-tools frontmatter" "allowed-tools:" "$PLAN_FM"
 

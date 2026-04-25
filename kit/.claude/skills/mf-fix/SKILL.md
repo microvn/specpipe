@@ -1,5 +1,15 @@
 ---
-description: Test-first bug fix — write failing test, fix code, verify green
+description: |
+  Test-first bug fix — write failing test, fix code, verify green.
+  Iron Law: never fix without finding root cause first.
+  Use when asked to "fix this bug", "fix bug", "sửa lỗi", "sửa bug",
+  "this is broken", "cái này hỏng", or when user reports a reproducible
+  bug with repro steps or a stack trace.
+  Proactively invoke this skill (do NOT patch directly) when the user
+  describes a bug they want fixed.
+  For complex/ambiguous bugs (outage, regression, "it was working yesterday",
+  data corruption), start with /mf-investigate first, then hand the report to /mf-fix.
+  Skip for typos or one-line obvious fixes.
 allowed-tools: Read, Write, Edit, Bash, Glob, Grep, AskUserQuestion
 ---
 Test-first bug fix — write failing test, fix code, verify green.

@@ -1,5 +1,15 @@
 ---
-description: /mf-voices — Multi-voice review. Orchestrate multiple LLMs to independently evaluate any input, synthesize consensus + disagreements into actionable output.
+description: |
+  Multi-voice review — orchestrate multiple LLMs (Claude + Codex + others) to
+  independently evaluate any input, synthesize consensus and disagreements
+  into actionable output.
+  Use when asked to "multi-voice review", "second opinion", "ý kiến nhiều mô hình",
+  "hỏi nhiều LLM", "ask multiple LLMs", "voices review", or "what do other models think".
+  Proactively suggest for high-stakes or controversial decisions — irreversible
+  architecture choices, security trade-offs, "are we sure about this design"
+  moments — where a single model's confidence is not enough.
+  Skip for trivial questions or work where one perspective is sufficient.
+  Works on code, specs, plans, ideas, or any text input.
 allowed-tools: Read, Bash, Glob, Grep, Write, AskUserQuestion
 ---
 # /mf-voices — Multi-Voice Review

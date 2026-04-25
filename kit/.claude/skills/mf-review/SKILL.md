@@ -1,5 +1,13 @@
 ---
-description: Pre-merge code review — security, correctness, spec alignment
+description: |
+  Pre-merge code review — security, correctness, spec alignment. Reviews diff
+  against the base branch with smart focus by blast radius.
+  Use when asked to "review this PR", "review code", "review trước khi merge",
+  "kiểm tra code", "check my diff", "pre-merge review", or "review my changes".
+  Proactively suggest before /mf-commit or when the user is about to merge,
+  especially after /mf-build produces a non-trivial diff.
+  Catches: SQL safety issues, security gaps, spec drift, regressions in
+  modified-not-added lines, and changes to sensitive layers (auth, payment, core).
 allowed-tools: Read, Bash, Glob, Grep, AskUserQuestion
 ---
 Pre-merge code review — security, correctness, spec alignment.
