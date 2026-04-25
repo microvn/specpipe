@@ -54,6 +54,12 @@ Step 4 → /mf-review (before merge)
           Checks API/Backend patterns (rate limiting, timeouts, CORS, error leakage).
           Extra layer for AI-generated code: regressions, trust boundaries, cost escalation.
 
+Step 4.5 → (Optional) /mf-voices
+          Multi-LLM second opinion: sends the diff (or spec) to 2–3 different LLMs,
+          synthesizes consensus + disagreements. Use when: high-stakes change
+          (auth/payment/data), mixed-confidence findings from /mf-review, or
+          you want cross-model verification before merge. Skip for routine changes.
+
 Step 5 → /mf-commit
 ```
 
@@ -223,6 +229,7 @@ Files to delete: [list]
 | `/mf-review` (diff-based) | 10–20k | Before merge |
 | `/mf-plan` (new feature) | 20–40k | Start of new feature |
 | `/mf-challenge` (adversarial) | 15–30k | After /mf-plan, for complex features |
+| `/mf-voices` (multi-LLM review) | 10–30k + external API cost | Optional — after /mf-review for high-stakes changes |
 | Full audit (manual) | 100k+ | Before release, quarterly |
 
 **Rule of thumb:** Daily work uses templates + `/mf-build` → low token cost.

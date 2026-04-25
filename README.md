@@ -662,6 +662,31 @@ docs/specs/<feature>/
 
 **Breaking changes:** If the diff removes/renames a public function, export, or API endpoint, uses `feat!` or `fix!` type, or adds a `BREAKING CHANGE:` footer.
 
+### /mf-voices — Multi-LLM Review (Optional)
+
+**Usage:**
+```
+/mf-voices                              # review current diff with multi-LLM panel
+/mf-voices docs/specs/auth/auth.md      # review a spec
+/mf-voices src/payment/                 # review specific files
+```
+
+**When to use:** Optional second opinion *after* `/mf-review` for high-stakes changes (auth, payment, data pipelines), when `/mf-review` returns mixed-confidence findings (most at 5–7), or any time you want cross-model verification before merge. Skip for routine refactors and small CRUD.
+
+**How it works:**
+
+1. **Detect available LLMs** — Checks for OpenAI / Codex CLI / Gemini / Perplexity / Anthropic API / Ollama in priority order. Falls back to a self-spawned Claude sub-agent if no external LLM is available, with the limitation flagged in the report.
+2. **Construct open-ended review prompts** — Same material to every voice with a light bias nudge (correctness / security / design). No structured templates, no severity scale forced on reviewers — they think freely; *we* structure the synthesis.
+3. **Call voices in parallel** — 2–3 voices typically; temperature 0.3; graceful degradation if any voice fails.
+4. **Synthesize** — Parses free-form responses into findings, classifies severity/category ourselves, identifies CONSENSUS (2+ voices agree → REINFORCED), UNIQUE findings (single voice → flag for verification), and DISAGREEMENTS (voices contradict → present both sides; tiebreaker for HIGH+).
+5. **Output report** — Critical/High findings, disagreements, voice breakdown table, agreement rate (100% may indicate shared blind spot), blind spots (categories with 0 findings).
+
+**Decision points** (all use `AskUserQuestion`): review type ambiguous, voice panel size for large reviews, voice unavailable, critical consensus finding, disagreement resolution, follow-up cost > $0.10, report destination.
+
+**Rules:** Same material different lenses. Don't resolve disagreements — present both sides, human decides. Consensus ≠ correct (flag if agreement rate is 100%). Findings must be specific (`auth.ts:47` not "code could be improved").
+
+**Token cost:** 10–30k host + external API cost (Budget: ~$0.01–0.05; Standard: ~$0.05–0.20; Premium: ~$0.20–0.50 per review).
+
 ---
 
 ## 6. Automatic Guards (Hooks)
@@ -1038,6 +1063,7 @@ Then use: `/deploy staging`
 | `/mf-review` (diff-based) | 10–20k | Before merge |
 | `/mf-plan` (new feature) | 20–40k | Start of feature |
 | `/mf-challenge` (adversarial review) | 15–30k | After /mf-plan, complex features |
+| `/mf-voices` (multi-LLM review) | 10–30k + external API cost (~$0.01–0.50) | Optional — after /mf-review for high-stakes changes |
 | Full audit (manual prompt) | 100k+ | Before release |
 
 ### Minimizing Token Usage

@@ -138,6 +138,9 @@ Not in scope: <1 line, or "None identified.">
 
 If total findings = 0 → print TL;DR with "No findings." and STOP. Skip Phase 4–6.
 
+After printing TL;DR, append one line:
+> 💡 Want a second opinion? Run `/mf-voices` on this diff for a multi-LLM cross-check before triaging — especially useful for security/payment changes or when most findings sit at confidence 5–7.
+
 ---
 
 ## Phase 4: Bulk triage
