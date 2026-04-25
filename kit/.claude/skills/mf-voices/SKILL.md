@@ -1,1080 +1,1008 @@
 ---
-description: Multi-voice review — orchestrate multiple LLMs to review code, docs, architecture, or skills. Synthesize consensus + disagreements into actionable report.
+description: /mf-voices — Multi-voice review. Orchestrate multiple LLMs to independently evaluate any input, synthesize consensus + disagreements into actionable output.
 allowed-tools: Read, Bash, Glob, Grep, Write, AskUserQuestion
 ---
 # /mf-voices — Multi-Voice Review
 
-Orchestrate multiple LLMs to independently review the same material,
-then synthesize their perspectives into consensus, disagreements, and action items.
+Get independent perspectives from multiple LLMs on anything —
+code, ideas, documents, architecture, skills, decisions.
 
 Target: $ARGUMENTS
 
 ---
 
-## What This Does
-
-1. Takes whatever you want reviewed (code diff, document, architecture, skill, PR)
-2. Sends it to 2-3 different LLMs with open-ended review prompts + light bias
-3. Collects their independent reviews (free-form, not templated)
-4. Synthesizes: what they agree on, where they disagree, what to act on
-
-You get a panel of reviewers instead of one opinion.
-
-**Command:** `/mf-voices` or `/mf-voices <target>`
-
----
-
-## Scope
+## How It Works
 
 ```
-This skill ORCHESTRATES reviews. It:
-  ✓ Reads the target material
-  ✓ Constructs review prompts
-  ✓ Calls external LLMs via CLI
-  ✓ Synthesizes findings into a report
-  ✓ Writes report to file (optional)
-
-It does NOT:
-  ✗ Fix code or edit files (suggest only)
-  ✗ Choose which findings to ignore (you decide)
-  ✗ Require all LLMs to be available (graceful degradation)
+1. Understand what you're asking          (Phase 1)
+2. Find available reviewers               (Phase 2)
+3. Ask them — open-ended, not templated   (Phase 3)
+4. Synthesize their responses             (Phase 4)
+5. Show you what matters for YOUR decision (Phase 5)
 ```
 
 ---
 
-## Prerequisites — LLM Access
+## Phase 1: Understand Intent
 
-This skill needs reviewers beyond the host (Claude Code main session).
-Check availability in priority order. **At least 1 method required.**
+Read `$ARGUMENTS`. Don't classify into a box — understand what the user
+is trying to DECIDE.
+
+### 1.1 — What is the user trying to decide?
+
+```
+Parse $ARGUMENTS for decision intent:
+
+"what do you think about..."  → User wants: opinions + consensus on direction
+"review code/diff"            → User wants: bugs, risks, merge/block decision
+"check this doc"              → User wants: readiness assessment, gaps
+"is this approach ok"         → User wants: validation or alternatives
+"any issues with this"        → User wants: risk identification
+"compare A vs B"              → User wants: trade-off analysis
+"this strategy"               → User wants: go/pivot/stop signal
+
+If unclear → ask 1 question:
+  "What decision are you trying to make from this review?"
+  Don't ask "what type of review" — ask "what decision".
+```
+
+### 1.2 — What material is involved?
+
+```bash
+# If $ARGUMENTS points to file(s)
+# Read and measure
+MATERIAL=$(cat <file> 2>/dev/null)
+LINES=$(echo "$MATERIAL" | wc -l | xargs)
+echo "Material: <file>, $LINES lines"
+
+# If $ARGUMENTS is about git diff
+MATERIAL=$(git diff main...HEAD 2>/dev/null)
+[ -z "$MATERIAL" ] && MATERIAL=$(git diff HEAD~1 2>/dev/null)
+
+# If $ARGUMENTS is a question/idea (no file)
+# Material = the question itself + any referenced context
+```
+
+If material > 32KB → chunk by logical sections.
+
+### 1.3 — Confirm before proceeding
+
+**Always confirm intent in 1 line before spawning voices.**
+Include voice count + which voice(s).
+
+```
+Simple (1 voice, auto-selected):
+  "Asking Perplexity if anyone has solved a similar problem. Ok?"
+  "Having Claude review auth.ts for bugs. Ok?"
+
+Medium (2 voices, auto-selected):
+  "Getting 2 opinions: Claude (code logic) + Perplexity (security/CVEs). Ok?"
+  "Asking GPT (business logic) + Claude (technical feasibility). Ok?"
+
+Complex (N voices, user picks via AskUserQuestion):
+  "Complex problem — I'll ask you to pick voices. First, confirm:
+   you want to evaluate [intent summary] — correct?"
+```
+
+**If user corrects → adjust intent + voice selection.**
+**If user says "add voice" or "fewer voices" → adjust.**
+
+---
+
+## Phase 2: Find Reviewers
+
+### 2.1 — Probe Availability
 
 ```bash
 echo "=== Reviewer availability ==="
 
-# --- External LLMs (API/CLI) ---
-
-# OpenAI
+# External LLMs
 command -v openai &>/dev/null && echo "OPENAI_CLI: available" || \
-  ([ -n "$OPENAI_API_KEY" ] && echo "OPENAI_API: key set" || echo "OPENAI: not available")
-
-# Codex CLI (OpenAI agentic)
-command -v codex &>/dev/null && echo "CODEX_CLI: available" || echo "CODEX: not available"
-
-# Google Gemini
+  ([ -n "$OPENAI_API_KEY" ] && echo "OPENAI_API: key set" || echo "OPENAI: ✗")
+command -v codex &>/dev/null && echo "CODEX_CLI: available" || echo "CODEX: ✗"
 command -v gemini &>/dev/null && echo "GEMINI_CLI: available" || \
-  ([ -n "$GEMINI_API_KEY" ] && echo "GEMINI_API: key set" || echo "GEMINI: not available")
-
-# Perplexity
-[ -n "$PERPLEXITY_API_KEY" ] && echo "PERPLEXITY_API: key set" || echo "PERPLEXITY: not available"
-
-# Anthropic API (call different Claude model as external voice)
+  ([ -n "$GEMINI_API_KEY" ] && echo "GEMINI_API: key set" || echo "GEMINI: ✗")
+[ -n "$PERPLEXITY_API_KEY" ] && echo "PERPLEXITY: available" || echo "PERPLEXITY: ✗"
+[ -n "$ANTIGRAVITY_API_KEY" ] && echo "ANTIGRAVITY: available" || \
+  (command -v antigravity &>/dev/null && echo "ANTIGRAVITY_CLI: available" || echo "ANTIGRAVITY: ✗")
 [ -n "$ANTHROPIC_API_KEY" ] && echo "ANTHROPIC_API: key set" || echo "ANTHROPIC: host only"
-
-# Local models (Ollama)
-command -v ollama &>/dev/null && echo "OLLAMA: available ($(ollama list 2>/dev/null | tail -n +2 | wc -l | xargs) models)" || echo "OLLAMA: not available"
-
-# --- Self-spawn (always available as fallback) ---
-
-# Claude Code CLI (spawn sub-agent)
-command -v claude &>/dev/null && echo "CLAUDE_CLI: available (self-spawn)" || echo "CLAUDE_CLI: not available"
+command -v ollama &>/dev/null && echo "OLLAMA: available" || echo "OLLAMA: ✗"
+command -v claude &>/dev/null && echo "SELF_SPAWN: available" || echo "SELF_SPAWN: ✗"
 
 echo "==========================="
 ```
 
-### Reviewer Priority (chọn voices theo thứ tự này)
+### 2.2 — Auth Probe (Tier 1 voices only)
 
-```
-Tier 1 — External LLM (khác model family = đa dạng nhất):
-  GPT via API/CLI, Gemini via API/CLI, Perplexity via API
-  → Khác training data, khác perspective = giá trị review cao nhất
-
-Tier 2 — External agents (cùng family nhưng chạy independent):
-  Codex CLI (OpenAI agentic — đọc code, chạy tools, suy luận dài)
-  Anthropic API gọi model Claude khác (vd: main = Opus, voice = Sonnet)
-  → Cùng family nhưng independent session = vẫn có giá trị
-
-Tier 3 — Local models:
-  Ollama (llama, codellama, deepseek, mistral...)
-  → Free, private, nhưng capability thấp hơn
-
-Tier 4 — Self-spawn (fallback — luôn available):
-  Claude Code CLI spawn sub-agent
-  → Cùng model BUT fresh context, no prior decisions, different role
-  → Tốt hơn không review, nhưng kém đa dạng nhất
-  → GHI RÕ trong report: "self-spawn voice — same model family"
-```
-
-**Minimum:** 1 reviewer ngoài main session. Nếu tất cả Tier 1-3 unavailable → dùng Tier 4 (self-spawn).
-Nếu ngay cả `claude` CLI không có → single-voice review bằng main session với role switch.
-
-**Recommended:** 2-3 voices, ít nhất 1 từ Tier 1 (khác model family).
-
-**Large review + 3+ voices available → trigger D2.**
-
----
-
-### Self-Spawn: Claude Code tự tạo sub-agent
-
-Khi không có external LLM nào available, hoặc cần thêm voice:
-
-**Cách hoạt động:**
-```
-Main session (đang chạy /review)
-  │
-  ├── Chuẩn bị prompt (material + bias)
-  │
-  ├── Spawn sub-agent qua claude CLI:
-  │   claude --print --model <model> --system "<role prompt>"
-  │   Input: review prompt qua stdin hoặc -p flag
-  │   Sub-agent: fresh context, không biết gì về session hiện tại
-  │   Output: review response → stdout
-  │
-  ├── Thu output từ sub-agent
-  │
-  └── Tiếp tục synthesis trong main session
-```
-
-**Implementation:**
+Before building expensive prompts, verify that API keys are actually valid.
+A set key does not mean a working key.
 
 ```bash
-# Spawn sub-agent với role reviewer
-# --print: non-interactive, output rồi exit
-# --system: set role khác main session
-# --model: có thể chọn model khác (vd: sonnet cho speed)
+# Lightweight auth probe — only for voices that will be used
+# Each probe: small request, < 10 tokens, just check for 401/403
 
-REVIEW_OUTPUT=$(echo "$REVIEW_PROMPT" | claude --print \
-  --system "You are an independent code reviewer. You have NO context about 
-the developer's intentions, prior decisions, or conversation history. 
-Review the code purely on its technical merits. Be direct and honest.
-If you find nothing wrong, say so — do not invent findings." \
-  --model claude-sonnet-4-20250514 \
-  2>/dev/null)
+# OpenAI
+if [ -n "$OPENAI_API_KEY" ]; then
+  _OAI_STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
+    -H "Authorization: Bearer $OPENAI_API_KEY" \
+    https://api.openai.com/v1/models 2>/dev/null)
+  [ "$_OAI_STATUS" = "200" ] && echo "OPENAI_AUTH: valid" || echo "OPENAI_AUTH: FAILED ($_OAI_STATUS)"
+fi
 
-if [ -z "$REVIEW_OUTPUT" ]; then
-  echo "SELF_SPAWN: failed — empty response"
-else
-  echo "SELF_SPAWN: success"
-  echo "$REVIEW_OUTPUT"
+# Perplexity
+if [ -n "$PERPLEXITY_API_KEY" ]; then
+  _PPX_STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
+    -H "Authorization: Bearer $PERPLEXITY_API_KEY" \
+    https://api.perplexity.ai/chat/completions \
+    -d '{"model":"sonar","messages":[{"role":"user","content":"ping"}],"max_tokens":1}' \
+    -H "Content-Type: application/json" 2>/dev/null)
+  [ "$_PPX_STATUS" = "200" ] && echo "PERPLEXITY_AUTH: valid" || echo "PERPLEXITY_AUTH: FAILED ($_PPX_STATUS)"
+fi
+
+# Gemini
+if [ -n "$GEMINI_API_KEY" ]; then
+  _GEM_STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
+    "https://generativelanguage.googleapis.com/v1beta/models?key=$GEMINI_API_KEY" 2>/dev/null)
+  [ "$_GEM_STATUS" = "200" ] && echo "GEMINI_AUTH: valid" || echo "GEMINI_AUTH: FAILED ($_GEM_STATUS)"
+fi
+
+# Anthropic
+if [ -n "$ANTHROPIC_API_KEY" ]; then
+  _ANT_STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
+    -H "x-api-key: $ANTHROPIC_API_KEY" \
+    -H "anthropic-version: 2023-06-01" \
+    https://api.anthropic.com/v1/models 2>/dev/null)
+  [ "$_ANT_STATUS" = "200" ] && echo "ANTHROPIC_AUTH: valid" || echo "ANTHROPIC_AUTH: FAILED ($_ANT_STATUS)"
 fi
 ```
 
-**Tại sao self-spawn có giá trị (dù cùng model family):**
+If any voice's auth probe returns FAILED:
+- Remove it from available voices BEFORE voice selection
+- Note in output: "Voice X skipped — auth failed"
+- Do NOT waste tokens building a prompt for a dead key
+
+### 2.3 — Reviewer Priority
 
 ```
-Main session biết:
-  ✓ Mọi quyết định đã thảo luận với user
-  ✓ Ngữ cảnh tại sao code được viết thế này
-  ✓ Trade-offs đã chấp nhận
-  → THIÊN KIẾN: có xu hướng đồng ý với code vì biết lý do
+Tier 1 — Different model family (most diverse):
+  GPT, Gemini, Perplexity, Antigravity
+  → Different training = different perspectives
 
-Sub-agent KHÔNG biết:
-  ✗ Không biết lý do đằng sau code
-  ✗ Không biết trade-offs đã thảo luận
-  ✗ Không biết quyết định trước đó
-  → FRESH EYES: đánh giá code thuần túy về mặt kỹ thuật
+Tier 2 — Same family, independent session:
+  Codex CLI, Anthropic API (different Claude model)
+  → Independent context = still valuable
+
+Tier 3 — Local:
+  Ollama
+  → Free, private, lower capability
+
+Tier 4 — Self-spawn (always available):
+  claude --print (fresh context, no conversation history)
+  → Same model but fresh eyes — better than nothing
+  → MARK in output: "self-spawn — same model family"
 ```
 
-**Hạn chế — ghi rõ trong report:**
-```
-⚠ Self-spawn voice dùng cùng model family với main session.
-Giá trị: fresh context, không thiên kiến từ conversation.
-Hạn chế: cùng training data → có thể cùng blind spots.
-Khuyến nghị: bổ sung bằng external LLM khi có thể.
-```
-
-**Codex CLI (nếu available) — agent mode, không chỉ text:**
-
-```bash
-# Codex chạy agentic — có thể đọc code, chạy commands
-# Mạnh hơn plain API call vì nó tự explore codebase
-
-TMPERR=$(mktemp /tmp/codex-err-XXXXXX.txt)
-
-# Review mode (Codex tự đọc diff)
-timeout 300 codex review \
-  "IMPORTANT: Do NOT read files under ~/.claude/, .claude/, agents/. 
-Stay focused on repository code only." \
-  --base main \
-  2>"$TMPERR"
-
-# Hoặc exec mode (tự do hơn)
-timeout 300 codex exec \
-  "$REVIEW_PROMPT" \
-  -C "$(git rev-parse --show-toplevel)" \
-  -s read-only \
-  --json < /dev/null 2>"$TMPERR"
-
-rm -f "$TMPERR"
-```
-
-**Perplexity (nếu API key available) — tốt cho security + best practices:**
-
-```bash
-# Perplexity có web search built-in → biết CVEs mới, best practices mới
-curl -s https://api.perplexity.ai/chat/completions \
-  -H "Authorization: Bearer $PERPLEXITY_API_KEY" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "model": "llama-3.1-sonar-large-128k-online",
-    "messages": [{"role": "user", "content": "'"$REVIEW_PROMPT"'"}],
-    "max_tokens": 4000,
-    "temperature": 0.3
-  }' | jq -r '.choices[0].message.content'
-```
-
----
-
-## Decision Points — AskUserQuestion
-
-Skill này có structured decision points ở các bước quan trọng.
-Dùng `AskUserQuestion` tool — KHÔNG hỏi bằng prose trong chat.
-
-**Rules cho mọi AskUserQuestion trong skill này:**
+### Voice Strengths — Who's Good at What
 
 ```
-1. Re-ground: Nhắc lại đang review gì, branch nào, voice nào available.
-   Assume user rời tab 20 phút rồi quay lại.
-
-2. Recommend: Luôn recommend 1 option + lý do 1 dòng.
-   Không neutral — nếu có preferred choice, nói thẳng.
-
-3. Options ngắn: Label A/B/C + mô tả 1 dòng.
-   Chi tiết đi trong question body, không trong options.
-
-4. Không block cho minor decisions:
-   - Cost < $0.10 → auto-proceed
-   - 1 voice fails nhưng 2+ still available → auto-continue, just log
-   - Material < 200 lines → auto-pick 2 voices, no ask
+┌─────────────────┬──────────────────────────────────────────────────────┐
+│ Voice           │ Best For                                             │
+├─────────────────┼──────────────────────────────────────────────────────┤
+│ Claude          │ Code review, nuanced reasoning, design/architecture, │
+│ (Sonnet/Opus)   │ long-context analysis, careful edge case thinking.   │
+│                 │ Strongest at: code quality, readability, subtle bugs.│
+├─────────────────┼──────────────────────────────────────────────────────┤
+│ GPT (4o/4.1)    │ Wide domain knowledge, business logic, product      │
+│                 │ thinking, real-world patterns. Strong at connecting  │
+│                 │ technical decisions to business impact.              │
+│                 │ Strongest at: domain expertise, practical tradeoffs. │
+├─────────────────┼──────────────────────────────────────────────────────┤
+│ Gemini          │ Broad analysis, large context window, multi-modal.  │
+│ (2.5 Pro)       │ Good at synthesizing large documents.               │
+│                 │ Strongest at: big-picture, cross-cutting concerns.  │
+├─────────────────┼──────────────────────────────────────────────────────┤
+│ Perplexity      │ Real-time web search. Knows current CVEs, latest    │
+│ (sonar-pro)     │ best practices, library health, who solved this     │
+│                 │ problem before. CITES SOURCES.                      │
+│                 │ Strongest at: security, research, current info,     │
+│                 │ "is this still best practice in 2026?".             │
+│                 │ UNIQUE: only voice with live web access.            │
+├─────────────────┼──────────────────────────────────────────────────────┤
+│ Antigravity     │ Research-grade analysis, academic rigor, deep       │
+│                 │ technical topics, literature review, comparative    │
+│                 │ analysis. Strong at structured argumentation.       │
+│                 │ Strongest at: research, essays, deep domain,        │
+│                 │ "what does the literature say about this approach?" │
+├─────────────────┼──────────────────────────────────────────────────────┤
+│ Codex CLI       │ Agentic — reads code itself, runs commands,        │
+│                 │ explores repo structure. Finds things text-only     │
+│                 │ review misses because it actually RUNS the code.    │
+│                 │ Strongest at: code bugs, runtime behavior,          │
+│                 │ "does this actually work when you run it?".         │
+├─────────────────┼──────────────────────────────────────────────────────┤
+│ Ollama (local)  │ Privacy-sensitive reviews. No data leaves machine.  │
+│                 │ Capability varies by model (llama3.1:70b decent).   │
+│                 │ Strongest at: private code, air-gapped envs.       │
+├─────────────────┼──────────────────────────────────────────────────────┤
+│ Self-spawn      │ Always available. Fresh context = no conversation   │
+│ (Claude CLI)    │ bias. Same model family = possible blind spots.     │
+│                 │ Strongest at: "second pair of eyes" when nothing    │
+│                 │ else available.                                     │
+└─────────────────┴──────────────────────────────────────────────────────┘
 ```
 
-### Decision Point Map
+### Smart Voice Assignment
 
-Dưới đây là MỌI chỗ skill cần AskUserQuestion. Không ask ở chỗ khác.
-
----
-
-### D1 — Review Type Ambiguous
-
-**When:** Phase 1 cannot determine review type from `$ARGUMENTS`.
-
-```json
-{
-  "questions": [{
-    "question": "What should I review? I see [material description] but I'm not sure what angle you want.",
-    "header": "Review type",
-    "multiSelect": false,
-    "options": [
-      {"label": "Code review — check my diff for bugs, security, design"},
-      {"label": "Document review — check this spec/doc for gaps and contradictions"},
-      {"label": "Architecture review — check design for scalability and failure modes"},
-      {"label": "Skill review — check this AI skill for clarity and edge cases"}
-    ]
-  }]
-}
-```
-
-Recommendation: Pick most likely based on file extensions. `.swift/.ts/.py` → code. `.md` → document.
-
----
-
-### D2 — Voice Panel Selection
-
-**When:** 3+ LLMs available AND material is large (> 500 lines or > 10 files).
-Skip this ask for small reviews — auto-pick 2-3 voices.
-
-```json
-{
-  "questions": [{
-    "question": "This is a large review ([N] lines across [M] files). I have [list available LLMs]. More voices = better coverage but higher cost.",
-    "header": "How many reviewers?",
-    "multiSelect": false,
-    "options": [
-      {"label": "2 voices (~$X.XX) — fast, good enough for most reviews"},
-      {"label": "3 voices (~$X.XX) — thorough, catches more edge cases"},
-      {"label": "All available (~$X.XX) — maximum coverage, recommended for critical changes"}
-    ]
-  }]
-}
-```
-
-Recommendation: 3 voices for code touching auth/payment/data. 2 voices otherwise.
-
----
-
-### D3 — Voice Unavailable
-
-**When:** 1 LLM fails (timeout, auth error, rate limit) AND only 1 remaining voice.
-If 2+ voices still available → auto-continue without asking.
-
-```json
-{
-  "questions": [{
-    "question": "[ModelName] failed: [reason]. Only [remaining model] is available. A single-voice review has no independent verification.",
-    "header": "Reviewer down",
-    "multiSelect": false,
-    "options": [
-      {"label": "Continue with 1 voice — flag as single-perspective"},
-      {"label": "Retry [failed model] — might be transient"},
-      {"label": "Stop — I'll fix the API key / connection and re-run"}
-    ]
-  }]
-}
-```
-
-Recommendation: Retry once. If still fails → continue with remaining.
-
----
-
-### D4 — Critical Finding Action
-
-**When:** Synthesis finds a CRITICAL severity finding with CONSENSUS (2+ voices agree).
-For HIGH and below → just report, don't ask.
-
-```json
-{
-  "questions": [{
-    "question": "2+ reviewers independently flagged a critical issue:\n\n[finding summary with file:line]\n\nThis is the kind of thing that causes incidents.",
-    "header": "Critical finding",
-    "multiSelect": false,
-    "options": [
-      {"label": "I'll fix this now — open /fix with this finding"},
-      {"label": "I see it — I'll handle it, just continue the report"},
-      {"label": "I disagree — explain why this isn't critical"}
-    ]
-  }]
-}
-```
-
-Recommendation: Fix now if it's auth/data/security. Otherwise continue report.
-
----
-
-### D5 — Disagreement Resolution
-
-**When:** Voices directly contradict each other on a HIGH+ finding.
-For MEDIUM and below disagreements → just report both sides, don't ask.
-
-```json
-{
-  "questions": [{
-    "question": "Reviewers disagree on [location]:\n\nVoice A ([model]): [position]\nVoice B ([model]): [position]\n\nThis affects [user impact].",
-    "header": "Reviewers disagree",
-    "multiSelect": false,
-    "options": [
-      {"label": "Get tiebreaker — ask a third model to weigh in (~$X.XX)"},
-      {"label": "Voice A is right — I know the context"},
-      {"label": "Voice B is right — I know the context"},
-      {"label": "Note it — I'll investigate myself"}
-    ]
-  }]
-}
-```
-
-Recommendation: Tiebreaker for security disagreements. "Note it" for design taste calls.
-
----
-
-### D6 — Follow-Up Deep Dive
-
-**When:** User requests drill-down on a specific finding AND estimated cost > $0.10.
-Below $0.10 → auto-proceed.
-
-```json
-{
-  "questions": [{
-    "question": "Asking [ModelName] to elaborate on [finding]. Estimated cost: ~$X.XX.",
-    "header": "Follow-up cost",
-    "multiSelect": false,
-    "options": [
-      {"label": "Go ahead"},
-      {"label": "Skip — the finding is clear enough"}
-    ]
-  }]
-}
-```
-
-Recommendation: Go ahead if finding is CRITICAL/HIGH. Skip if LOW/NIT.
-
----
-
-### D7 — Report Destination
-
-**When:** Review is complete. Ask only if review has 3+ HIGH/CRITICAL findings.
-For clean reviews → just show in chat, don't ask.
-
-```json
-{
-  "questions": [{
-    "question": "/mf-voices complete. [N] critical + high findings. Where should I put the report?",
-    "header": "Save report?",
-    "multiSelect": false,
-    "options": [
-      {"label": "Chat only — I'll act on it now"},
-      {"label": "Save to docs/voices/ — reference later"},
-      {"label": "Both — show now and save"}
-    ]
-  }]
-}
-```
-
-Recommendation: Save if > 5 findings or if review is for a PR. Chat only for quick checks.
-
----
-
-### 1.1 — Detect Review Type
-
-Based on `$ARGUMENTS` and file inspection:
+Skill selects voices based on intent + voice strengths:
 
 ```
-CODE REVIEW:
-  Trigger: git diff, PR, specific files, "review my changes"
-  Material: git diff output + affected files
-  Command: git diff main...HEAD (or specified range)
+Intent: code review
+  Best voices: Claude (quality) + Codex (runtime) + Perplexity (CVEs)
+  Alt: Claude + GPT (domain logic) + self-spawn
 
-DOCUMENT REVIEW:
-  Trigger: .md file, spec, RFC, "review this doc"
-  Material: file contents
-  
-ARCHITECTURE REVIEW:
-  Trigger: "review architecture", "design review", system diagram
-  Material: relevant source files + docs
+Intent: strategy / business decision
+  Best voices: GPT (domain/business) + Claude (reasoning) + Perplexity (research)
+  Alt: GPT + Antigravity (deep analysis) + self-spawn
 
-SKILL REVIEW:
-  Trigger: .md skill file, CLAUDE.md, "review this skill"
-  Material: skill file contents
+Intent: research / deep technical topic
+  Best voices: Perplexity (current info) + Antigravity (academic rigor) + Claude (reasoning)
+  Alt: Perplexity + GPT (broad knowledge) + self-spawn
 
-GENERAL:
-  Trigger: anything else
-  Material: $ARGUMENTS content or referenced files
+Intent: security review
+  Best voices: Perplexity (CVEs, advisories) + Claude (logic) + Codex (runtime test)
+  Alt: Perplexity + GPT + self-spawn
+
+Intent: architecture / design
+  Best voices: Claude (design) + GPT (practical tradeoffs) + Gemini (big picture)
+  Alt: Claude + Perplexity (who solved this before) + self-spawn
+
+Intent: document readiness
+  Best voices: Claude (nuance) + GPT (domain) + Antigravity (rigor)
+  Alt: Claude + Perplexity (current standards) + self-spawn
+
+Intent: comparison (A vs B)
+  Best voices: Perplexity (research/benchmarks) + GPT (practical) + Claude (reasoning)
+  Alt: Antigravity (structured comparison) + any 2
+
+Fallback (any intent, limited voices):
+  Use whatever is available. Self-spawn as last resort.
+  ALWAYS note which voices would be ideal but weren't available.
 ```
 
-### 1.2 — Gather Material
-
-```bash
-# For code review
-MATERIAL=$(git diff main...HEAD 2>/dev/null)
-[ -z "$MATERIAL" ] && MATERIAL=$(git diff HEAD~1 2>/dev/null)
-
-# For file review
-# MATERIAL=$(cat <file-path>)
-
-# Truncation guard: if material > 8000 tokens (~32KB), summarize or chunk
-MATERIAL_SIZE=$(echo "$MATERIAL" | wc -c)
-```
-
-If material > 32KB → split into logical chunks (by file for diffs, by section for docs).
-Review each chunk separately, synthesize at end.
-
-### 1.3 — Context Signal
-
-From `$ARGUMENTS`, detect emphasis:
+### Voice Count — Adaptive, Not Fixed
 
 ```
-Security-sensitive:  "auth", "payment", "crypto", "token", "secret", "permission"
-  → Weight security findings higher
+Do NOT default to 3 voices. Voice count depends on complexity.
 
-Performance-sensitive: "slow", "scale", "optimize", "latency", "throughput"  
-  → Weight performance findings higher
+Simple (clear question, material < 100 lines, straightforward intent):
+  → 1 voice — pick BEST FIT for intent, don't ask
+  → Example: "any bugs in this?" → spawn Claude (best for code)
+  → Example: "has anyone done this before?" → spawn Perplexity (web search)
+  → Fast, cheap, enough for simple questions
 
-User-facing: "UI", "UX", "frontend", "customer", "user experience"
-  → Weight usability/accessibility findings higher
+Medium (material 100-500 lines, a few concerns, clear but nuanced intent):
+  → 2 voices — pick 2 best fit, don't ask
+  → Example: "review security + logic" → Perplexity (CVEs) + Claude (logic)
 
-No signal: balanced review across all dimensions
+Complex (material > 500 lines, multi-faceted, strategy/architecture, high stakes):
+  → Ask user to pick voices via AskUserQuestion
+  → Suggest combo based on intent + available voices
+```
+
+### Complexity Detection
+
+```
+Signals for SIMPLE (auto 1 voice):
+  - Short, clear question ("any bugs?", "approach ok?")
+  - Material < 100 lines or 1 small file
+  - User says "quick", "fast", "just one opinion"
+
+Signals for MEDIUM (auto 2 voices):
+  - Material 100-500 lines
+  - Question has 2+ concerns ("security + performance")
+  - User didn't say "quick" but also didn't say "thorough"
+
+Signals for COMPLEX (ask user):
+  - Material > 500 lines or multi-file
+  - Strategy, architecture, or high-stakes decision
+  - User says "thorough", "complete", "multiple perspectives"
+  - Disagreements likely (controversial topic, multiple valid approaches)
+  - User explicit: "/mf-voices 3" or "/mf-voices full"
+
+When in doubt → treat as MEDIUM (2 voices, don't ask).
 ```
 
 ---
 
-## Phase 2: Construct Review Prompts
+## Phase 3: Ask Reviewers
 
-### Prompt Philosophy
+### 3.1 — Prompt Construction
 
-```
-DO NOT feed structured format/options/categories into reviewer prompts.
+**Core principle: ask an open question, not a structured template.**
 
-Why:
-  - Pre-defined categories → reviewer only thinks inside your box → misses insights outside it
-  - Pre-defined severity levels → reviewer conforms instead of judging independently
-  - Finding-by-finding template → kills holistic observations ("architecture is wrong" isn't a single finding)
-  - Forcing 1 lens ("only look at security") → blind to obvious issues in other areas
-
-Reviewer must THINK FREELY, decide what matters, express in their own words.
-Structuring/categorizing findings is OUR job in Phase 4 (Synthesis).
-```
-
-### Core Prompt (shared across all LLMs)
-
-Every reviewer gets the same material + same open-ended instruction.
-NO template. NO checklist. NO severity scale.
+Every reviewer gets:
 
 ```
-BASE PROMPT:
+[Filesystem Boundary]
++
+[Base Question]
++
+[Bias — light nudge matched to user's intent]
++
+[Material]
+```
 
-"Review the following content. Be direct. Be honest.
+**Filesystem Boundary (always prepend):**
+```
+IMPORTANT: Do NOT read files under ~/.claude/, .claude/, .cursor/,
+agents/, node_modules/, __pycache__/, .git/objects/, vendor/,
+Pods/, DerivedData/, dist/, build/, .next/.
+Focus only on the content provided below.
+```
 
-I want to know:
+**Base Question (same for all voices, all intents):**
+```
+"Review the following. Be direct, be honest.
+
 - What's wrong or could go wrong?
 - What concerns you?
-- What would you change if this were your code/doc?
-- What's good and should be kept?
+- What would you change?
+- What's good and should stay?
 
-Be specific — point to exact files, lines, sections.
-If you see an overall pattern (not just individual bugs), say so.
-If you find nothing wrong, say that — don't invent findings.
+Be specific — point to exact locations.
+If you see an overall pattern, say it.
+If nothing is wrong, say that — don't invent problems.
 
 MATERIAL:
-<material here>"
+<content>"
 ```
 
-### Bias Prompts (light nudge — NOT constraint)
+### 3.2 — Bias Selection (matched to intent, not to type)
 
-Each reviewer gets 1-2 extra sentences SUGGESTING a direction, but NOT limiting:
+Bias is a LIGHT NUDGE — 1-2 sentences appended after base question.
+Reviewer can and should go beyond the nudge.
 
-```
-BIAS A — Lean toward correctness:
-  "I'm especially curious: does this code actually do what it claims?
-   But if you see something else more important, say that too."
-
-BIAS B — Lean toward security:
-  "I'm especially curious: how could this code be exploited?
-   But if you see something else more important, say that too."
-
-BIAS C — Lean toward design:
-  "I'm especially curious: will the next person understand this code?
-   But if you see something else more important, say that too."
-```
-
-**Key:** "But if you see something else more important, say that too."
-→ Permits reviewer to OVERRIDE the suggested lens.
-
-### Bias Assignment
+**Choose 3 biases that match the user's DECISION INTENT:**
 
 ```
-If 3 LLMs available:
-  Voice 1 (e.g., GPT)     → Bias A (lean correctness)
-  Voice 2 (e.g., Gemini)  → Bias B (lean security)
-  Voice 3 (e.g., Claude)  → Bias C (lean design)
+When user wants DIRECTION (go/pivot/stop):
+  Bias 1: "Pay special attention to: is this feasible? What's the biggest risk?"
+  Bias 2: "Pay special attention to: who benefits? Does this solve a real problem or an imagined one?"
+  Bias 3: "Pay special attention to: is there a simpler way to achieve the same goal?"
 
-If 2 LLMs available:
-  Voice 1 → Bias A (lean correctness)
-  Voice 2 → Bias B (lean security)
-  No dedicated Bias C — both are still free to comment on design
+When user wants VALIDATION (ok or not):
+  Bias 1: "Pay special attention to: is this approach on the right track? What's missing?"
+  Bias 2: "Pay special attention to: what risks are being overlooked? What failure modes haven't been considered?"
+  Bias 3: "Pay special attention to: has anyone solved this problem better already?"
 
-If 1 external LLM:
-  Voice 1 (external) → Bias A
-  Voice 2 (host/self) → Bias B
-  Flag: "2-voice review (limited diversity)"
+When user wants BUG/RISK FINDING:
+  Bias 1: "Pay special attention to: is the code/logic correct? Edge cases?"
+  Bias 2: "Pay special attention to: security? How could this be exploited?"
+  Bias 3: "Pay special attention to: maintainability? Will the next person understand this?"
 
-If 0 external:
-  Single voice: no bias, base prompt only
-  Flag: "⚠ Single-voice review — no independent verification"
+When user wants COMPARISON (A vs B):
+  Bias 1: "Pay special attention to: where does A beat B? Where does B beat A?"
+  Bias 2: "Pay special attention to: risk of each option? Which one fails worse?"
+  Bias 3: "Pay special attention to: is there an option C that neither has considered?"
+
+When user wants READINESS CHECK:
+  Bias 1: "Pay special attention to: is this ready to use? What's missing?"
+  Bias 2: "Pay special attention to: any internal contradictions? Is the logic consistent?"
+  Bias 3: "Pay special attention to: can the implementer read this and actually execute?"
+
+When intent doesn't fit above:
+  No bias — just base question. Let voices decide what matters.
 ```
 
----
+**Every bias ends with:** "But if you see a more important issue, say that instead."
 
-## Phase 3: Execute Reviews
+### 3.3 — Special Voice Roles
 
-### 3.1 — Call Each LLM
+**Perplexity (when available):**
+Always assign to the bias that needs real-time information:
+- Security → search CVEs, advisories
+- Strategy → search who else solved this
+- Research → search current standards, benchmarks
+- Comparison → search real-world data
 
-Call LLMs in parallel when possible. Each call is independent.
+Dedicated system prompt for Perplexity:
+```
+"You have web search. Use it to find:
+- Known vulnerabilities in mentioned libraries/patterns
+- Who else solved this problem and how
+- Current best practices (not outdated)
+- Real benchmarks/case studies if discussing performance
+Cite sources for every external claim."
+```
+
+**Antigravity (when available):**
+Assign to the bias that needs deep analysis, structured reasoning:
+- Research topics → academic perspective, literature
+- Complex comparisons → structured argumentation
+- Strategy → rigorous feasibility analysis
+- Document review → logical consistency, argumentation quality
+
+**Codex CLI (when available):**
+Assign to the bias that needs actual code interaction:
+- Code review → reads files, traces execution
+- Bug hunting → can actually run tests
+- Architecture → explores repo structure, dependency graph
+Do NOT use for idea/strategy review — overkill, wastes agentic tokens.
+
+### 3.4 — Execute Calls
+
+Each voice call is wrapped in a timeout. If a call hangs, skip it and
+continue with remaining voices.
 
 ```bash
-# === OpenAI (GPT) ===
-# Via CLI
-openai api chat.completions.create \
-  -m gpt-4o \
-  -g user "$REVIEW_PROMPT_A" \
-  --max-tokens 4000 \
-  2>/dev/null
+# Timeout wrapper — use for every voice call
+# Usage: voice_call <timeout_seconds> <command...>
+voice_call() {
+  local _TIMEOUT=$1; shift
+  timeout "$_TIMEOUT" "$@" 2>/tmp/voice-err-$$.txt
+  local _EXIT=$?
+  if [ "$_EXIT" = "124" ]; then
+    echo "VOICE_TIMEOUT: call exceeded ${_TIMEOUT}s"
+    return 124
+  fi
+  return $_EXIT
+}
 
-# Via curl (fallback)
-curl -s https://api.openai.com/v1/chat/completions \
+# OpenAI GPT (timeout: 60s)
+voice_call 60 curl -s https://api.openai.com/v1/chat/completions \
   -H "Authorization: Bearer $OPENAI_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{
     "model": "gpt-4o",
-    "messages": [{"role": "user", "content": "'"$REVIEW_PROMPT_A"'"}],
-    "max_tokens": 4000,
-    "temperature": 0.3
+    "messages": [{"role": "user", "content": "'"$PROMPT"'"}],
+    "max_tokens": 4000, "temperature": 0.3
   }' | jq -r '.choices[0].message.content'
 
-
-# === Google Gemini ===
-# Via CLI
-gemini generate "$REVIEW_PROMPT_B" --model gemini-2.5-pro 2>/dev/null
-
-# Via curl (fallback)
-curl -s "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent?key=$GEMINI_API_KEY" \
+# Gemini (timeout: 60s)
+voice_call 60 curl -s "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent?key=$GEMINI_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{
-    "contents": [{"parts": [{"text": "'"$REVIEW_PROMPT_B"'"}]}],
+    "contents": [{"parts": [{"text": "'"$PROMPT"'"}]}],
     "generationConfig": {"maxOutputTokens": 4000, "temperature": 0.3}
   }' | jq -r '.candidates[0].content.parts[0].text'
 
-
-# === Ollama (local) ===
-ollama run llama3.1:70b "$REVIEW_PROMPT_C" 2>/dev/null
-
-# Via API
-curl -s http://localhost:11434/api/generate \
+# Perplexity (timeout: 90s — web search takes longer)
+voice_call 90 curl -s https://api.perplexity.ai/chat/completions \
+  -H "Authorization: Bearer $PERPLEXITY_API_KEY" \
+  -H "Content-Type: application/json" \
   -d '{
-    "model": "llama3.1:70b",
-    "prompt": "'"$REVIEW_PROMPT_C"'",
-    "stream": false
-  }' | jq -r '.response'
+    "model": "sonar-pro",
+    "messages": [
+      {"role": "system", "content": "You are a reviewer with web search. Search for relevant CVEs, benchmarks, prior art, and current best practices. Cite sources."},
+      {"role": "user", "content": "'"$PROMPT"'"}
+    ],
+    "max_tokens": 4000, "temperature": 0.3
+  }' | jq -r '.choices[0].message.content'
 
-
-# === Anthropic (different Claude model as second voice) ===
-curl -s https://api.anthropic.com/v1/messages \
+# Anthropic API (timeout: 60s)
+voice_call 60 curl -s https://api.anthropic.com/v1/messages \
   -H "x-api-key: $ANTHROPIC_API_KEY" \
   -H "content-type: application/json" \
   -H "anthropic-version: 2023-06-01" \
   -d '{
     "model": "claude-sonnet-4-20250514",
     "max_tokens": 4000,
-    "messages": [{"role": "user", "content": "'"$REVIEW_PROMPT_B"'"}]
+    "messages": [{"role": "user", "content": "'"$PROMPT"'"}]
   }' | jq -r '.content[0].text'
+
+# Codex CLI (timeout: 300s — agentic, for code review only)
+voice_call 300 codex review "$PROMPT" --base main 2>/dev/null
+
+# Antigravity (timeout: 60s)
+[ -n "$ANTIGRAVITY_API_KEY" ] && \
+voice_call 60 curl -s https://api.antigravity.ai/v1/chat/completions \
+  -H "Authorization: Bearer $ANTIGRAVITY_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "antigravity-latest",
+    "messages": [{"role": "user", "content": "'"$PROMPT"'"}],
+    "max_tokens": 4000, "temperature": 0.3
+  }' | jq -r '.choices[0].message.content'
+
+# Ollama (timeout: 120s — local, can be slow)
+voice_call 120 curl -s http://localhost:11434/api/generate \
+  -d '{"model": "llama3.1:70b", "prompt": "'"$PROMPT"'", "stream": false}' \
+  | jq -r '.response'
+
+# Self-spawn (timeout: 120s)
+echo "$PROMPT" | voice_call 120 claude --print \
+  --system "You are an independent reviewer. Fresh context. No prior conversation. Be direct." \
+  --model claude-sonnet-4-20250514 2>/dev/null
 ```
 
-### 3.2 — Handle Failures Gracefully
+### 3.5 — Post-Response Checks
 
 ```
-LLM call fails (timeout, rate limit, error)?
-  → Log: "Voice N (ModelName): UNAVAILABLE — <error>"
-  → Continue with remaining voices
-  → Minimum 1 voice required to produce report
-  → 0 voices succeed → BLOCKED, suggest retry or check API keys
+Rabbit hole: response mentions .claude/, SKILL.md, package-lock.json
+  → Flag "⚠ Voice N got distracted by config files"
 
-LLM returns garbage (no structured findings)?
-  → Log: "Voice N: UNSTRUCTURED — attempting extraction"
-  → Best-effort parse: look for severity keywords, file references
-  → If still unusable → mark as "Voice N: no usable findings"
-```
+Empty: response < 100 chars
+  → Flag "Voice N: empty response"
 
-### 3.3 — Temperature & Parameters
+Timeout: voice_call returned 124
+  → Flag "Voice N: timed out after Xs"
+  → If 2+ voices remaining: continue silently
+  → If only 1 remaining: ask retry/continue/stop
 
-```
-temperature: 0.3  (low — want analytical, not creative)
-max_tokens: 4000  (enough for thorough review)
-top_p: 0.9        (slightly narrow for consistency)
+Auth error: HTTP 401/403 in response
+  → Flag "Voice N: auth failed"
+  → Should have been caught by auth probe — log as unexpected
 
-Rationale: review is analytical task. Low temperature reduces
-hallucinated findings. We want disagreements from different
-training data/perspectives, not from randomness.
+Rate limit: HTTP 429 in response
+  → Flag "Voice N: rate limited"
+  → If 2+ voices remaining: continue silently
+  → If only 1 remaining: ask retry/continue/stop
 ```
 
 ---
 
 ## Phase 4: Synthesize
 
-This is where the skill adds unique value. Reviewers return free-form responses —
-paragraphs, bullets, or a mix. OUR job is structuring their responses into
-comparable, actionable findings.
+### 4.1 — Read All Responses
 
-**Principle: WE structure, reviewers DON'T.**
-Reviewers speak freely. We categorize after. This preserves insights
-that rigid formats would kill.
+Read each voice's free-form response. Don't impose structure yet.
+Note for each voice:
+- What did they focus on? (may differ from bias — that's fine)
+- What's their overall stance?
+- What specific concerns did they raise?
+- What did they praise?
 
-### 4.1 — Parse findings from free-form responses
-
-Read each response. Extract each distinct concern/observation.
-
-For each concern a reviewer raises, WE assign:
+### 4.2 — Find Patterns
 
 ```
-  voice:      model name
-  severity:   CRITICAL | HIGH | MEDIUM | LOW | NIT
-              (WE assess based on reviewer's language +
-               actual impact, NOT assigned by reviewer)
-  category:   WE classify — reference list:
-              LOGIC, EDGE_CASE, SECURITY, ERROR, RACE, PERF,
-              NAMING, DESIGN, TESTABILITY, CONVENTION, DOCS, A11Y, DX
-              If finding doesn't fit any category → create new or use "GENERAL"
-  location:   file:line or section (if reviewer specified)
-              If reviewer was vague → WE grep to find specific location
-  issue:      summarize from reviewer's words (preserve meaning, don't add/remove)
-  suggestion: if reviewer proposed a fix → keep
-              if not → WE may add, marked "(suggestion from synthesis)"
-  verbatim:   short quote from reviewer (so user sees what reviewer actually said)
+CONSENSUS: 2+ voices raise same concern or hold same position
+  → Strong signal. Note it.
+
+UNIQUE: Only 1 voice raises something
+  → May be specialist insight or false positive
+  → Keep, mark as single-voice
+
+DISAGREEMENT: Voices contradict each other
+  → Most valuable data. This is WHERE the decision lives.
+  → Present both sides clearly.
+
+SEVERITY (for code/doc findings only — WE assign, not reviewers):
+  If material is code or doc:
+    → Parse specific findings, assign CRITICAL/HIGH/MEDIUM/LOW
+    → Based on reviewer language + actual impact
+  If material is idea/strategy:
+    → Do NOT use severity — use consensus/disagreement instead
 ```
 
-**Important:** If a reviewer makes HOLISTIC observations (e.g., "this architecture is
-over-complicated", "naming conventions are inconsistent throughout"), these are NOT
-individual findings. Record separately as "Overall observations" in the report —
-don't force into finding format.
-
-### 4.2 — Find Consensus & Disagreements
+### 4.3 — Identify the Decision Point
 
 ```
-CONSENSUS (2+ voices agree):
-  Same location + same issue (even if different wording)
-  → Merge into single finding
-  → Confidence: REINFORCED (multiple independent reviewers agree)
-  → Note: "Found by: Voice A, Voice B"
-  → **If CRITICAL severity → trigger D4** (ask user to fix now or continue)
+From patterns, determine: what does the user need to DECIDE?
 
-UNIQUE FINDINGS (only 1 voice):
-  → Keep, but mark: "Single voice — verify before acting"
-  → Not necessarily wrong — different lenses catch different things
-  → Specialist findings (security from security lens) are expected unique
-
-DISAGREEMENTS (voices contradict):
-  Voice A says X is fine, Voice B says X is a bug
-  → Flag explicitly: "DISAGREEMENT at <location>"
-  → Present both perspectives
-  → **If HIGH+ severity → trigger D5** (ask user to resolve or get tiebreaker)
-  → If MEDIUM or below → just report both sides, don't ask
-  
-SEVERITY DISAGREEMENT:
-  Same finding but different severity (A says HIGH, B says LOW)
-  → Report higher severity + note disagreement
-  → "Voice A: HIGH, Voice B: LOW — recommend treating as HIGH"
+If consensus is clear → decision is easy, show verdict
+If disagreement is clear → decision is hard, show both sides + context
+If all voices say "fine" → confirm clean, move on
 ```
 
-### 4.3 — Priority Ranking
+### 4.4 — Confusion Protocol
 
 ```
-CRITICAL findings first (always)
-  then CONSENSUS HIGH (reinforced)
-  then UNIQUE HIGH (single voice)
-  then CONSENSUS MEDIUM
-  then UNIQUE MEDIUM
-  then LOW/NIT (grouped at end)
+If during synthesis you discover:
+  - Voices are responding to fundamentally different interpretations of the intent
+  - A voice raised something that changes the entire framing of the problem
+  - Material had a critical ambiguity that voices split on differently
 
-Context signal from Phase 1.3 adjusts:
-  Security-sensitive → security findings promoted +1 severity tier
-  Performance-sensitive → perf findings promoted +1
-  User-facing → a11y/UX findings promoted +1
+→ STOP synthesis. Do not force a verdict.
+→ Name the ambiguity in 1 sentence.
+→ Present the split: "Voice A read this as X, Voice B read this as Y."
+→ Ask the user which framing is correct before continuing.
+
+This is rare. Most synthesis proceeds normally.
 ```
 
 ---
 
-## Phase 5: Output Report
+## Phase 5: Output — Matched to Intent
+
+### Core Rule
 
 ```
-MULTI-VOICE REVIEW REPORT
-════════════════════════════════════════════════════════════════
-
-Target:     <what was reviewed>
-Type:       <code | document | architecture | skill | general>
-Date:       <date>
-Voices:     <N voices — list model names>
-            e.g., "3 voices: GPT-4o (correctness), Perplexity sonar-pro (security),
-                   Claude Sonnet (design)"
-
-─── SUMMARY ───
-<2-3 sentences: overall quality assessment, biggest concern, recommended action>
-
-Total findings: N (C critical, H high, M medium, L low, N nits)
-Consensus findings: N (agreed by 2+ voices)
-Unique findings: N (single voice)  
-Disagreements: N
-
-─── OVERALL OBSERVATIONS ───
-(Holistic patterns, architecture concerns, direction — not individual findings)
-
-Voice A (GPT-4o): "<overall observation if any, verbatim>"
-Voice B (Gemini): "<overall observation if any, verbatim>"
-Voice C (Claude): "<overall observation if any, verbatim>"
-
-Common theme: <summary if multiple voices raised same holistic concern>
-(Omit this section if no voice made holistic observations)
-
-─── CRITICAL + HIGH FINDINGS ───
-
-### [C1] <title> — CRITICAL
-Location:   <file:line or section>
-Category:   <SECURITY | LOGIC | ...>
-Found by:   Voice A, Voice B (CONSENSUS — REINFORCED)
-Issue:      <specific description>
-Suggestion: <specific fix>
-Impact:     <what goes wrong if not fixed>
-
-### [H1] <title> — HIGH
-Location:   <file:line>
-Category:   <category>
-Found by:   Voice B only (UNIQUE — verify)
-Issue:      <description>
-Suggestion: <fix>
-
-... (all critical + high findings) ...
-
-─── DISAGREEMENTS ───
-
-### [D1] <location>
-Voice A (GPT-4o):     "<finding or opinion>"
-Voice B (Gemini):     "<contradicting finding or opinion>"
-Implication:          <what this means for the developer>
-Recommendation:       <suggest how to resolve — test, benchmark, or human judgment>
-
-... (all disagreements, if any) ...
-
-─── MEDIUM FINDINGS ───
-
-### [M1] <title> — MEDIUM
-Location:   <file:line>
-Found by:   <voice(s)>
-Issue:      <description>
-Suggestion: <fix>
-
-... 
-
-─── LOW + NITS ───
-(condensed — 1 line per finding)
-
-- [L1] <file:line> — <issue> (<voice>)
-- [L2] <file:line> — <issue> (<voice>)
-- [N1] <file:line> — <nit> (<voice>)
-
-─── VOICE BREAKDOWN ───
-
-| Voice | Model | Lens | Findings | Unique | Consensus | Tokens | Est. Cost |
-|-------|-------|------|----------|--------|-----------|--------|-----------|
-| A | GPT-4o | Correctness | N | N | N | N | ~$X.XX |
-| B | Gemini-2.5-Pro | Security | N | N | N | N | ~$X.XX |
-| C | Claude Sonnet | Design | N | N | N | N | ~$X.XX |
-| **Total** | | | **N** | **N** | **N** | **N** | **~$X.XX** |
-
-─── META ───
-Agreement rate:  <N% — (consensus findings / total unique findings) × 100>
-                 100% = all voices found same things (possible shared blind spot)
-                 < 30% = voices looked at very different concerns (expected with different lenses)
-Blind spots:     <categories with 0 findings across all voices — may indicate gap>
-Rabbit holes:    <"none" or "Voice N reviewed config files — findings demoted">
-Limitations:     <material truncated? voice unavailable? single-voice degradation?>
-
-════════════════════════════════════════════════════════════════
+Chat output is optimized for DECISIONS — not information.
+Max 20 lines in chat. Full details in file.
 ```
 
-**After report displayed:** If 3+ HIGH/CRITICAL findings → **trigger D7** (ask save to file or chat only).
-Clean review → show in chat, don't ask.
+### Completion Status
 
-### Report File Naming
+After synthesis, assign 1 of 4 statuses. Status appears on the first line
+of chat output, right after the target name.
 
-When saving to file:
 ```
-docs/voices/YYYY-MM-DD-<target-short-name>.md
-Example: docs/voices/2026-04-25-auth-middleware.md
+DONE — All voices responded, synthesis is clear, user has enough data to decide.
+
+DONE_WITH_CONCERNS — Synthesis complete but:
+  • Voices disagree on an important point (not just minor)
+  • 1+ voice flagged a risk that other voices didn't mention
+  • Self-spawn only → same model family bias
+  • 100% consensus on a complex topic → possible shared blind spot
+  → List each concern, 1 line each.
+
+BLOCKED — Cannot produce meaningful output:
+  • All voices failed (timeout/auth/empty)
+  • Material unreadable or too large even after chunking
+  • Intent still unclear after already asking once
+  → State clearly: blocked because of what, what was tried, what user should do next.
+
+NEEDS_CONTEXT — Missing important info discovered MID-workflow:
+  • Voice A asked "what auth does this use?" but material doesn't say
+  • Voices disagree because of an unstated assumption
+  → State clearly: what's needed, from whom, to unlock which decision.
+```
+
+If BLOCKED or NEEDS_CONTEXT → do NOT output synthesis.
+Only output status + reason + next step.
+
+### Output adapts to what voices actually said — not to a pre-set template.
+
+But there are structural patterns for common intents:
+
+---
+
+**When user wanted DIRECTION:**
+
+```
+/mf-voices — <target>                    STATUS: <status>
+══════════════════════════════════════════
+Voices: <N> (<names>)
+
+VERDICT: <GO | PIVOT | STOP | SPLIT>
+
+✅ Consensus:
+  • <what all voices agree on>
+  • <what all voices agree on>
+
+❌ Disagreements:
+  • <topic> — A: <position> / B: <position>
+
+💡 Insight:
+  • <notable observation — 1 voice>
+
+→ docs/voices/<file>.md
+══════════════════════════════════════════
 ```
 
 ---
 
-## Adaptive Behavior
-
-### Small Review (< 200 lines diff, < 5 files)
+**When user wanted VALIDATION:**
 
 ```
-Use 2 voices (not 3)
-Combine lenses: Correctness+Security, Design+DX
-Report: condensed, skip voice breakdown table
-```
+/mf-voices — <target>                    STATUS: <status>
+══════════════════════════════════════════
+Voices: <N> (<names>)
 
-### Large Review (> 500 lines, > 10 files)
+ASSESSMENT: <SOLID | HAS GAPS | RETHINK>
 
-```
-Chunk material by file or logical group
-Each chunk reviewed independently
-Synthesis merges across chunks
-Cross-file findings (e.g., API contract mismatch) flagged separately
-```
+✅ Validated:
+  • <aspects voices confirm are good>
 
-### No External LLM Available
+🔴 Must address:
+  • <gaps/risks voices agree are blocking>
 
-```
-Single-voice mode:
-  Run all 3 lenses sequentially as separate prompts to self
-  Flag: "⚠ Single-voice — no independent verification"
-  Still valuable: structured multi-lens review is better than ad-hoc
-  But: consensus/disagreement analysis not possible
+🟡 Consider:
+  • <concerns raised but not blocking>
+
+→ docs/voices/<file>.md
+══════════════════════════════════════════
 ```
 
 ---
 
-## Review-Type Specific Prompts
-
-### Code Review — Additional Context
+**When user wanted BUG/RISK FINDING (code review):**
 
 ```
-Append to base prompt:
-  "Also check:
-   - Does this diff introduce test coverage for new behavior?
-   - Are there files that SHOULD have changed but didn't? (spec, docs, tests)
-   - Is the commit atomic? (one concern per diff, or mixed changes?)
-   - Any TODO/FIXME/HACK without ticket reference?"
+/mf-voices — <target>                    STATUS: <status>
+══════════════════════════════════════════
+Voices: <N> (<names>)
+
+GATE: <PASS | FAIL — N blocking>
+
+🔴 Blocking:
+  [C1] <summary> — <file:line>
+  [H1] <summary> — <file:line> (consensus)
+
+⚠️ Non-blocking:
+  [H2] <summary> — <file:line>
+
+🔵 Disagreements:
+  [D1] <topic> — <file:line>
+
+→ docs/voices/<file>.md
+══════════════════════════════════════════
 ```
 
-### Document Review — Additional Context
+---
+
+**When user wanted COMPARISON:**
 
 ```
-Append to base prompt:
-  "Also check:
-   - Are there claims without evidence or examples?
-   - Is the structure logical? (Can a reader follow top-to-bottom?)
-   - Are there contradictions between sections?
-   - Are edge cases and error paths documented, not just happy path?
-   - Is terminology consistent throughout?"
+/mf-voices — <A> vs <B>                  STATUS: <status>
+══════════════════════════════════════════
+Voices: <N> (<names>)
+
+LEAN: <A | B | DEPENDS | NO CLEAR WINNER>
+
+Option A:
+  ✅ <strengths voices agree on>
+  ❌ <weaknesses voices agree on>
+
+Option B:
+  ✅ <strengths voices agree on>
+  ❌ <weaknesses voices agree on>
+
+🔵 Disagreements:
+  • <where voices pick different sides>
+
+💡 Option C (if any voice proposed one):
+  • <alternative approach>
+
+→ docs/voices/<file>.md
+══════════════════════════════════════════
 ```
 
-### Architecture Review — Additional Context
+---
+
+**When user wanted READINESS CHECK:**
 
 ```
-Append to base prompt:
-  "Also check:
-   - Single points of failure?
-   - What happens when [component] is down?
-   - Are boundaries between modules clear? (Who owns what?)
-   - Will this scale to 10x current load? What breaks first?
-   - Are there implicit assumptions not documented?"
+/mf-voices — <target>                    STATUS: <status>
+══════════════════════════════════════════
+Voices: <N> (<names>)
+
+READY: <YES | NOT YET — N items | MAJOR ISSUES>
+
+🔴 Fix before using:
+  • <blocking issue + location>
+
+🟡 Should fix:
+  • <non-blocking issue>
+
+✅ Already good:
+  • <what voices confirm is ready>
+
+→ docs/voices/<file>.md
+══════════════════════════════════════════
 ```
 
-### Skill Review — Additional Context
+---
+
+**When intent doesn't fit patterns above:**
 
 ```
-Append to base prompt:
-  "Also check:
-   - Are instructions clear enough for an AI to follow unambiguously?
-   - Are there steps that could be interpreted multiple ways?
-   - Is there a clear stop condition for each phase?
-   - Are edge cases handled? (empty input, failure, timeout)
-   - Does the output format contain everything needed for the next step?"
+/mf-voices — <target>                    STATUS: <status>
+══════════════════════════════════════════
+Voices: <N> (<names>)
+
+✅ Consensus:
+  • <what voices agree on>
+
+❌ Disagreements:
+  • <where voices differ>
+
+💡 Notable:
+  • <unique insights>
+
+→ docs/voices/<file>.md
+══════════════════════════════════════════
+```
+
+---
+
+**DONE_WITH_CONCERNS example** (status details appear between status line and verdict):
+
+```
+/mf-voices — auth.ts refactor            STATUS: DONE_WITH_CONCERNS
+══════════════════════════════════════════
+⚠ Concerns:
+  • Self-spawn only — same model family, possible blind spots
+  • 100% consensus on complex topic — verify independently
+
+Voices: 2 (Claude self-spawn, Claude self-spawn)
+
+GATE: PASS
+...
+```
+
+---
+
+### Report File — Save on Demand, Not Always
+
+```
+Do NOT auto-save files. Wastes tokens on file writing + formatting.
+
+When to suggest save:
+  - 3+ voices, many disagreements → complex, worth saving
+  - User says "save"
+  - Many findings (> 5 CRITICAL+HIGH for code, > 3 disagreements for ideas)
+
+When NOT to suggest save:
+  - Quick review, 2 voices, clear consensus → chat output is enough
+  - User says "quick" or "fast"
+  - Simple yes/no validation
+
+If save needed → include in next-action options.
+If not needed → chat output is sufficient, user can copy if they want.
+```
+
+File format when saving (`docs/voices/<date>-<target>.md`):
+
+```markdown
+# /mf-voices — <target>
+Date: <date>
+Voices: <list>
+Intent: <what user was deciding>
+Status: <DONE | DONE_WITH_CONCERNS | ...>
+
+## Summary
+<same as chat output>
+
+## Voice A (<model>) — Full Response
+<verbatim>
+
+## Voice B (<model>) — Full Response
+<verbatim>
+
+## Synthesis Notes
+- Consensus: <list>
+- Disagreements: <list>
+- Unique insights: <list>
+
+## META
+| Voice | Model | Bias | Tokens | Cost |
+|-------|-------|------|--------|------|
+| A | ... | ... | N | ~$X |
+Agreement rate: N%
+Limitations: <if any>
+```
+
+---
+
+## After Output: Next Action
+
+After showing chat summary, ask what's next.
+Options adapt based on complexity + output + status.
+
+**DONE — Simple review (clear consensus, few findings):**
+```json
+{
+  "questions": [{
+    "question": "/mf-voices done.",
+    "header": "What next?",
+    "multiSelect": false,
+    "options": [
+      {"label": "Act on it — proceed with recommendation"},
+      {"label": "Drill down — details on specific point"},
+      {"label": "Done — I have what I need"}
+    ]
+  }]
+}
+```
+
+**DONE_WITH_CONCERNS or complex review (disagreements, many findings, CRITICAL items):**
+```json
+{
+  "questions": [{
+    "question": "/mf-voices done. [N] disagreements, [N] critical findings.",
+    "header": "What next?",
+    "multiSelect": false,
+    "options": [
+      {"label": "Drill down — details on specific point"},
+      {"label": "Resolve disagreement — get tiebreaker voice"},
+      {"label": "Save full report — docs/voices/ for reference"},
+      {"label": "Fix now — address critical items"},
+      {"label": "More voices — add external LLM for diversity"},
+      {"label": "Done — I'll decide myself"}
+    ]
+  }]
+}
+```
+
+**Self-spawn only (limited diversity):**
+```json
+{
+  "questions": [{
+    "question": "/mf-voices done (self-spawn only — same model family).",
+    "header": "What next?",
+    "multiSelect": false,
+    "options": [
+      {"label": "Good enough — proceed"},
+      {"label": "Get real diversity — add external LLM (GPT/Perplexity/Antigravity)"},
+      {"label": "Drill down — details on specific point"},
+      {"label": "Done"}
+    ]
+  }]
+}
+```
+
+**BLOCKED:**
+```json
+{
+  "questions": [{
+    "question": "/mf-voices BLOCKED — [reason].",
+    "header": "What next?",
+    "multiSelect": false,
+    "options": [
+      {"label": "Retry — try again with same voices"},
+      {"label": "Different voices — switch to available alternatives"},
+      {"label": "Abort — I'll handle this manually"}
+    ]
+  }]
+}
+```
+
+**NEEDS_CONTEXT:**
+```json
+{
+  "questions": [{
+    "question": "/mf-voices needs context — [what's missing].",
+    "header": "What next?",
+    "multiSelect": false,
+    "options": [
+      {"label": "Provide context — I'll answer now"},
+      {"label": "Continue anyway — work with what you have"},
+      {"label": "Abort — I'll come back later"}
+    ]
+  }]
+}
+```
+
+---
+
+## Drill Down (on demand)
+
+After summary, user can request details:
+
+```
+"details on [topic]"            → show relevant voice quotes + context
+"what did voice A say"          → show Voice A full response
+"why the disagreement on [X]"   → show both positions + reasoning
+"any sources?" (Perplexity)     → show citations from Perplexity response
+```
+
+Each drill-down = 1 focused response, not full report dump.
+
+---
+
+## Adaptive Sizing
+
+```
+Simple (< 100 lines, clear question):
+  1 voice, best-fit for intent
+  Compact output, no file save
+  Total cost: ~$0.01-0.05
+
+Medium (100-500 lines, 2+ concerns):
+  2 voices, auto-selected
+  Standard output, file save on request
+  Total cost: ~$0.05-0.15
+
+Complex (> 500 lines, multi-faceted, high stakes):
+  N voices (user picks via AskUserQuestion)
+  Full output + suggest file save
+  Total cost: depends on N voices + models
 ```
 
 ---
 
 ## Rules
 
-1. **Same material, different lenses.** Every voice reviews the same content. Difference comes from lens + model perspective, not from seeing different things.
-2. **Low temperature.** Reviews are analytical. Disagreements should come from different training/perspective, not randomness.
-3. **Don't resolve disagreements.** Present both sides. Developer decides. AI panel advises, human owns the decision.
-4. **Graceful degradation.** 1 voice fails → continue with remaining. 0 succeed → BLOCKED.
-5. **No phantom findings.** If a voice says "no issues in this category" → record that. Absence of findings IS data.
-6. **Consensus ≠ correct.** All 3 voices can be wrong about the same thing (shared training bias). Flag this in META: "Agreement rate 100% — consider if shared blind spot exists."
-7. **Findings must be specific.** "Code could be improved" is not a finding. "auth.ts:47 — token check returns undefined on expired session, should return AuthError.Expired" is a finding.
-8. **Truncation = declared.** If material was truncated or chunked, say so. Reviewer saw partial picture → findings may miss cross-file issues.
-
----
-
-## LLM Configuration Guide
-
-### API Key Setup
-
-```bash
-# Add to shell profile (~/.zshrc, ~/.bashrc)
-
-# OpenAI
-export OPENAI_API_KEY="sk-..."
-
-# Google Gemini
-export GEMINI_API_KEY="..."
-
-# Anthropic (if calling as second voice)
-export ANTHROPIC_API_KEY="sk-ant-..."
-
-# Ollama (no key needed, just install + pull model)
-# brew install ollama
-# ollama pull llama3.1:70b
-```
-
-### Recommended Model Combinations
-
-```
-Budget (low cost):
-  Voice 1: GPT-4o-mini (correctness)
-  Voice 2: Gemini Flash (security)
-  → Cost: ~$0.01-0.05 per review
-
-Standard:
-  Voice 1: GPT-4o (correctness)
-  Voice 2: Gemini 2.5 Pro (security)  
-  Voice 3: Claude Sonnet (design) — via API, not self
-  → Cost: ~$0.05-0.20 per review
-
-Premium:
-  Voice 1: GPT-4.1 (correctness)
-  Voice 2: Gemini 2.5 Pro (security)
-  Voice 3: Claude Opus (design)
-  → Cost: ~$0.20-0.50 per review
-
-Local (free, private):
-  Voice 1: Ollama llama3.1:70b (correctness)
-  Voice 2: Ollama codellama:34b (code-specific)
-  → Cost: $0, but slower + less capable
-```
-
-### Model Strengths (guide lens assignment)
-
-```
-GPT-4o / 4.1:     Strong at logic bugs, edge cases, code correctness
-Gemini 2.5 Pro:   Strong at security analysis, broad knowledge
-Claude Sonnet/Opus: Strong at design, readability, nuanced reasoning
-Llama 3.1 70B:    Decent at code review, good for privacy-sensitive
-CodeLlama:        Specialized for code, misses design/docs concerns
-DeepSeek Coder:   Strong at code logic, weaker on security/design
-```
-
----
-
-## Follow-Up: Drill Into Specific Findings
-
-After the report is delivered, user may want to drill deeper into specific findings.
-
-### Targeted Follow-Up
-
-If user says "ask Voice B about finding H1" or "elaborate on the security concern":
-
-1. Identify which voice and which finding
-2. Construct follow-up prompt:
-   ```
-   <Filesystem Boundary>
-   You previously reviewed this material and found:
-   "<paste the specific finding>"
-   
-   The developer wants more detail:
-   - Exact reproduction steps if this is a bug
-   - Code example showing the fix
-   - How confident are you this is a real issue vs false positive?
-   
-   <Original material for context>
-   ```
-3. Call ONLY that specific LLM (not all voices)
-4. Present response attributed to that voice
-
-### Cross-Examine a Disagreement
-
-If user says "resolve disagreement D1" or "who's right about the auth issue":
-
-1. Take the disagreement
-2. Send to a THIRD voice (not either of the two that disagreed):
-   ```
-   <Filesystem Boundary>
-   Two reviewers disagree about this code:
-   
-   Reviewer A says: "<Voice A's position>"
-   Reviewer B says: "<Voice B's position>"
-   
-   The code in question: <relevant snippet>
-   
-   Who is correct? Or are they both partially right?
-   Be specific — cite the code.
-   ```
-3. Present as "Tiebreaker voice (ModelName) says: ..."
-4. Still don't auto-resolve — present all 3 opinions, user decides
-
-### Cost Guard
-
-Follow-up calls are individual API calls. **Trigger D6** if estimated cost > $0.10.
-Below $0.10 → auto-proceed without asking.
-
-# Review specific file
-claude "/review src/auth/middleware.ts"
-
-# Review with emphasis
-claude "/review — focus on security, this handles payment tokens"
-
-# Review a document
-claude "/review docs/business-logic/FileList.md"
-
-# Review architecture
-claude "/review the caching architecture in src/cache/"
-
-# Review a skill
-claude "/review .claude/commands/fix.md"
-```
+1. **Understand intent first.** Don't classify — understand what decision the user faces.
+2. **Confirm before spawning.** 1 line: what voices will look at, under what angle.
+3. **Bias matches intent, not type.** Strategy question → strategy biases. Code question → code biases.
+4. **Open prompts, no templates.** Reviewers think freely. We structure after.
+5. **Output for decision, not information.** Chat max 20 lines. Details in file.
+6. **Don't resolve disagreements.** Present both sides. User decides.
+7. **Consensus ≠ correct.** All voices can share blind spots. Note when agreement is 100%.
+8. **Findings must be specific.** Location, not vibes.
+9. **Perplexity → web-grounded role.** When available, assign to bias benefiting from live search.
+10. **Graceful degradation.** 1 voice fails → continue. 0 succeed → BLOCKED.
+11. **Probe before prompting.** Verify auth before building expensive prompts. Dead keys waste tokens.
+12. **Timeout everything.** Every voice call gets a timeout. A hanging call must never block the entire review.
