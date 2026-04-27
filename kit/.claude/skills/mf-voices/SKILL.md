@@ -218,17 +218,19 @@ Tier 4 — Self-spawn (always available):
 │                 │ Strongest at: code quality, readability, subtle bugs.│
 ├─────────────────┼──────────────────────────────────────────────────────┤
 │ GPT (5-mini /   │ Wide domain knowledge, business logic, product      │
-│  5)             │ thinking, real-world patterns. Strong at connecting  │
+│  5.5)           │ thinking, real-world patterns. Strong at connecting  │
 │                 │ technical decisions to business impact.              │
-│                 │ Default: gpt-5-mini ($0.75/$4.50). gpt-5 ($0.625/$5) │
-│                 │ for top-quality strategy work.                       │
+│                 │ Default: gpt-5-mini ($0.25/$2). gpt-5.5 ($5/$30,    │
+│                 │ released 2026-04-23) only when top quality matters  │
+│                 │ — gpt-5.5 is now pricier than Sonnet 4.6.           │
 │                 │ Strongest at: domain expertise, practical tradeoffs. │
 ├─────────────────┼──────────────────────────────────────────────────────┤
 │ Gemini          │ Broad analysis, large context window, multi-modal.  │
-│ (3 Flash / Pro) │ Good at synthesizing large documents.               │
-│                 │ Default: gemini-3-flash ($0.50/$3). Upgrade to      │
-│                 │ gemini-3-pro ($2/$12, $4/$18 over 200k ctx) for    │
-│                 │ long-material big-picture work.                     │
+│ (3 Flash /      │ Good at synthesizing large documents.               │
+│  3.1 Pro)       │ Default: gemini-3-flash ($0.50/$3). Upgrade to      │
+│                 │ gemini-3.1-pro-preview ($2/$12, $4/$18 >200k ctx).  │
+│                 │ NOTE: gemini-3-pro deprecated 2026-03-09 — calls   │
+│                 │ to that model ID will fail. Use 3.1-pro-preview.   │
 │                 │ Strongest at: big-picture, cross-cutting concerns.  │
 ├─────────────────┼──────────────────────────────────────────────────────┤
 │ Perplexity      │ Real-time web search. Knows current CVEs, latest    │
@@ -454,7 +456,7 @@ Cite sources for every external claim."
 **Antigravity:** Not available as a hosted chat API. Google Antigravity is
 an agentic IDE — there is no public REST endpoint to call. Skip until a
 CLI bridge exists; in the meantime, route the "deep analysis / structured
-reasoning" bias to Gemini 3 Pro (large context) or Claude Opus.
+reasoning" bias to Gemini 3.1 Pro (large context) or Claude Opus 4.7.
 
 **Codex CLI (when available):**
 Assign to the bias that needs actual code interaction:
@@ -502,8 +504,9 @@ voice_call() {
 }
 
 # OpenAI GPT (timeout: 60s)
-# gpt-5-mini: $0.75/$4.50 per 1M tokens — good balance for review work.
-# Upgrade to "gpt-5" ($0.625/$5.00) only when intent demands top quality.
+# gpt-5-mini: $0.25/$2.00 per 1M tokens — cheap, strong default for review.
+# Upgrade to "gpt-5.5" ($5/$30, released 2026-04-23) only when top quality
+# matters — note gpt-5.5 is now more expensive per output than Sonnet 4.6.
 # NOTE: GPT-5 family uses `max_completion_tokens`, not `max_tokens` (legacy).
 # Sending `max_tokens` to gpt-5* returns HTTP 400.
 _PAYLOAD=$(jq -n --arg p "$PROMPT" '{
@@ -519,8 +522,10 @@ voice_call 60 curl -s https://api.openai.com/v1/chat/completions \
 
 # Gemini (timeout: 60s)
 # gemini-3-flash: $0.50/$3.00 per 1M tokens — cheapest Tier-1 voice.
-# Upgrade to "gemini-3-pro" ($2.00/$12.00, $4/$18 over 200k ctx) for big-picture
-# work on long material.
+# Upgrade to "gemini-3.1-pro-preview" ($2.00/$12.00, $4/$18 over 200k ctx)
+# for big-picture work on long material.
+# NOTE: gemini-3-pro was deprecated/shut down 2026-03-09. Hardcoding
+# "gemini-3-pro" returns 404 — always use "gemini-3.1-pro-preview".
 _PAYLOAD=$(jq -n --arg p "$PROMPT" '{
   contents: [{parts: [{text: $p}]}],
   generationConfig: {maxOutputTokens: 4000, temperature: 0.3}
