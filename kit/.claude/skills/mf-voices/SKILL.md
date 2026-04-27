@@ -109,12 +109,23 @@ echo "=== Reviewer availability ==="
 # External LLMs
 command -v openai &>/dev/null && echo "OPENAI_CLI: available" || \
   ([ -n "$OPENAI_API_KEY" ] && echo "OPENAI_API: key set" || echo "OPENAI: ✗")
-command -v codex &>/dev/null && echo "CODEX_CLI: available" || echo "CODEX: ✗"
+# Codex needs binary AND auth (one of: $CODEX_API_KEY, $OPENAI_API_KEY,
+# or ${CODEX_HOME:-~/.codex}/auth.json). Binary alone isn't enough.
+if command -v codex &>/dev/null; then
+  _CODEX_AUTH_FILE="${CODEX_HOME:-$HOME/.codex}/auth.json"
+  if [ -n "$CODEX_API_KEY" ] || [ -n "$OPENAI_API_KEY" ] || [ -f "$_CODEX_AUTH_FILE" ]; then
+    echo "CODEX_CLI: available"
+  else
+    echo "CODEX: ✗ (binary present, no auth — run 'codex login')"
+  fi
+else
+  echo "CODEX: ✗"
+fi
 command -v gemini &>/dev/null && echo "GEMINI_CLI: available" || \
   ([ -n "$GEMINI_API_KEY" ] && echo "GEMINI_API: key set" || echo "GEMINI: ✗")
 [ -n "$PERPLEXITY_API_KEY" ] && echo "PERPLEXITY: available" || echo "PERPLEXITY: ✗"
-[ -n "$ANTIGRAVITY_API_KEY" ] && echo "ANTIGRAVITY: available" || \
-  (command -v antigravity &>/dev/null && echo "ANTIGRAVITY_CLI: available" || echo "ANTIGRAVITY: ✗")
+# Antigravity is Google's IDE, not a REST API — only probe if a CLI bridge exists
+command -v antigravity &>/dev/null && echo "ANTIGRAVITY_CLI: available" || echo "ANTIGRAVITY: ✗ (IDE only)"
 [ -n "$ANTHROPIC_API_KEY" ] && echo "ANTHROPIC_API: key set" || echo "ANTHROPIC: host only"
 command -v ollama &>/dev/null && echo "OLLAMA: available" || echo "OLLAMA: ✗"
 command -v claude &>/dev/null && echo "SELF_SPAWN: available" || echo "SELF_SPAWN: ✗"
@@ -139,20 +150,20 @@ if [ -n "$OPENAI_API_KEY" ]; then
   [ "$_OAI_STATUS" = "200" ] && echo "OPENAI_AUTH: valid" || echo "OPENAI_AUTH: FAILED ($_OAI_STATUS)"
 fi
 
-# Perplexity
+# Perplexity — SKIPPED: Perplexity has no free auth-probe endpoint.
+# A real chat completion (even max_tokens:1) is billed per request, so probing
+# every run wastes money. Trust the key is set; if invalid, the actual review
+# call will return 401 and Phase 3.5 (Post-Response Checks) flags it as
+# "auth failed". Net cost: 1 wasted real call vs N probe calls per session.
 if [ -n "$PERPLEXITY_API_KEY" ]; then
-  _PPX_STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
-    -H "Authorization: Bearer $PERPLEXITY_API_KEY" \
-    https://api.perplexity.ai/chat/completions \
-    -d '{"model":"sonar","messages":[{"role":"user","content":"ping"}],"max_tokens":1}' \
-    -H "Content-Type: application/json" 2>/dev/null)
-  [ "$_PPX_STATUS" = "200" ] && echo "PERPLEXITY_AUTH: valid" || echo "PERPLEXITY_AUTH: FAILED ($_PPX_STATUS)"
+  echo "PERPLEXITY_AUTH: assumed valid (probe skipped — would cost money)"
 fi
 
-# Gemini
+# Gemini — use header auth (x-goog-api-key) to keep the key out of URLs/logs.
 if [ -n "$GEMINI_API_KEY" ]; then
   _GEM_STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
-    "https://generativelanguage.googleapis.com/v1beta/models?key=$GEMINI_API_KEY" 2>/dev/null)
+    -H "x-goog-api-key: $GEMINI_API_KEY" \
+    https://generativelanguage.googleapis.com/v1beta/models 2>/dev/null)
   [ "$_GEM_STATUS" = "200" ] && echo "GEMINI_AUTH: valid" || echo "GEMINI_AUTH: FAILED ($_GEM_STATUS)"
 fi
 
@@ -175,8 +186,9 @@ If any voice's auth probe returns FAILED:
 
 ```
 Tier 1 — Different model family (most diverse):
-  GPT, Gemini, Perplexity, Antigravity
+  GPT, Gemini, Perplexity
   → Different training = different perspectives
+  (Antigravity = Google IDE only, not a REST API — skip until a CLI bridge exists)
 
 Tier 2 — Same family, independent session:
   Codex CLI, Anthropic API (different Claude model)
@@ -199,30 +211,38 @@ Tier 4 — Self-spawn (always available):
 │ Voice           │ Best For                                             │
 ├─────────────────┼──────────────────────────────────────────────────────┤
 │ Claude          │ Code review, nuanced reasoning, design/architecture, │
-│ (Sonnet/Opus)   │ long-context analysis, careful edge case thinking.   │
+│ (Haiku 4.5 /    │ long-context analysis, careful edge case thinking.   │
+│  Sonnet 4.6 /   │ Default voice: sonnet-4-6 ($3/$15). Self-spawn uses  │
+│  Opus 4.7)      │ haiku-4-5 ($1/$5). Bump to opus-4-7 ($5/$25) for    │
+│                 │ hardest reasoning.                                   │
 │                 │ Strongest at: code quality, readability, subtle bugs.│
 ├─────────────────┼──────────────────────────────────────────────────────┤
-│ GPT (4o/4.1)    │ Wide domain knowledge, business logic, product      │
-│                 │ thinking, real-world patterns. Strong at connecting  │
+│ GPT (5-mini /   │ Wide domain knowledge, business logic, product      │
+│  5)             │ thinking, real-world patterns. Strong at connecting  │
 │                 │ technical decisions to business impact.              │
+│                 │ Default: gpt-5-mini ($0.75/$4.50). gpt-5 ($0.625/$5) │
+│                 │ for top-quality strategy work.                       │
 │                 │ Strongest at: domain expertise, practical tradeoffs. │
 ├─────────────────┼──────────────────────────────────────────────────────┤
 │ Gemini          │ Broad analysis, large context window, multi-modal.  │
-│ (2.5 Pro)       │ Good at synthesizing large documents.               │
+│ (3 Flash / Pro) │ Good at synthesizing large documents.               │
+│                 │ Default: gemini-3-flash ($0.50/$3). Upgrade to      │
+│                 │ gemini-3-pro ($2/$12, $4/$18 over 200k ctx) for    │
+│                 │ long-material big-picture work.                     │
 │                 │ Strongest at: big-picture, cross-cutting concerns.  │
 ├─────────────────┼──────────────────────────────────────────────────────┤
 │ Perplexity      │ Real-time web search. Knows current CVEs, latest    │
-│ (sonar-pro)     │ best practices, library health, who solved this     │
-│                 │ problem before. CITES SOURCES.                      │
+│ (sonar /        │ best practices, library health, who solved this     │
+│  sonar-pro)     │ problem before. CITES SOURCES.                      │
+│                 │ Default: sonar-pro ($3/$15) for citation quality.   │
+│                 │ sonar ($1/$1) for cheap quick lookups.              │
 │                 │ Strongest at: security, research, current info,     │
-│                 │ "is this still best practice in 2026?".             │
+│                 │ "is this current best practice?".                   │
 │                 │ UNIQUE: only voice with live web access.            │
 ├─────────────────┼──────────────────────────────────────────────────────┤
-│ Antigravity     │ Research-grade analysis, academic rigor, deep       │
-│                 │ technical topics, literature review, comparative    │
-│                 │ analysis. Strong at structured argumentation.       │
-│                 │ Strongest at: research, essays, deep domain,        │
-│                 │ "what does the literature say about this approach?" │
+│ Antigravity     │ Google's agentic IDE (launched 2025). NOT a hosted  │
+│ (IDE only)      │ chat API — accessed via the IDE / CLI, not REST.    │
+│                 │ Skip this voice unless a working CLI bridge exists. │
 ├─────────────────┼──────────────────────────────────────────────────────┤
 │ Codex CLI       │ Agentic — reads code itself, runs commands,        │
 │                 │ explores repo structure. Finds things text-only     │
@@ -231,7 +251,7 @@ Tier 4 — Self-spawn (always available):
 │                 │ "does this actually work when you run it?".         │
 ├─────────────────┼──────────────────────────────────────────────────────┤
 │ Ollama (local)  │ Privacy-sensitive reviews. No data leaves machine.  │
-│                 │ Capability varies by model (llama3.1:70b decent).   │
+│                 │ Capability varies by model (llama3.3:70b decent).   │
 │                 │ Strongest at: private code, air-gapped envs.       │
 ├─────────────────┼──────────────────────────────────────────────────────┤
 │ Self-spawn      │ Always available. Fresh context = no conversation   │
@@ -252,11 +272,11 @@ Intent: code review
 
 Intent: strategy / business decision
   Best voices: GPT (domain/business) + Claude (reasoning) + Perplexity (research)
-  Alt: GPT + Antigravity (deep analysis) + self-spawn
+  Alt: GPT + Gemini (big-picture) + self-spawn
 
 Intent: research / deep technical topic
-  Best voices: Perplexity (current info) + Antigravity (academic rigor) + Claude (reasoning)
-  Alt: Perplexity + GPT (broad knowledge) + self-spawn
+  Best voices: Perplexity (current info) + GPT (broad knowledge) + Claude (reasoning)
+  Alt: Perplexity + Gemini (large-context synthesis) + self-spawn
 
 Intent: security review
   Best voices: Perplexity (CVEs, advisories) + Claude (logic) + Codex (runtime test)
@@ -267,12 +287,12 @@ Intent: architecture / design
   Alt: Claude + Perplexity (who solved this before) + self-spawn
 
 Intent: document readiness
-  Best voices: Claude (nuance) + GPT (domain) + Antigravity (rigor)
-  Alt: Claude + Perplexity (current standards) + self-spawn
+  Best voices: Claude (nuance) + GPT (domain) + Perplexity (current standards)
+  Alt: Claude + Gemini (logical consistency) + self-spawn
 
 Intent: comparison (A vs B)
   Best voices: Perplexity (research/benchmarks) + GPT (practical) + Claude (reasoning)
-  Alt: Antigravity (structured comparison) + any 2
+  Alt: Gemini (structured comparison) + any 2
 
 Fallback (any intent, limited voices):
   Use whatever is available. Self-spawn as last resort.
@@ -333,7 +353,7 @@ When in doubt → treat as MEDIUM (2 voices, don't ask).
 Every reviewer gets:
 
 ```
-[Filesystem Boundary]
+[Filesystem Boundary — agentic voices only]
 +
 [Base Question]
 +
@@ -342,12 +362,18 @@ Every reviewer gets:
 [Material]
 ```
 
-**Filesystem Boundary (always prepend):**
+**Filesystem Boundary — prepend ONLY for agentic voices (Codex CLI, self-spawn,
+local agents). Hosted chat APIs (OpenAI, Gemini, Anthropic Messages, Perplexity)
+have no file access — the boundary is wasted tokens for them.**
+
 ```
-IMPORTANT: Do NOT read files under ~/.claude/, .claude/, .cursor/,
-agents/, node_modules/, __pycache__/, .git/objects/, vendor/,
-Pods/, DerivedData/, dist/, build/, .next/.
-Focus only on the content provided below.
+IMPORTANT: Do NOT read or execute any files under ~/.claude/, .claude/,
+.cursor/, agents/, .claude/skills/, node_modules/, __pycache__/,
+.git/objects/, vendor/, Pods/, DerivedData/, dist/, build/, .next/.
+These paths contain skill definitions, build artifacts, or vendored code
+meant for a different AI system or tooling — they will waste your time
+and pull you off-task. Ignore them completely. Focus only on the content
+provided below.
 ```
 
 **Base Question (same for all voices, all intents):**
@@ -425,12 +451,10 @@ Dedicated system prompt for Perplexity:
 Cite sources for every external claim."
 ```
 
-**Antigravity (when available):**
-Assign to the bias that needs deep analysis, structured reasoning:
-- Research topics → academic perspective, literature
-- Complex comparisons → structured argumentation
-- Strategy → rigorous feasibility analysis
-- Document review → logical consistency, argumentation quality
+**Antigravity:** Not available as a hosted chat API. Google Antigravity is
+an agentic IDE — there is no public REST endpoint to call. Skip until a
+CLI bridge exists; in the meantime, route the "deep analysis / structured
+reasoning" bias to Gemini 3 Pro (large context) or Claude Opus.
 
 **Codex CLI (when available):**
 Assign to the bias that needs actual code interaction:
@@ -444,7 +468,26 @@ Do NOT use for idea/strategy review — overkill, wastes agentic tokens.
 Each voice call is wrapped in a timeout. If a call hangs, skip it and
 continue with remaining voices.
 
+**JSON safety:** every payload is built with `jq -n --arg` so material
+containing quotes, newlines, or backslashes cannot break the JSON or
+inject extra fields. Never interpolate `$PROMPT` directly into a JSON
+string with `'"$PROMPT"'`.
+
 ```bash
+# Defensive: PROMPT must be set before any voice call
+: "${PROMPT:?PROMPT is empty — refusing to call voices}"
+
+# macOS does not ship GNU `timeout` — fall back to `gtimeout` (brew coreutils).
+# Without this shim, every voice call below errors with "command not found".
+if ! command -v timeout >/dev/null 2>&1; then
+  if command -v gtimeout >/dev/null 2>&1; then
+    timeout() { command gtimeout "$@"; }
+  else
+    echo "WARN: neither timeout nor gtimeout found — install coreutils (brew install coreutils)"
+    timeout() { shift; "$@"; }   # no-op fallback (no timeout enforcement)
+  fi
+fi
+
 # Timeout wrapper — use for every voice call
 # Usage: voice_call <timeout_seconds> <command...>
 voice_call() {
@@ -459,70 +502,103 @@ voice_call() {
 }
 
 # OpenAI GPT (timeout: 60s)
+# gpt-5-mini: $0.75/$4.50 per 1M tokens — good balance for review work.
+# Upgrade to "gpt-5" ($0.625/$5.00) only when intent demands top quality.
+# NOTE: GPT-5 family uses `max_completion_tokens`, not `max_tokens` (legacy).
+# Sending `max_tokens` to gpt-5* returns HTTP 400.
+_PAYLOAD=$(jq -n --arg p "$PROMPT" '{
+  model: "gpt-5-mini",
+  messages: [{role: "user", content: $p}],
+  max_completion_tokens: 4000,
+  temperature: 0.3
+}')
 voice_call 60 curl -s https://api.openai.com/v1/chat/completions \
   -H "Authorization: Bearer $OPENAI_API_KEY" \
   -H "Content-Type: application/json" \
-  -d '{
-    "model": "gpt-4o",
-    "messages": [{"role": "user", "content": "'"$PROMPT"'"}],
-    "max_tokens": 4000, "temperature": 0.3
-  }' | jq -r '.choices[0].message.content'
+  -d "$_PAYLOAD" | jq -r '.choices[0].message.content'
 
 # Gemini (timeout: 60s)
-voice_call 60 curl -s "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent?key=$GEMINI_API_KEY" \
+# gemini-3-flash: $0.50/$3.00 per 1M tokens — cheapest Tier-1 voice.
+# Upgrade to "gemini-3-pro" ($2.00/$12.00, $4/$18 over 200k ctx) for big-picture
+# work on long material.
+_PAYLOAD=$(jq -n --arg p "$PROMPT" '{
+  contents: [{parts: [{text: $p}]}],
+  generationConfig: {maxOutputTokens: 4000, temperature: 0.3}
+}')
+voice_call 60 curl -s "https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash:generateContent" \
+  -H "x-goog-api-key: $GEMINI_API_KEY" \
   -H "Content-Type: application/json" \
-  -d '{
-    "contents": [{"parts": [{"text": "'"$PROMPT"'"}]}],
-    "generationConfig": {"maxOutputTokens": 4000, "temperature": 0.3}
-  }' | jq -r '.candidates[0].content.parts[0].text'
+  -d "$_PAYLOAD" | jq -r '.candidates[0].content.parts[0].text'
 
 # Perplexity (timeout: 90s — web search takes longer)
+# sonar-pro: $3/$15 per 1M — keeps citations + deeper search.
+# For cheap quick lookups, "sonar" is $1/$1. Use sonar-pro when sources matter.
+_PAYLOAD=$(jq -n --arg p "$PROMPT" '{
+  model: "sonar-pro",
+  messages: [
+    {role: "system", content: "You are a reviewer with web search. Search for relevant CVEs, benchmarks, prior art, and current best practices. Cite sources."},
+    {role: "user", content: $p}
+  ],
+  max_tokens: 4000,
+  temperature: 0.3
+}')
 voice_call 90 curl -s https://api.perplexity.ai/chat/completions \
   -H "Authorization: Bearer $PERPLEXITY_API_KEY" \
   -H "Content-Type: application/json" \
-  -d '{
-    "model": "sonar-pro",
-    "messages": [
-      {"role": "system", "content": "You are a reviewer with web search. Search for relevant CVEs, benchmarks, prior art, and current best practices. Cite sources."},
-      {"role": "user", "content": "'"$PROMPT"'"}
-    ],
-    "max_tokens": 4000, "temperature": 0.3
-  }' | jq -r '.choices[0].message.content'
+  -d "$_PAYLOAD" | jq -r '.choices[0].message.content'
 
 # Anthropic API (timeout: 60s)
+# claude-sonnet-4-6: $3/$15 per 1M — main quality voice for code/reasoning.
+# For cheap independent second opinion, "claude-haiku-4-5" ($1/$5) works too.
+_PAYLOAD=$(jq -n --arg p "$PROMPT" '{
+  model: "claude-sonnet-4-6",
+  max_tokens: 4000,
+  messages: [{role: "user", content: $p}]
+}')
 voice_call 60 curl -s https://api.anthropic.com/v1/messages \
   -H "x-api-key: $ANTHROPIC_API_KEY" \
   -H "content-type: application/json" \
   -H "anthropic-version: 2023-06-01" \
-  -d '{
-    "model": "claude-sonnet-4-20250514",
-    "max_tokens": 4000,
-    "messages": [{"role": "user", "content": "'"$PROMPT"'"}]
-  }' | jq -r '.content[0].text'
+  -d "$_PAYLOAD" | jq -r '.content[0].text'
 
-# Codex CLI (timeout: 300s — agentic, for code review only)
-voice_call 300 codex review "$PROMPT" --base main 2>/dev/null
+# Codex CLI (timeout: 300s — agentic, reads code itself)
+# Use `codex exec` for free-form review prompts. Critical flags:
+#   < /dev/null            — prevents stdin deadlock (regression in codex 0.120.x)
+#   -C "$_REPO_ROOT"       — runs at git root, not random CWD
+#   -s read-only           — sandbox, codex cannot mutate files
+#   -c '...="high"'        — explicit reasoning effort (default is too low)
+#   --enable web_search_cached — lets codex look up CVEs / current docs
+# For diff-against-main reviews specifically, swap `exec "$PROMPT"` for
+# `review "$PROMPT" --base main` (same other flags).
+_REPO_ROOT=$(git rev-parse --show-toplevel 2>/dev/null || pwd)
+voice_call 300 codex exec "$PROMPT" \
+  -C "$_REPO_ROOT" \
+  -s read-only \
+  -c 'model_reasoning_effort="high"' \
+  --enable web_search_cached \
+  < /dev/null 2>/tmp/voice-codex-err-$$.txt
 
-# Antigravity (timeout: 60s)
-[ -n "$ANTIGRAVITY_API_KEY" ] && \
-voice_call 60 curl -s https://api.antigravity.ai/v1/chat/completions \
-  -H "Authorization: Bearer $ANTIGRAVITY_API_KEY" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "model": "antigravity-latest",
-    "messages": [{"role": "user", "content": "'"$PROMPT"'"}],
-    "max_tokens": 4000, "temperature": 0.3
-  }' | jq -r '.choices[0].message.content'
+# Antigravity — SKIPPED.
+# Google Antigravity is an agentic IDE, not a hosted chat-completions API.
+# There is no public REST endpoint. Use the IDE directly or a CLI bridge
+# if/when one ships, then add it here as its own voice.
 
 # Ollama (timeout: 120s — local, can be slow)
+_PAYLOAD=$(jq -n --arg p "$PROMPT" '{
+  model: "llama3.3:70b",
+  prompt: $p,
+  stream: false
+}')
 voice_call 120 curl -s http://localhost:11434/api/generate \
-  -d '{"model": "llama3.1:70b", "prompt": "'"$PROMPT"'", "stream": false}' \
-  | jq -r '.response'
+  -d "$_PAYLOAD" | jq -r '.response'
 
 # Self-spawn (timeout: 120s)
+# claude-haiku-4-5: $1/$5 per 1M — cheap fresh-eyes second opinion.
+# Bump to "claude-sonnet-4-6" if Haiku misses too much on complex material.
+# Note: Claude Code CLI uses --append-system-prompt, NOT --system (would error).
 echo "$PROMPT" | voice_call 120 claude --print \
-  --system "You are an independent reviewer. Fresh context. No prior conversation. Be direct." \
-  --model claude-sonnet-4-20250514 2>/dev/null
+  --append-system-prompt "You are an independent reviewer. Fresh context. No prior conversation. Be direct." \
+  --model claude-haiku-4-5 2>/dev/null
 ```
 
 ### 3.5 — Post-Response Checks
@@ -619,6 +695,10 @@ This is rare. Most synthesis proceeds normally.
 ```
 Chat output is optimized for DECISIONS — not information.
 Max 20 lines in chat. Full details in file.
+
+The "→ docs/voices/<file>.md" footer in the templates below is CONDITIONAL —
+include it ONLY when a report file was actually written (see "Report File —
+Save on Demand" below). For unsaved chat-only reviews, OMIT that line.
 ```
 
 ### Completion Status
@@ -924,7 +1004,7 @@ Options adapt based on complexity + output + status.
     "multiSelect": false,
     "options": [
       {"label": "Good enough — proceed"},
-      {"label": "Get real diversity — add external LLM (GPT/Perplexity/Antigravity)"},
+      {"label": "Get real diversity — add external LLM (GPT/Gemini/Perplexity)"},
       {"label": "Drill down — details on specific point"},
       {"label": "Done"}
     ]
