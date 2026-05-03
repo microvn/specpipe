@@ -121,8 +121,19 @@ if command -v codex &>/dev/null; then
 else
   echo "CODEX: ✗"
 fi
-command -v gemini &>/dev/null && echo "GEMINI_CLI: available" || \
-  ([ -n "$GEMINI_API_KEY" ] && echo "GEMINI_API: key set" || echo "GEMINI: ✗")
+# Gemini needs binary AND auth (one of: $GEMINI_API_KEY or ~/.gemini/oauth_creds.json
+# from `gemini auth login`). Binary alone isn't enough — same shape as Codex above.
+if command -v gemini &>/dev/null; then
+  if [ -n "$GEMINI_API_KEY" ] || [ -f "$HOME/.gemini/oauth_creds.json" ]; then
+    echo "GEMINI_CLI: available"
+  else
+    echo "GEMINI: ✗ (binary present, no auth — run 'gemini auth login')"
+  fi
+elif [ -n "$GEMINI_API_KEY" ]; then
+  echo "GEMINI_API: key set"
+else
+  echo "GEMINI: ✗"
+fi
 [ -n "$PERPLEXITY_API_KEY" ] && echo "PERPLEXITY: available" || echo "PERPLEXITY: ✗"
 # Antigravity is Google's IDE, not a REST API — only probe if a CLI bridge exists
 command -v antigravity &>/dev/null && echo "ANTIGRAVITY_CLI: available" || echo "ANTIGRAVITY: ✗ (IDE only)"
@@ -160,11 +171,14 @@ if [ -n "$PERPLEXITY_API_KEY" ]; then
 fi
 
 # Gemini — use header auth (x-goog-api-key) to keep the key out of URLs/logs.
+# If no API key but CLI is OAuth-authenticated, trust it (Phase 3.4 routes to CLI).
 if [ -n "$GEMINI_API_KEY" ]; then
   _GEM_STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
     -H "x-goog-api-key: $GEMINI_API_KEY" \
     https://generativelanguage.googleapis.com/v1beta/models 2>/dev/null)
   [ "$_GEM_STATUS" = "200" ] && echo "GEMINI_AUTH: valid" || echo "GEMINI_AUTH: FAILED ($_GEM_STATUS)"
+elif command -v gemini &>/dev/null && [ -f "$HOME/.gemini/oauth_creds.json" ]; then
+  echo "GEMINI_AUTH: assumed valid (CLI OAuth — probe skipped)"
 fi
 
 # Anthropic
@@ -200,6 +214,8 @@ Tier 3 — Local:
 
 Tier 4 — Self-spawn (always available):
   claude --print (fresh context, no conversation history)
+  → Inherits the current Claude Code session's model by default
+    (override via $MF_VOICES_SELF_SPAWN_MODEL)
   → Same model but fresh eyes — better than nothing
   → MARK in output: "self-spawn — same model family"
 ```
@@ -212,8 +228,11 @@ Tier 4 — Self-spawn (always available):
 ├─────────────────┼──────────────────────────────────────────────────────┤
 │ Claude          │ Code review, nuanced reasoning, design/architecture, │
 │ (Haiku 4.5 /    │ long-context analysis, careful edge case thinking.   │
-│  Sonnet 4.6 /   │ Default voice: sonnet-4-6 ($3/$15). Self-spawn uses  │
-│  Opus 4.7)      │ haiku-4-5 ($1/$5). Bump to opus-4-7 ($5/$25) for    │
+│  Sonnet 4.6 /   │ Default voice: sonnet-4-6 ($3/$15). Self-spawn      │
+│  Opus 4.7)      │ inherits the current Claude Code session's model    │
+│                 │ (override via $MF_VOICES_SELF_SPAWN_MODEL — e.g.    │
+│                 │ haiku-4-5 $1/$5 for cheap second opinion).          │
+│                 │ Bump to opus-4-7 ($5/$25) for                       │
 │                 │ hardest reasoning.                                   │
 │                 │ Strongest at: code quality, readability, subtle bugs.│
 ├─────────────────┼──────────────────────────────────────────────────────┤
@@ -598,12 +617,15 @@ voice_call 120 curl -s http://localhost:11434/api/generate \
   -d "$_PAYLOAD" | jq -r '.response'
 
 # Self-spawn (timeout: 120s)
-# claude-haiku-4-5: $1/$5 per 1M — cheap fresh-eyes second opinion.
-# Bump to "claude-sonnet-4-6" if Haiku misses too much on complex material.
+# By default, `claude --print` inherits the model from the user's current Claude
+# Code session/config — DO NOT hardcode a model here. Hardcoding silently overrode
+# the user's choice (e.g. forcing Haiku on an Opus session) and made the docs lie.
+# To override for a cheaper second opinion, set MF_VOICES_SELF_SPAWN_MODEL
+# (e.g. claude-haiku-4-5 for $1/$5 per 1M, or claude-sonnet-4-6 for stronger).
 # Note: Claude Code CLI uses --append-system-prompt, NOT --system (would error).
 echo "$PROMPT" | voice_call 120 claude --print \
   --append-system-prompt "You are an independent reviewer. Fresh context. No prior conversation. Be direct." \
-  --model claude-haiku-4-5 2>/dev/null
+  ${MF_VOICES_SELF_SPAWN_MODEL:+--model "$MF_VOICES_SELF_SPAWN_MODEL"} 2>/dev/null
 ```
 
 ### 3.5 — Post-Response Checks
