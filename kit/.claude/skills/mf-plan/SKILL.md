@@ -363,6 +363,21 @@ Show:
 - Implementation order: which stories to implement first (by priority + dependency)
 - Next steps: "Implement stories in order. Use `/mf-build` to verify each story. For complex specs, run `/mf-challenge` first."
 
+**Suggest the HTML view (do NOT auto-render):**
+
+`/mf-plan` only writes the spec markdown. Rendering the scannable HTML view is a separate skill (`/mf-spec-render`) the user invokes explicitly. After Phase 4 summary, point the user at it in 1-2 lines so they know the option exists. Match the user's conversation language.
+
+Include:
+
+- The skill command: `/mf-spec-render <feature>`
+- One sentence on what it produces and why they might want it (sidebar TOC, story cards, collapsible AS, dark/light theme — fast human scanning)
+
+Example wording (English — translate as needed):
+
+> Want a scannable HTML view of this spec? Run `/mf-spec-render <feature>` — it generates `<feature>.html` next to the `.md` with a sidebar TOC, story cards with P-badges, collapsible Given/When/Then, and dark/light theme. The `.md` stays the source of truth either way.
+
+Do not invoke `/mf-spec-render` from here. The user chooses when to render.
+
 **Required outputs (add to every spec):**
 
 **"What Already Exists"** — List code/flows that already partially solve sub-problems in this spec. Is the plan reusing or rebuilding them? If rebuilding → justify why. Write under `## What Already Exists` in the spec.
@@ -510,6 +525,16 @@ Present the decision using the `AskUserQuestion` tool:
 > Common mistake: update the spec, forget to write to Change Log.
 > Every C5 execution → Change Log MUST have a new row. No exceptions.
 > (Exception: non-semantic changes — C7 — do not write to Change Log.)
+
+**Suggest re-rendering the HTML view (do NOT auto-render):**
+
+After C5 applies changes, the `.md` is up to date but any previously generated `<feature>.html` is now stale. Don't render it automatically — point the user at `/mf-spec-render` so they invoke it when ready. Match the user's conversation language.
+
+Example wording (English — translate as needed):
+
+> Spec updated. If you have `<feature>.html` from a previous render, it's now stale — run `/mf-spec-render <feature>` to refresh it. If you've never rendered the HTML view for this spec, you can run the same command to generate it.
+
+Do not invoke `/mf-spec-render` from here.
 
 ### C6: Consistency check
 

@@ -34,7 +34,14 @@ Step 1 → /mf-plan "description of feature"
           framework built-in search, distribution check.
           Adds "What Already Exists" and "Not in Scope" sections to the spec.
           Answers validation questions with effort scales (human: X / CC: Y).
+          At the end, suggests /mf-spec-render if you want a scannable HTML view.
           Review before proceeding.
+
+Step 1.5 → (Optional) /mf-spec-render <feature>
+          Generates <feature>.html next to the .md — sidebar TOC, story cards,
+          collapsible Given/When/Then, dark/light theme. Useful when the spec
+          is long and you want to scan it visually or share it with stakeholders.
+          Source .md remains canonical; .html is regenerable, never hand-edit.
 
 Step 2 → (Optional) /mf-challenge docs/specs/<feature>/<feature>.md
           Adversarial review: spawns hostile reviewers to find flaws.
@@ -72,6 +79,8 @@ Step 1 → /mf-plan docs/specs/<feature>/<feature>.md "description of changes"
           Mode C handles everything: snapshot → classification → change report → apply.
           Do NOT manually edit the spec before running /mf-plan — it creates the
           snapshot first, then applies changes. Manual edits bypass snapshot protection.
+          At the end, suggests /mf-spec-render to refresh <feature>.html if you
+          have an HTML view (it's stale after this update).
 
 Step 2 → Implement code changes.
           /mf-build
@@ -229,6 +238,7 @@ Files to delete: [list]
 | `/mf-review` (diff-based) | 10–20k | Before merge |
 | `/mf-plan` (new feature) | 20–40k | Start of new feature |
 | `/mf-challenge` (adversarial) | 15–30k | After /mf-plan, for complex features |
+| `/mf-spec-render` (HTML view) | 3–8k | User-invoked after `/mf-plan` if HTML view wanted, or to refresh stale `.html` |
 | `/mf-voices` (multi-LLM review) | 10–30k + external API cost | Optional — after /mf-review for high-stakes changes |
 | Full audit (manual) | 100k+ | Before release, quarterly |
 
