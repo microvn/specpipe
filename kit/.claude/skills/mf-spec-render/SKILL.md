@@ -16,7 +16,8 @@ description: |
   in chat ("hard to scan", "lots to read") or after a Mode C update has made
   any existing <feature>.html stale.
 
-  Skip for files that are not specs (investigation, explore doc — defer V1+).
+  Skip for files that are not specs (investigation, explore doc, RFC, retro,
+  README) — those go to the generic sibling skill [[mf-md-render]] instead.
 
   Idempotent: re-rendering overwrites the previous .html. Safe to run anytime.
 allowed-tools: Read, Write, Bash, Glob, Grep

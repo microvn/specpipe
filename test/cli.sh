@@ -117,6 +117,12 @@ assert_exists "skills: mf-fix/SKILL.md"        "$PROJECT_DIR/.claude/skills/mf-f
 assert_exists "skills: mf-review/SKILL.md"     "$PROJECT_DIR/.claude/skills/mf-review/SKILL.md"
 assert_exists "skills: mf-commit/SKILL.md"     "$PROJECT_DIR/.claude/skills/mf-commit/SKILL.md"
 assert_exists "skills: mf-voices/SKILL.md"     "$PROJECT_DIR/.claude/skills/mf-voices/SKILL.md"
+assert_exists "skills: mf-spec-render/SKILL.md"       "$PROJECT_DIR/.claude/skills/mf-spec-render/SKILL.md"
+assert_exists "skills: mf-spec-render/template.html"  "$PROJECT_DIR/.claude/skills/mf-spec-render/template.html"
+assert_exists "skills: mf-spec-render/components.md"  "$PROJECT_DIR/.claude/skills/mf-spec-render/components.md"
+assert_exists "skills: mf-md-render/SKILL.md"         "$PROJECT_DIR/.claude/skills/mf-md-render/SKILL.md"
+assert_exists "skills: mf-md-render/template.html"    "$PROJECT_DIR/.claude/skills/mf-md-render/template.html"
+assert_exists "skills: mf-md-render/components.md"     "$PROJECT_DIR/.claude/skills/mf-md-render/components.md"
 
 # Hooks
 assert_exists "hooks: path-guard.sh"      "$PROJECT_DIR/.claude/hooks/path-guard.sh"

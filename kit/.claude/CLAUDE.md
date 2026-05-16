@@ -22,6 +22,7 @@ Every change follows this cycle: **SPEC (with acceptance scenarios) → CODE + T
 | Pre-merge check | `/mf-review` | Diff-based quality gate |
 | Commit changes | `/mf-commit` | Secret scan + conventional commit |
 | Render spec HTML | `/mf-spec-render <feature>` | Generates scannable `<feature>.html` (sidebar TOC, story cards). Run after `/mf-plan` if you want the HTML view, or to refresh a stale one |
+| Render any markdown HTML | `/mf-md-render <file.md>` | Generic counterpart to `/mf-spec-render` for non-spec markdown (investigation, explore, RFC, retro, README). Callouts, step cards, Mermaid, dark/light theme |
 | Multi-LLM review | `/mf-voices [target]` | Send material to 2–3 LLMs, synthesize consensus + disagreements |
 
 For detailed workflow steps, templates, and decision trees, see `docs/WORKFLOW.md`.

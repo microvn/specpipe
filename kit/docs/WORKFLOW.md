@@ -42,6 +42,8 @@ Step 1.5 → (Optional) /mf-spec-render <feature>
           collapsible Given/When/Then, dark/light theme. Useful when the spec
           is long and you want to scan it visually or share it with stakeholders.
           Source .md remains canonical; .html is regenerable, never hand-edit.
+          For non-spec markdown (investigation, explore, RFC, retro, README),
+          use /mf-md-render <file.md> instead — same idea, generic content.
 
 Step 2 → (Optional) /mf-challenge docs/specs/<feature>/<feature>.md
           Adversarial review: spawns hostile reviewers to find flaws.
@@ -239,6 +241,7 @@ Files to delete: [list]
 | `/mf-plan` (new feature) | 20–40k | Start of new feature |
 | `/mf-challenge` (adversarial) | 15–30k | After /mf-plan, for complex features |
 | `/mf-spec-render` (HTML view) | 3–8k | User-invoked after `/mf-plan` if HTML view wanted, or to refresh stale `.html` |
+| `/mf-md-render` (HTML view, any md) | 3–8k | User-invoked for non-spec markdown — investigation, explore, RFC, retro, README |
 | `/mf-voices` (multi-LLM review) | 10–30k + external API cost | Optional — after /mf-review for high-stakes changes |
 | Full audit (manual) | 100k+ | Before release, quarterly |
 

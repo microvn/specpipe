@@ -31,6 +31,13 @@ export const COMPONENTS = {
     '.claude/skills/mf-commit/SKILL.md',
     '.claude/skills/mf-voices/SKILL.md',
     '.claude/skills/mf-spec-render/SKILL.md',
+    '.claude/skills/mf-spec-render/template.html',
+    '.claude/skills/mf-spec-render/components.md',
+    '.claude/skills/mf-spec-render/examples/user-auth.md',
+    '.claude/skills/mf-spec-render/examples/user-auth.html',
+    '.claude/skills/mf-md-render/SKILL.md',
+    '.claude/skills/mf-md-render/template.html',
+    '.claude/skills/mf-md-render/components.md',
   ],
   config: [
     '.claude/settings.json',

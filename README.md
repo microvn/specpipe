@@ -235,11 +235,15 @@ your-project/
 │       ├── mf-fix/SKILL.md          ← /mf-fix skill
 │       ├── mf-review/SKILL.md       ← /mf-review skill
 │       ├── mf-commit/SKILL.md       ← /mf-commit skill
-│       ├── mf-spec-render/          ← /mf-spec-render skill (HTML view, user-invoked)
+│       ├── mf-spec-render/          ← /mf-spec-render skill (spec HTML view, user-invoked)
 │       │   ├── SKILL.md
 │       │   ├── template.html
 │       │   ├── components.md
 │       │   └── examples/
+│       ├── mf-md-render/            ← /mf-md-render skill (generic markdown HTML view)
+│       │   ├── SKILL.md
+│       │   ├── template.html
+│       │   └── components.md
 │       └── mf-voices/SKILL.md       ← /mf-voices skill (multi-LLM review)
 ├── scripts/
 │   └── build-test.sh          ← Universal test runner
@@ -511,6 +515,26 @@ docs/specs/<feature>/
 **Source remains truth:**
 - `.md` is canonical. Edit `.md` via `/mf-plan`; regenerate `.html` via this skill.
 - Never hand-edit the `.html`. Re-rendering is idempotent — run `/mf-spec-render` any time you want the HTML to catch up with the `.md`.
+
+**Token cost:** 3–8k (template + components cached; output ≈ source markdown × 1.2 — no CSS/JS in output token stream).
+
+### /mf-md-render — Render Any Markdown as HTML View
+
+Generic counterpart to `/mf-spec-render`. Same template/component architecture, but for arbitrary long-form markdown with no fixed schema — investigation reports, explore docs, RFCs, retros, design notes, READMEs.
+
+**Usage:**
+```
+/mf-md-render docs/investigate/payment-bug-2026-05-16.md   # render next to source
+/mf-md-render <file.md> --out report.html                  # custom output path
+/mf-md-render docs/notes/                                   # list + prompt
+/mf-md-render                                                # prompt for path
+```
+
+**When to use:** Any non-spec markdown you want as a scannable, shareable single HTML file. It refuses spec files (heading `### S-NNN:`) and points you to `/mf-spec-render` instead.
+
+**How it works:** Reads source + `template.html` + `components.md`, then uses an *analyzer pattern* (not fixed parsing) — each markdown chunk is mapped to the best component: numbered actions → step cards, GFM admonitions → callouts, ` ```mermaid ` → diagrams, pros/cons → compare cards, long appendices → collapsible. Builds the buffer in-memory, writes once.
+
+**Output features:** sidebar TOC + scroll-spy + search, anchored headings with copy-link, code blocks with copy button + language label, Mermaid diagrams (CDN), 4-variant callouts (note/tip/warn/danger), step cards, compare cards, task lists, footnotes, figure+caption, dark/light/auto theme, scroll progress bar, mobile drawer, print stylesheet. Self-contained (only Mermaid loads from CDN).
 
 **Token cost:** 3–8k (template + components cached; output ≈ source markdown × 1.2 — no CSS/JS in output token stream).
 
@@ -1115,6 +1139,7 @@ Then use: `/deploy staging`
 | `/mf-plan` (new feature) | 20–40k | Start of feature |
 | `/mf-challenge` (adversarial review) | 15–30k | After /mf-plan, complex features |
 | `/mf-spec-render` (HTML view) | 3–8k | User-invoked after /mf-plan when HTML view wanted, or to refresh stale `.html` |
+| `/mf-md-render` (HTML view, any md) | 3–8k | User-invoked for non-spec markdown — investigation, explore, RFC, retro, README |
 | `/mf-voices` (multi-LLM review) | 10–30k + external API cost (~$0.01–0.50) | Optional — after /mf-review for high-stakes changes |
 | Full audit (manual prompt) | 100k+ | Before release |
 
