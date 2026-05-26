@@ -1,6 +1,6 @@
 ---
 description: Read-only root-cause investigation — OPTIONAL branch before /mf-fix. Produces an investigation report with potential root cause hypotheses, evidence, blast radius — no code changes. Use when bug is complex, ambiguous, production-critical, or user explicitly wants to diagnose before fixing (outage, data corruption, regression, unclear stack trace, "it was working yesterday"). Skip for trivial bugs — go straight to /mf-fix. Writes docs/investigate/<slug>-YYYY-MM-DD.md and hands off to /mf-fix.
-allowed-tools: Read, Write, Bash, Glob, Grep, AskUserQuestion
+allowed-tools: Read, Write, Bash, Glob, Grep, AskUserQuestion, mcp__graphatlas__*
 ---
 Deep investigation — find root cause, map blast radius, report without changing code.
 
@@ -102,6 +102,19 @@ If 2+ required fields are missing → ask ONE question via `AskUserQuestion`:
 
 ---
 
+## Phase 1.5 — Graphatlas probe (run once, silently)
+
+Before Phase 2, probe whether graphatlas (GA) is connected:
+
+1. Call `mcp__graphatlas__ga_architecture` with `max_modules: 1`.
+2. Interpret:
+   - Returns `modules` → **GA available.** Use `ga_*` for every locate / blast-radius step below. Grep is fallback.
+   - Error `STALE_INDEX` → call `mcp__graphatlas__ga_reindex` (mode `"full"`), retry once, then treat as available. (This skill is read-only, so no further reindex is needed during the run.)
+   - Tool not found / connection error / any other failure → **GA unavailable.** Use grep/glob throughout. Do not re-probe.
+3. Carry the outcome through Phase 2-5.
+
+---
+
 ## Phase 2: Locate
 
 Find where the bug lives. Work from the outside in.
@@ -117,7 +130,7 @@ Start with the most specific artifact available, in priority order:
 | Feature/screen name | Grep for route/handler/view name → trace to logic |
 | Only vague description | Grep keywords → read surrounding code → narrow |
 
-> If `codebase-memory-mcp` is connected, prefer `search_code("<error message or function name>")` for indexed lookup and `trace_call_path` to map callers — more reliable than grep. Fallback: the grep recipes below.
+> **If GA available (per Phase 1.5):** `ga_symbols("<function or type>")` for definitions (ranked by caller count — picks the popular def when names collide), then `ga_callers` / `ga_callees` to map the call graph; `ga_impact(symbol=...)` for a whole-feature view. **If GA unavailable, or the query is free-text error string inside a literal:** use the grep recipes below.
 
 ```bash
 # Extension set covers ~90% of mainstream code:
@@ -419,7 +432,7 @@ Legend:
   [UNCLEAR]    = couldn't determine coverage, needs human check
 ```
 
-> If `codebase-memory-mcp` is connected, prefer `trace_call_path` for caller/callee mapping and `get_architecture` to check whether the affected code lives in a sensitive layer (auth, payment, core). More accurate than grep for blast radius.
+> **If GA available, lean on it for blast radius.** `ga_impact(symbol=...)` is the one-shot tool — returns impacted files, tests, routes, and a runtime risk score. Pair with `ga_callers` / `ga_callees` for the call graph and `ga_architecture` to identify the module/layer (auth, payment, core). More accurate than grep — uses typed CALL/REFERENCES edges and resolves polymorphic dispatch. If GA is unavailable, fall back to grep + manual file reading.
 
 ### 5.2 — Impact Scope
 

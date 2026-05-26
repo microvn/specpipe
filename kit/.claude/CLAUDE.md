@@ -24,6 +24,7 @@ Every change follows this cycle: **SPEC (with acceptance scenarios) → CODE + T
 | Render spec HTML | `/mf-spec-render <feature>` | Generates scannable `<feature>.html` (sidebar TOC, story cards). Run after `/mf-plan` if you want the HTML view, or to refresh a stale one |
 | Render any markdown HTML | `/mf-md-render <file.md>` | Generic counterpart to `/mf-spec-render` for non-spec markdown (investigation, explore, RFC, retro, README). Callouts, step cards, Mermaid, dark/light theme |
 | Multi-LLM review | `/mf-voices [target]` | Send material to 2–3 LLMs, synthesize consensus + disagreements |
+| Rephrase to human voice | `/mf-humanize [text]` | Turn plan/notes/AI output into natural, send-ready text. Infers format + audience + tone, strips AI tone. Not part of the dev cycle |
 
 For detailed workflow steps, templates, and decision trees, see `docs/WORKFLOW.md`.
 

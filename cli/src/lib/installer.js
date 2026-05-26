@@ -38,6 +38,7 @@ export const COMPONENTS = {
     '.claude/skills/mf-md-render/SKILL.md',
     '.claude/skills/mf-md-render/template.html',
     '.claude/skills/mf-md-render/components.md',
+    '.claude/skills/mf-humanize/SKILL.md',
   ],
   config: [
     '.claude/settings.json',

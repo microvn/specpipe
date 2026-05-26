@@ -244,7 +244,8 @@ your-project/
 │       │   ├── SKILL.md
 │       │   ├── template.html
 │       │   └── components.md
-│       └── mf-voices/SKILL.md       ← /mf-voices skill (multi-LLM review)
+│       ├── mf-voices/SKILL.md       ← /mf-voices skill (multi-LLM review)
+│       └── mf-humanize/SKILL.md     ← /mf-humanize skill (rephrase to human voice)
 ├── scripts/
 │   └── build-test.sh          ← Universal test runner
 └── docs/
@@ -761,6 +762,31 @@ Generic counterpart to `/mf-spec-render`. Same template/component architecture, 
 **Rules:** Same material different lenses. Don't resolve disagreements — present both sides, human decides. Consensus ≠ correct (flag if agreement rate is 100%). Findings must be specific (`auth.ts:47` not "code could be improved").
 
 **Token cost:** 10–30k host + external API cost (Budget: ~$0.01–0.05; Standard: ~$0.05–0.20; Premium: ~$0.20–0.50 per review).
+
+---
+
+### /mf-humanize — Rephrase to Human Voice
+
+**Usage:**
+```
+/mf-humanize <paste plan/notes/draft>           # infer format + audience from context
+/mf-humanize reply jira <notes>                  # target a specific format
+/mf-humanize draft a customer email <notes>      # switch audience, hide implementation
+```
+
+**When to use:** You have a plan, bullet notes, or AI-generated draft and want it rewritten into natural, send-ready text — a PR description, release note, slack announcement, postmortem, customer reply, LinkedIn post, or plain email. Not part of the spec-first dev cycle. Skip for pure translation, summarization, or generating content from zero.
+
+**How it works:**
+
+1. **Infer target format** — From explicit instruction → session context → input shape → fallback to tight plain text. No fixed whitelist; uncommon or hybrid formats follow their own conventions.
+2. **Infer audience** — Engineering, customer, executive, public, or mixed. Same content, phrasing shifts by reader (technical terms for engineers, outcome-focused for customers).
+3. **Preserve facts** — Numbers, names, error codes, file paths, commands, URLs, commitments, and decisions are never paraphrased. Certainty is never softened ("will ship Monday" ≠ "hope to ship Monday").
+4. **Strip AI tone** — Removes em-dash overuse, banned buzzwords (EN + VI), hollow openings/closings, fake enthusiasm, and "rule of three" pile-ups. Varies sentence rhythm.
+5. **Return send-ready text** — The final version directly, no preamble, no explanation of edits.
+
+**Language:** Follows the session's dominant language. Mixed Vietnamese-English is fine — technical terms stay untranslated.
+
+**Token cost:** 2–6k, no external API.
 
 ---
 

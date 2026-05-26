@@ -10,7 +10,7 @@ description: |
   unclear requirements produces unclear specs.
   Skip if the user already has detailed acceptance criteria written down.
   Hands off to /mf-plan when discovery is complete.
-allowed-tools: Read, Glob, Grep, Bash, AskUserQuestion, WebSearch
+allowed-tools: Read, Glob, Grep, Bash, AskUserQuestion, WebSearch, mcp__graphatlas__*
 ---
 
 Feature discovery as Client Technical Lead. The client says "I want feature X". Your job is to ask until you understand enough to hand off to spec — nothing missing, nothing extra, nothing misunderstood.
@@ -97,6 +97,19 @@ Search when the model's knowledge is not reliable enough for the decision at han
 
 ---
 
+## Phase 0a — Graphatlas probe (run once, silently)
+
+Before any discovery step, probe whether graphatlas (GA) is connected:
+
+1. Call `mcp__graphatlas__ga_architecture` with `max_modules: 1`.
+2. Interpret:
+   - Returns `modules` → **GA available.** Use `ga_*` for every code-discovery step. Grep is fallback only.
+   - Error `STALE_INDEX` → call `mcp__graphatlas__ga_reindex` (mode `"full"`), retry once, then treat as available.
+   - Tool not found / connection error / any other failure → **GA unavailable.** Skip every `ga_*` recommendation below and use grep/glob directly. Do not re-probe per step.
+3. Record the outcome internally and carry it through the rest of the run.
+
+---
+
 ## Phase 0 — Codebase scan (before asking the user anything)
 
 Run silently. The client does not need to know about this step.
@@ -105,11 +118,10 @@ Run silently. The client does not need to know about this step.
 |---|--------|---------|
 | S1 | Read `CLAUDE.md` | Project context, conventions, tech stack |
 | S2 | List `docs/specs/` and `docs/explore/` | Does a spec or explore doc already exist? Any related spec? If an explore doc already exists for this feature → ask: "An explore doc already exists for this feature. Start fresh or update it?" Wait for answer before continuing. |
-| S3 | Grep `$ARGUMENTS` keywords in the codebase | Existing related code — how much already exists? |
-| S4 | List related screens/routes | Understand the system surface area |
-| S5 | If `codebase-memory-mcp` is connected → prefer `search_code` and `get_architecture` | Indexed search + architecture visibility more reliable than grep — use this before S3 if connected |
+| S3 | **If GA available (per Phase 0a):** start with `ga_architecture` to map modules, then `ga_symbols` for each `$ARGUMENTS` keyword to resolve definitions, then `ga_file_summary` on the matched files to scope the surface. **If GA unavailable or returns empty for free-text:** grep the keywords directly. | Existing related code — how much already exists? Indexed symbol table + module map are more reliable than textual grep. |
+| S4 | List related screens/routes — if GA available, use `ga_symbols` on the route/handler name then `ga_callers` to find where they are mounted; otherwise grep | Understand the system surface area |
 
-**Fallback — if scan yields nothing useful** (no CLAUDE.md, messy codebase, MCP unavailable): skip scan results, ask the user directly at the start of Phase 1:
+**Fallback — if scan yields nothing useful** (no CLAUDE.md, messy codebase, graphatlas + grep both empty): skip scan results, ask the user directly at the start of Phase 1:
 > "Does this feature have any existing code, or is it completely new? If it exists, where is it in the system?"
 
 Internal classification (if scan succeeds):

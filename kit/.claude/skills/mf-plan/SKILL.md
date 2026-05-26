@@ -10,7 +10,7 @@ description: |
   Per project rules: never write code before the spec exists, and never auto-modify
   specs from code — /mf-plan is the only path that touches specs.
   Skip if a current spec already exists and matches the request — go straight to /mf-build.
-allowed-tools: Read, Write, Edit, Bash, Glob, Grep, AskUserQuestion, Agent
+allowed-tools: Read, Write, Edit, Bash, Glob, Grep, AskUserQuestion, Agent, mcp__graphatlas__*
 ---
 Generate spec with acceptance scenarios from description or existing spec.
 
@@ -92,20 +92,28 @@ docs/specs/
 
 ## Phase 0: Codebase Awareness
 
+**Graphatlas probe (run once, silently, before P0-1):**
+
+1. Call `mcp__graphatlas__ga_architecture` with `max_modules: 1`.
+2. Interpret:
+   - Returns `modules` → **GA available.** Use `ga_*` everywhere in the P0 table below. Grep/glob is fallback.
+   - Error `STALE_INDEX` → call `mcp__graphatlas__ga_reindex` (mode `"full"`), retry once, then treat as available.
+   - Tool not found / connection error / any other failure → **GA unavailable.** Use grep/glob throughout. Do not re-probe.
+3. Carry the outcome through the rest of Phase 0.
+
 Before writing anything, run this checklist:
 
 | # | Action | How |
 |---|--------|-----|
-| P0-1 | **Keyword scan** | Grep the codebase for 3-5 keywords from the feature description. Note matching files, functions, types. |
+| P0-1 | **Keyword scan** | **If GA available:** `ga_symbols` on 3-5 keywords from the feature description for indexed definitions, then `ga_file_summary` on each match to scope. **If GA unavailable** or the keyword matches only string/comment text (no symbol hits): grep. |
 | P0-2 | **Related specs** | List `docs/specs/` directories. Read the main spec of any related feature. Is there overlap? |
-| P0-2b | **Explore doc** | Derive feature name from `$ARGUMENTS` as kebab-case (same convention as `docs/specs/<feature>/`). Check `docs/explore/<feature-name>.md`. If no exact match, list `docs/explore/` and fuzzy-match by keywords. If found → read it. Log: "Explore findings found for '<feature>' — using as primary input. Skipping P0-3, P0-4 (already covered)." Continue with P0-5, P0-6, P0-7. Map explore fields to spec sections: **Feature + Happy path** → Overview + Stories (happy path AS); **Unhappy paths** → Stories (error path AS); **Business rules** → Constraints & Invariants; **Data impact** → Data Model; **Out of scope** → Not in Scope; **Permissions** → Story descriptions; **Technical risks** → What Already Exists (note conflicts). |
-| P0-3 | **Dependency scan** | In the feature area, check imports/dependencies. What modules does this code touch? |
-| P0-4 | **Reusable utilities** | Look for existing helpers, validators, formatters, shared types that the new feature could reuse. List candidates. |
+| P0-2b | **Explore doc** | Derive feature name from `$ARGUMENTS` as kebab-case (same convention as `docs/specs/<feature>/`). Check `docs/explore/<feature-name>.md`. If no exact match, list `docs/explore/` and fuzzy-match by keywords. If found → read it. Log: "Explore findings found for '<feature>' — using as primary input. Skipping P0-3, P0-4 (already covered)." Continue with P0-5, P0-6. Map explore fields to spec sections: **Feature + Happy path** → Overview + Stories (happy path AS); **Unhappy paths** → Stories (error path AS); **Business rules** → Constraints & Invariants; **Data impact** → Data Model; **Out of scope** → Not in Scope; **Permissions** → Story descriptions; **Technical risks** → What Already Exists (note conflicts). |
+| P0-3 | **Dependency scan** | `ga_architecture` for the module map and `ga_importers` / `ga_callees` on touched symbols to see what this code reaches. Manual import-grep is a fallback. |
+| P0-4 | **Reusable utilities** | `ga_symbols` (fuzzy match) on names like `validate`, `format`, `parse`, `<domain>Helper` to find existing helpers; `ga_hubs` to surface the most-connected utilities worth reusing. |
 | P0-5 | **Project patterns** | Identify test framework, naming conventions, directory structure from existing code. |
 | P0-6 | **Change Log** | If the feature exists, read its Change Log to understand evolution. |
-| P0-7 | **Knowledge graph** | If `codebase-memory-mcp` is available, use `search_code`, `get_architecture`, and `trace_call_path` to discover related code, understand architecture context, and trace dependencies — faster and more thorough than manual grep. |
 
-If `codebase-memory-mcp` MCP server is connected, prefer it for P0-1, P0-3, P0-4 — it provides indexed search, architecture overview, and call path tracing that are more reliable than ad-hoc grep.
+**Tooling rule:** when GA is available (per the probe above), prefer it — `ga_architecture`, `ga_symbols`, `ga_callers`, `ga_callees`, `ga_importers`, `ga_file_summary`, `ga_impact`, `ga_hubs` — over grep/glob/find for every step. Indexed symbol table + typed call/reference edges beat textual matching for discovery and dependency tracing. Use grep when GA is unavailable, or for free-text inside strings/comments.
 
 Record findings as bullet points — carry them into Phase 2 (Data Model, Constraints) and Phase 3 (ambiguity check).
 

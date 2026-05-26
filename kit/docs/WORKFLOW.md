@@ -243,6 +243,7 @@ Files to delete: [list]
 | `/mf-spec-render` (HTML view) | 3–8k | User-invoked after `/mf-plan` if HTML view wanted, or to refresh stale `.html` |
 | `/mf-md-render` (HTML view, any md) | 3–8k | User-invoked for non-spec markdown — investigation, explore, RFC, retro, README |
 | `/mf-voices` (multi-LLM review) | 10–30k + external API cost | Optional — after /mf-review for high-stakes changes |
+| `/mf-humanize` (rephrase text) | 2–6k | User-invoked — rephrase plan/notes/AI output into send-ready text. Outside the dev cycle |
 | Full audit (manual) | 100k+ | Before release, quarterly |
 
 **Rule of thumb:** Daily work uses templates + `/mf-build` → low token cost.

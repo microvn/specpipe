@@ -9,9 +9,22 @@ description: |
   a planned feature.
   Requires a spec from /mf-plan or equivalent — if no spec exists, run /mf-plan
   first instead of jumping into code.
-allowed-tools: Read, Write, Edit, Bash, Glob, Grep, AskUserQuestion
+allowed-tools: Read, Write, Edit, Bash, Glob, Grep, AskUserQuestion, mcp__graphatlas__*
 ---
 TDD delivery loop — write failing tests from spec AS, implement story by story, drive to GREEN.
+
+## Phase 0a — Graphatlas probe (run once)
+
+Before Phase 0:
+
+1. Call `mcp__graphatlas__ga_architecture` with `max_modules: 1`.
+2. Interpret:
+   - Returns `modules` → **GA available.** Use `ga_*` for locate / call-graph / impact below. Grep is fallback.
+   - Error `STALE_INDEX` → call `mcp__graphatlas__ga_reindex` (mode `"full"`), retry once, then treat as available.
+   - Tool not found / connection error / any other failure → **GA unavailable.** Use grep/glob throughout. Do not re-probe.
+3. After each story's GREEN passes and before moving to the next story, call `ga_reindex` so callers/impact queries for subsequent stories reflect the new code. Cheap insurance — skip only if no further `ga_*` queries are planned.
+
+---
 
 ## Phase 0: Build Context
 
@@ -47,7 +60,7 @@ TDD delivery loop — write failing tests from spec AS, implement story by story
    S-003 pending
    ```
 
-4. **Locate related code:** If `codebase-memory-mcp` is connected, prefer `search_code` to find all files touching this feature, `trace_call_path` to understand the dependency chain, and `get_architecture` to check if the feature belongs to a sensitive layer — indexed search and call graph visibility more reliable than ad-hoc grep. Fallback: Grep for the main function/type names in the changed files.
+4. **Locate related code.** **If GA available (per Phase 0a):** `ga_symbols` on the main function/type names from the spec → definitions; `ga_callers`/`ga_callees` → dependency chain; `ga_impact(symbol=...)` → blast radius + affected tests; `ga_architecture` → confirm module/layer (auth, payment, core); `ga_file_summary` before reading a file in full. **If GA unavailable:** grep for the main function/type names in the changed files.
 
 5. **Read existing tests** for the changed files — find patterns, fixtures, naming conventions. Don't duplicate.
 

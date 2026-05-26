@@ -123,6 +123,7 @@ assert_exists "skills: mf-spec-render/components.md"  "$PROJECT_DIR/.claude/skil
 assert_exists "skills: mf-md-render/SKILL.md"         "$PROJECT_DIR/.claude/skills/mf-md-render/SKILL.md"
 assert_exists "skills: mf-md-render/template.html"    "$PROJECT_DIR/.claude/skills/mf-md-render/template.html"
 assert_exists "skills: mf-md-render/components.md"     "$PROJECT_DIR/.claude/skills/mf-md-render/components.md"
+assert_exists "skills: mf-humanize/SKILL.md"          "$PROJECT_DIR/.claude/skills/mf-humanize/SKILL.md"
 
 # Hooks
 assert_exists "hooks: path-guard.sh"      "$PROJECT_DIR/.claude/hooks/path-guard.sh"
@@ -214,7 +215,7 @@ section "init — skill files have YAML frontmatter"
 setup
 
 cli init "$PROJECT_DIR"
-for skill in mf-explore mf-plan mf-build mf-challenge mf-investigate mf-fix mf-review mf-commit mf-voices; do
+for skill in mf-explore mf-plan mf-build mf-challenge mf-investigate mf-fix mf-review mf-commit mf-voices mf-humanize; do
   CONTENT=$(head -1 "$PROJECT_DIR/.claude/skills/$skill/SKILL.md")
   assert_contains "$skill/SKILL.md starts with ---" "---" "$CONTENT"
 done
@@ -339,7 +340,7 @@ setup
 
 cli init --global
 
-# All 8 skills
+# Core SKILL.md skills
 assert_exists "global skills: mf-explore"   "$TEST_HOME/.claude/skills/mf-explore/SKILL.md"
 assert_exists "global skills: mf-plan"      "$TEST_HOME/.claude/skills/mf-plan/SKILL.md"
 assert_exists "global skills: mf-build"     "$TEST_HOME/.claude/skills/mf-build/SKILL.md"
@@ -349,6 +350,7 @@ assert_exists "global skills: mf-fix"       "$TEST_HOME/.claude/skills/mf-fix/SK
 assert_exists "global skills: mf-review"    "$TEST_HOME/.claude/skills/mf-review/SKILL.md"
 assert_exists "global skills: mf-commit"    "$TEST_HOME/.claude/skills/mf-commit/SKILL.md"
 assert_exists "global skills: mf-voices"    "$TEST_HOME/.claude/skills/mf-voices/SKILL.md"
+assert_exists "global skills: mf-humanize"  "$TEST_HOME/.claude/skills/mf-humanize/SKILL.md"
 
 # All 6 hooks
 assert_exists "global hooks: path-guard.sh"      "$TEST_HOME/.claude/hooks/path-guard.sh"
@@ -442,7 +444,7 @@ setup
 
 cli init --global
 
-for skill in mf-explore mf-plan mf-build mf-challenge mf-investigate mf-fix mf-review mf-commit mf-voices; do
+for skill in mf-explore mf-plan mf-build mf-challenge mf-investigate mf-fix mf-review mf-commit mf-voices mf-humanize; do
   FIRST=$(head -1 "$TEST_HOME/.claude/skills/$skill/SKILL.md")
   assert_contains "global $skill starts with ---" "---" "$FIRST"
 done

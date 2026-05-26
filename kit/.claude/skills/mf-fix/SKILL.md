@@ -10,7 +10,7 @@ description: |
   For complex/ambiguous bugs (outage, regression, "it was working yesterday",
   data corruption), start with /mf-investigate first, then hand the report to /mf-fix.
   Skip for typos or one-line obvious fixes.
-allowed-tools: Read, Write, Edit, Bash, Glob, Grep, AskUserQuestion
+allowed-tools: Read, Write, Edit, Bash, Glob, Grep, AskUserQuestion, mcp__graphatlas__*
 ---
 Test-first bug fix — write failing test, fix code, verify green.
 
@@ -26,6 +26,19 @@ Fixing symptoms creates whack-a-mole debugging. Every fix that doesn't address t
 
 ---
 
+## Phase 0a — Graphatlas probe (run once)
+
+Before locating code, probe whether graphatlas (GA) is connected:
+
+1. Call `mcp__graphatlas__ga_architecture` with `max_modules: 1`.
+2. Interpret:
+   - Returns `modules` → **GA available.** Use `ga_*` for code discovery, blast-radius, and risk. Grep is fallback only.
+   - Error `STALE_INDEX` → call `mcp__graphatlas__ga_reindex` (mode `"full"`), retry once, then treat as available.
+   - Tool not found / connection error / any other failure → **GA unavailable.** Use grep/glob throughout this run. Do not re-probe.
+3. After every batch of source edits in Phase 3 (Fix), call `ga_reindex` so later queries reflect the new state.
+
+---
+
 ## Phase 0: Investigate
 
 Don't jump to code. Understand the bug first:
@@ -33,7 +46,7 @@ Don't jump to code. Understand the bug first:
 0. **Investigation handoff check.** If `$ARGUMENTS` references a file under `docs/investigate/`, read it first — it contains pre-built root cause hypothesis, blast radius, and recommended actions from `/mf-investigate`. Skip redundant discovery; jump to Phase 1 using its findings. If no such file and the bug is complex/ambiguous/production-critical → suggest the user run `/mf-investigate "<bug>"` first; otherwise proceed.
 
 1. **Parse the report.** Symptom? Expected vs actual? Repro steps? If context is missing → ask ONE question via AskUserQuestion before proceeding.
-2. **Locate the code.** If `codebase-memory-mcp` is connected, prefer `search_code("<error message or function name>")` to find related files and `trace_call_path` to map callers and impact radius — indexed search and call graph visibility that grep cannot match. Fallback: Grep for keywords from the bug (error messages, function names).
+2. **Locate the code.** **If GA available (per Phase 0a):** `ga_symbols("<function or type>")` → definitions; `ga_callers` + `ga_callees` on the resolved symbol → call graph; `ga_impact(symbol=...)` → blast radius + affected tests + risk in one shot; `ga_file_summary` before reading a file in full. **If GA unavailable or the query is free text** (error strings inside literals, log lines): grep.
 3. **Check history.** `git log --oneline -20 -- <affected-files>` — was this working before? What changed? Regression = root cause is in the diff.
 4. **Pattern check.** Match the symptom against known bug patterns:
 
@@ -48,7 +61,7 @@ Don't jump to code. Understand the bug first:
 
 5. **Reproduce deterministically.** If you can't trigger the bug reliably → gather more evidence. Do NOT guess.
 
-> If `codebase-memory-mcp` is connected, prefer it for steps 2 and 4 — `search_code` for finding affected files, `trace_call_path` for blast radius, `get_architecture` to check if the bug lives in a sensitive layer (auth, payment, core). These are more reliable than ad-hoc grep.
+> **If GA available, lean on it for steps 2 and 4.** `ga_symbols` resolves names, `ga_callers`/`ga_callees` map the call graph, `ga_impact` returns blast radius + test gaps + risk, `ga_architecture` reveals which module/layer (auth, payment, core) the bug sits in, `ga_risk` scores whether a change here is safe. If GA is unavailable, fall back to grep + `git log` + manual reading.
 
 **Required output:** `Root cause hypothesis: ...` — a specific, testable claim about what is wrong and why.
 
@@ -165,7 +178,7 @@ Make the **minimal change** needed.
 
 **Similar-risk scan (MANDATORY after fix, before Phase 3):** Grep for the same pattern that caused this bug, scoped to:
 1. The same file as the fix (all sibling functions in the fixed file).
-2. Direct callers of the fixed function (one level up — use grep, trace_call_path, or IDE refs).
+2. Direct callers of the fixed function (one level up — if GA available, `ga_callers`; otherwise grep or IDE refs).
 
 Do NOT auto-fix findings — the minimal-fix rule stands. Record each under Phase 5 `SIMILAR_RISK:` as `<file:line> — same pattern, unguarded`.
 

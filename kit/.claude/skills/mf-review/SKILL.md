@@ -8,9 +8,22 @@ description: |
   especially after /mf-build produces a non-trivial diff.
   Catches: SQL safety issues, security gaps, spec drift, regressions in
   modified-not-added lines, and changes to sensitive layers (auth, payment, core).
-allowed-tools: Read, Bash, Glob, Grep, AskUserQuestion
+allowed-tools: Read, Bash, Glob, Grep, AskUserQuestion, mcp__graphatlas__*
 ---
 Pre-merge code review — security, correctness, spec alignment.
+
+## Phase 0a — Graphatlas probe (run once, silently)
+
+Before Phase 0:
+
+1. Call `mcp__graphatlas__ga_architecture` with `max_modules: 1`.
+2. Interpret:
+   - Returns `modules` → **GA available.** Use `ga_impact`, `ga_risk`, `ga_architecture` for blast-radius and layer checks below. Manual grep is fallback.
+   - Error `STALE_INDEX` → call `mcp__graphatlas__ga_reindex` (mode `"full"`), retry once, then treat as available. (Reviewing the diff against a stale index gives wrong impact — reindex matters here.)
+   - Tool not found / connection error / any other failure → **GA unavailable.** Skip `ga_*` steps and review the diff manually. Do not re-probe.
+3. Carry the outcome through Phase 0 - 4.
+
+---
 
 ## Phase 0: Understand Intent
 
@@ -21,7 +34,7 @@ Pre-merge code review — security, correctness, spec alignment.
    ```
 2. Check for spec in `docs/specs/<feature>/<feature>.md` — review against INTENT.
 3. Read the diff: `git diff "$BASE"...HEAD`
-4. **Expand blast radius:** If `codebase-memory-mcp` is connected, prefer `search_code("<changed function or type>")` to find files not in the diff that may be affected, and `get_architecture()` to check if changed files belong to a sensitive layer (auth, payment, core) — more reliable than manual grep. Fallback: skip, review diff only.
+4. **Expand blast radius.** **If GA available (per Phase 0a):** run `ga_impact(diff=<full diff>)` (or `changed_files=[...]`) to get impacted files, affected tests, affected routes/configs, and a 4-dim risk score in one call — this is the flagship review tool, prefer it over any chain of grep + manual reading. Cross-check with `ga_architecture` for module/layer membership (auth, payment, core) and `ga_risk(changed_files=[...])` for a refactor-safety gate. **If GA unavailable:** grep for each changed function/type name across the rest of the tree to find affected files; identify sensitive paths (`auth/`, `payment/`, `core/`) by directory.
 5. **What already exists:** List any code/flows that already partially solve the problem in this diff. Flag if the diff rebuilds something that already exists.
 
 If `$ARGUMENTS` provided → scope to those files only.
