@@ -7,7 +7,7 @@ import { homedir } from 'node:os';
 import { log } from '../lib/logger.js';
 import { hashFile } from '../lib/hasher.js';
 import { readManifest, writeManifest, setFileEntry, refreshCustomizationStatus } from '../lib/manifest.js';
-import { getAllFiles, getTemplateDir, setPermissions, COMPONENTS, installSkillGlobal, getGlobalSkillsDir, installHookGlobal, getGlobalHooksDir, installScriptGlobal, getGlobalScriptsDir, mergeGlobalSettings } from '../lib/installer.js';
+import { getAllFiles, getTemplateDir, setPermissions, COMPONENTS, installSkillGlobal, getGlobalSkillsDir, installHookGlobal, getGlobalHooksDir, mergeGlobalSettings } from '../lib/installer.js';
 
 const GLOBAL_MANIFEST = join(homedir(), '.claude', '.devkit-manifest.json');
 
@@ -66,26 +66,6 @@ export async function upgradeGlobal({ force = false } = {}) {
     if (hSkipped > 0) hookParts.push(`${hSkipped} customized (use --force to overwrite)`);
     log.pass(`Global hooks: ${hookParts.join(', ')}`);
   }
-
-  // Upgrade global scripts
-  const globalScriptsDir = getGlobalScriptsDir();
-  await mkdir(globalScriptsDir, { recursive: true });
-
-  log.blank();
-  console.log('--- Upgrading global scripts ---');
-  let sUpdated = 0; let sSkipped = 0; let sIdentical = 0;
-
-  for (const relPath of COMPONENTS.scripts) {
-    const { result, kitHash } = await installScriptGlobal(relPath, globalScriptsDir, { force, globalFiles });
-    if (result === 'copied') sUpdated++;
-    else if (result === 'identical') sIdentical++;
-    else sSkipped++;
-    if (result !== 'skipped') updatedFiles[relPath] = { kitHash };
-  }
-
-  let scriptParts = [`${sUpdated} updated`, `${sIdentical} unchanged`];
-  if (sSkipped > 0) scriptParts.push(`${sSkipped} customized (use --force to overwrite)`);
-  log.pass(`Global scripts: ${scriptParts.join(', ')}`);
 
   await writeGlobalManifest({ ...meta, globalInstalled: true, files: updatedFiles, updatedAt: new Date().toISOString() });
 

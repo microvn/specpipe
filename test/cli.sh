@@ -133,10 +133,9 @@ assert_exists "hooks: glob-guard.js"      "$PROJECT_DIR/.claude/hooks/glob-guard
 assert_exists "hooks: file-guard.js"      "$PROJECT_DIR/.claude/hooks/file-guard.js"
 assert_exists "hooks: self-review.sh"     "$PROJECT_DIR/.claude/hooks/self-review.sh"
 
-# Config, scripts, docs
+# Config, docs
 assert_exists "config: settings.json"  "$PROJECT_DIR/.claude/settings.json"
 assert_exists "config: CLAUDE.md"      "$PROJECT_DIR/.claude/CLAUDE.md"
-assert_exists "scripts: build-test.sh" "$PROJECT_DIR/scripts/build-test.sh"
 assert_exists "docs: WORKFLOW.md"      "$PROJECT_DIR/docs/WORKFLOW.md"
 
 # Placeholder dirs
@@ -158,7 +157,6 @@ assert_json_valid "settings.json: valid JSON" "$PROJECT_DIR/.claude/settings.jso
 assert_executable "path-guard.sh is executable"      "$PROJECT_DIR/.claude/hooks/path-guard.sh"
 assert_executable "sensitive-guard.sh is executable" "$PROJECT_DIR/.claude/hooks/sensitive-guard.sh"
 assert_executable "self-review.sh is executable"     "$PROJECT_DIR/.claude/hooks/self-review.sh"
-assert_executable "build-test.sh is executable"      "$PROJECT_DIR/scripts/build-test.sh"
 
 teardown
 
@@ -170,7 +168,6 @@ cli init "$PROJECT_DIR" --only skills
 
 assert_exists "skills present with --only skills"  "$PROJECT_DIR/.claude/skills/mf-plan/SKILL.md"
 assert_absent "hooks absent with --only skills"    "$PROJECT_DIR/.claude/hooks/path-guard.sh"
-assert_absent "scripts absent with --only skills"  "$PROJECT_DIR/scripts/build-test.sh"
 assert_absent "docs absent with --only skills"     "$PROJECT_DIR/docs/WORKFLOW.md"
 
 teardown
@@ -297,7 +294,6 @@ cli remove "$PROJECT_DIR"
 
 assert_absent "hooks removed"     "$PROJECT_DIR/.claude/hooks/path-guard.sh"
 assert_absent "skills removed"    "$PROJECT_DIR/.claude/skills/mf-plan/SKILL.md"
-assert_absent "scripts removed"   "$PROJECT_DIR/scripts/build-test.sh"
 assert_absent "manifest removed"  "$PROJECT_DIR/.claude/.devkit-manifest.json"
 
 # Preserved items
@@ -359,10 +355,6 @@ assert_exists "global hooks: comment-guard.js"    "$TEST_HOME/.claude/hooks/comm
 assert_exists "global hooks: glob-guard.js"       "$TEST_HOME/.claude/hooks/glob-guard.js"
 assert_exists "global hooks: file-guard.js"       "$TEST_HOME/.claude/hooks/file-guard.js"
 assert_exists "global hooks: self-review.sh"      "$TEST_HOME/.claude/hooks/self-review.sh"
-
-# Scripts
-assert_exists     "global scripts: build-test.sh"          "$TEST_HOME/.claude/scripts/build-test.sh"
-assert_executable "global: build-test.sh executable"       "$TEST_HOME/.claude/scripts/build-test.sh"
 
 # Executable permissions
 assert_executable "global: path-guard.sh executable"      "$TEST_HOME/.claude/hooks/path-guard.sh"
@@ -461,7 +453,6 @@ cli init --global
 OUT_UG=$(cli_out upgrade --global)
 assert_contains "global upgrade no changes: skills unchanged"  "unchanged" "$OUT_UG"
 assert_contains "global upgrade no changes: hooks unchanged"   "unchanged" "$OUT_UG"
-assert_contains "global upgrade no changes: scripts unchanged" "scripts"   "$OUT_UG"
 
 teardown
 
@@ -523,11 +514,14 @@ section "remove --global"
 setup
 
 cli init --global
+# Simulate a legacy install that still has the old global build-test.sh
+mkdir -p "$TEST_HOME/.claude/scripts"
+echo "#!/usr/bin/env bash" > "$TEST_HOME/.claude/scripts/build-test.sh"
 cli remove --global
 
 assert_absent "global skills dir removed"    "$TEST_HOME/.claude/skills"
 assert_absent "global hooks dir removed"     "$TEST_HOME/.claude/hooks"
-assert_absent "global scripts dir removed"   "$TEST_HOME/.claude/scripts"
+assert_absent "legacy build-test.sh removed" "$TEST_HOME/.claude/scripts/build-test.sh"
 assert_absent "global manifest removed"      "$TEST_HOME/.claude/.devkit-manifest.json"
 S=$(cat "$TEST_HOME/.claude/settings.json")
 assert_not_contains "settings.json: devkit entries removed" "path-guard.sh" "$S"

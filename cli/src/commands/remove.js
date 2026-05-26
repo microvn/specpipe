@@ -36,13 +36,15 @@ export async function removeGlobal() {
     log.skip('~/.claude/hooks/ (not found)');
   }
 
-  // Remove ~/.claude/scripts/
-  const globalScriptsDir = join(homedir(), '.claude', 'scripts');
-  if (existsSync(globalScriptsDir)) {
-    await rm(globalScriptsDir, { recursive: true, force: true });
-    log.del('~/.claude/scripts/');
-  } else {
-    log.skip('~/.claude/scripts/ (not found)');
+  // Legacy cleanup: older installs shipped ~/.claude/scripts/build-test.sh.
+  // The script is no longer part of the kit — sweep up the orphan if present.
+  const legacyScript = join(homedir(), '.claude', 'scripts', 'build-test.sh');
+  if (existsSync(legacyScript)) {
+    await unlink(legacyScript);
+    log.del('~/.claude/scripts/build-test.sh (legacy)');
+    try {
+      await rmdir(join(homedir(), '.claude', 'scripts'));
+    } catch { /* keep dir if user has other scripts in it */ }
   }
 
   // Remove devkit hook entries from ~/.claude/settings.json
@@ -110,7 +112,7 @@ export async function removeCommand(path, opts = {}) {
   // Clean up empty directories
   const dirsToClean = [
     '.claude/hooks',
-    'scripts',
+    'scripts', // legacy: older installs placed build-test.sh here
   ];
 
   for (const dir of dirsToClean) {

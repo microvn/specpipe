@@ -267,10 +267,7 @@ If every path is already covered, the diagram will have zero `[GAP]` rows — th
 
 ## Test Command
 
-Resolve once before running tests. Check in order:
-1. `scripts/build-test.sh` exists in project root → `bash scripts/build-test.sh`
-2. `~/.claude/scripts/build-test.sh` exists (global install) → `bash ~/.claude/scripts/build-test.sh`
-3. Auto-detect from project markers:
+Resolve once before running tests. Auto-detect from project markers:
 
 | Marker | Run all | Run filtered |
 |--------|---------|-------------|
@@ -284,7 +281,7 @@ Resolve once before running tests. Check in order:
 | Package.swift | `swift test` | `swift test --filter "<pattern>"` |
 | Gemfile | `bundle exec rspec` | `bundle exec rspec -e "<pattern>"` |
 
-All test commands below use `TEST_CMD` to mean the resolved command. For filtered runs, append `--filter "<pattern>"` (build-test.sh) or use the framework's native filter flag from the table above.
+All test commands below use `TEST_CMD` to mean the resolved command. For filtered runs, use the framework's native filter flag from the table above.
 
 **Filter pattern verification (MANDATORY before trusting a filtered run):**
 

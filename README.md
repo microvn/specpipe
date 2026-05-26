@@ -16,12 +16,11 @@ A lightweight, spec-first development toolkit for [Claude Code](https://claude.a
 4. [Daily Workflows](#4-daily-workflows)
 5. [Commands Reference](#5-commands-reference)
 6. [Automatic Guards (Hooks)](#6-automatic-guards-hooks)
-7. [Build Test Script](#7-build-test-script)
-8. [Spec Format](#8-spec-format)
-9. [Customization](#9-customization)
-10. [Token Cost Guide](#10-token-cost-guide)
-11. [Troubleshooting](#11-troubleshooting)
-12. [FAQ](#12-faq)
+7. [Spec Format](#7-spec-format)
+8. [Customization](#8-customization)
+9. [Token Cost Guide](#9-token-cost-guide)
+10. [Troubleshooting](#10-troubleshooting)
+11. [FAQ](#11-faq)
 
 ---
 
@@ -171,7 +170,7 @@ That's the 5 minutes. The CLI auto-detected your project (Swift + XCTest here) �
 | **Claude Code CLI** | Yes | Runs the commands and hooks |
 | **Git** | Yes | Change detection, commit workflow |
 | **Node.js** (18+) | Yes | File guard hook, JSON parsing |
-| **Bash** (4+) | Yes | Path guard hook, build-test script |
+| **Bash** (4+) | Yes | Path guard hook, shell-based hooks |
 | **Language toolchain** | Yes | Whatever your project uses (Swift, npm, pytest, etc.) |
 | **[GraphAtlas](https://github.com/microvn/graphatlas)** | Optional | Graph-based code intelligence — skills prefer it over `grep` when connected (see below) |
 
@@ -248,8 +247,6 @@ your-project/
 │       │   └── components.md
 │       ├── mf-voices/SKILL.md       ← /mf-voices skill (multi-LLM review)
 │       └── mf-humanize/SKILL.md     ← /mf-humanize skill (rephrase to human voice)
-├── scripts/
-│   └── build-test.sh          ← Universal test runner
 └── docs/
     ├── specs/                 ← Your specs (folder-per-feature)
     │   └── <feature>/
@@ -303,7 +300,7 @@ npx claude-devkit-cli list
 npx claude-devkit-cli remove
 ```
 
-This removes hooks, skills, settings, and build-test.sh. It preserves `CLAUDE.md` (which you may have customized) and `docs/` (which contains your specs).
+This removes hooks, skills, and settings. It preserves `CLAUDE.md` (which you may have customized) and `docs/` (which contains your specs).
 
 ---
 
@@ -399,7 +396,7 @@ This removes hooks, skills, settings, and build-test.sh. It preserves `CLAUDE.md
 
 2. Delete production code + related tests.
 
-3. bash scripts/build-test.sh (run full suite)
+3. Run the full test suite (your project's native test command).
    Fix cascading breaks.
 
 4. /mf-commit
@@ -972,63 +969,7 @@ echo $?  # expect: 0
 
 ---
 
-## 7. Build Test Script
-
-### Usage
-
-```bash
-bash scripts/build-test.sh                    # run all tests
-bash scripts/build-test.sh --filter "Auth"    # filter by pattern
-bash scripts/build-test.sh --list             # show detected project type
-bash scripts/build-test.sh --ci               # machine-readable output
-bash scripts/build-test.sh --help             # show usage
-```
-
-### Supported Languages
-
-| Language | Detected By | Test Command |
-|----------|-------------|-------------|
-| Swift (SPM) | `Package.swift` | `swift test` |
-| Swift (Xcode) | `*.xcworkspace` / `*.xcodeproj` | `xcodebuild test` |
-| Node (Vitest) | `vitest.config.*` or vitest in `package.json` | `npx vitest run` |
-| Node (Jest) | `jest.config.*` or jest in `package.json` | `npx jest` |
-| Python (pytest) | `pyproject.toml`, `setup.py`, `pytest.ini` | `python3 -m pytest` |
-| Rust | `Cargo.toml` | `cargo test` |
-| Go | `go.mod` | `go test -race ./...` |
-| Java (Gradle) | `build.gradle` / `build.gradle.kts` | `./gradlew test` |
-| Java (Maven) | `pom.xml` | `mvn test` |
-| C# (.NET) | `*.sln` / `*.csproj` | `dotnet test` |
-| Ruby (RSpec) | `Gemfile` with rspec | `bundle exec rspec` |
-| Ruby (Minitest) | `Gemfile` without rspec | `bundle exec rake test` |
-
-Detection order: first match wins. The script also detects package managers (pnpm, bun) for Node projects.
-
-### Exit Codes
-
-| Code | Meaning |
-|------|---------|
-| 0 | All tests passed |
-| 1 | Tests failed |
-| 2 | No project detected or missing tooling |
-
-### CI Integration
-
-```yaml
-# GitHub Actions example
-- name: Run tests
-  run: bash scripts/build-test.sh --ci
-```
-
-### Adding a New Language
-
-Edit `scripts/build-test.sh`:
-1. Add a `detect_<language>()` function
-2. Add it to the `DETECTORS` array
-3. The function should set `LANG_NAME` and `TEST_CMD`
-
----
-
-## 8. Spec Format
+## 7. Spec Format
 
 ### Spec Template
 
@@ -1120,7 +1061,7 @@ Snapshots are immutable, managed by mf-plan (not developers), and capped at 5 mo
 
 ---
 
-## 9. Customization
+## 8. Customization
 
 ### Environment Variables
 
@@ -1165,7 +1106,7 @@ Then use: `/deploy staging`
 
 ---
 
-## 10. Token Cost Guide
+## 9. Token Cost Guide
 
 | Activity | Tokens | Frequency |
 |----------|--------|-----------|
@@ -1190,7 +1131,7 @@ Then use: `/deploy staging`
 
 ---
 
-## 11. Troubleshooting
+## 10. Troubleshooting
 
 ### Hook not firing
 
@@ -1204,12 +1145,12 @@ Then use: `/deploy staging`
 
 ### Tests not detected
 
-**Symptom:** `build-test.sh` says "No supported project detected."
+**Symptom:** `/mf-build` or `/mf-fix` can't figure out how to run the tests.
 
 **Check:**
 1. Are you in the project root? `pwd`
-2. Does the project marker file exist? (e.g., `package.json`, `Cargo.toml`)
-3. Run `bash scripts/build-test.sh --list` for diagnostic output.
+2. Does the project marker file exist? (e.g., `package.json`, `Cargo.toml`, `pyproject.toml`)
+3. If your test command is non-standard, set it explicitly in `.claude/CLAUDE.md` under **Testing** so the skills use it.
 
 ### Wrong base branch
 
@@ -1240,7 +1181,7 @@ export FILE_GUARD_EXCLUDE="*.generated.swift,*.pb.go,*.min.js,*.snap"
 
 ---
 
-## 12. FAQ
+## 11. FAQ
 
 **Q: Do I need specs for every tiny change?**
 A: No. Changes under 5 lines with no behavior change can skip the spec. Just `/mf-build` and `/mf-commit`. The spec-first rule is for meaningful behavior changes.
@@ -1252,7 +1193,7 @@ A: Only for external services you can't run locally (third-party APIs, email ser
 A: This usually means the spec is ambiguous. Clarify the spec first, then re-run `/mf-build`. Good specs produce good tests.
 
 **Q: Can I use this with other AI coding tools?**
-A: The commands and hooks are Claude Code-specific. The specs, workflow, and `build-test.sh` work with any tool or manual workflow.
+A: The commands and hooks are Claude Code-specific. The specs and workflow work with any tool or manual workflow.
 
 **Q: When should I use `/mf-challenge`?**
 A: After `/mf-plan`, for complex features involving authentication, payments, data pipelines, or multi-service integration. It spawns parallel hostile reviewers that find security holes, failure modes, and false assumptions BEFORE you write code. Skip it for simple CRUD or small features — the overhead isn't worth it.
@@ -1261,10 +1202,10 @@ A: After `/mf-plan`, for complex features involving authentication, payments, da
 A: This is intentionally not a command (it's expensive and rare). When needed, prompt Claude directly: "Audit test coverage for feature X against docs/specs/X/X.md acceptance scenarios. Identify gaps and write missing tests."
 
 **Q: What if my project uses multiple languages?**
-A: `build-test.sh` detects the first match. For monorepos, you may need to run it from each sub-project directory or customize the script.
+A: The skills auto-detect the test command from the first project marker they find. For monorepos, run `/mf-build` from each sub-project directory, or pin the test command per project in `.claude/CLAUDE.md` under **Testing**.
 
 **Q: Can I add more skills?**
-A: Yes. Create a directory `.claude/skills/<name>/SKILL.md` and it becomes available as a slash command. See [Customization](#9-customization).
+A: Yes. Create a directory `.claude/skills/<name>/SKILL.md` and it becomes available as a slash command. See [Customization](#8-customization).
 
 **Q: How do I update the kit in existing projects?**
 A: Run `npx claude-devkit-cli upgrade`. It automatically detects which files you've customized and only updates unchanged files. Use `--force` to overwrite everything.

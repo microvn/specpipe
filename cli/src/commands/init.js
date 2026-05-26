@@ -59,26 +59,6 @@ export async function initGlobal({ force = false, hooks = false } = {}) {
   log.pass(`Global skills: ${parts.join(', ')}`);
   log.info('Skills available in all projects via ~/.claude/skills/');
 
-  // --- Global scripts ---
-  const { getGlobalScriptsDir, installScriptGlobal } = await import('../lib/installer.js');
-  const globalScriptsDir = getGlobalScriptsDir();
-  await mkdir(globalScriptsDir, { recursive: true });
-
-  log.blank();
-  console.log('--- Installing global scripts ---');
-  let sCopied = 0; let sSkipped = 0; let sIdentical = 0;
-  for (const relPath of COMPONENTS.scripts) {
-    const { result, kitHash } = await installScriptGlobal(relPath, globalScriptsDir, { force, globalFiles: existing.files || {} });
-    if (result === 'copied') sCopied++;
-    else if (result === 'identical') sIdentical++;
-    else sSkipped++;
-    if (result !== 'skipped') updatedFiles[relPath] = { kitHash };
-  }
-  const sParts = [`${sCopied} copied`];
-  if (sIdentical > 0) sParts.push(`${sIdentical} identical`);
-  if (sSkipped > 0) sParts.push(`${sSkipped} customized (use --force to overwrite)`);
-  log.pass(`Global scripts: ${sParts.join(', ')}`);
-
   if (hooks) {
     await initGlobalHooks({ force, _globalFiles: updatedFiles, _skipManifestWrite: true });
   }
@@ -286,7 +266,6 @@ export async function initCommand(path, opts) {
   console.log('  .claude/settings.json      — Hook configuration');
   console.log('  .claude/hooks/             — 6 guards (file, path, glob, comment, sensitive, self-review)');
   console.log('  .claude/skills/            — /mf-plan, /mf-challenge, /mf-build, /mf-fix, /mf-review, /mf-commit, /mf-voices');
-  console.log('  scripts/build-test.sh      — Universal test runner');
   console.log('  docs/WORKFLOW.md           — Workflow reference');
   log.blank();
   const parts = [`${copied} copied`];

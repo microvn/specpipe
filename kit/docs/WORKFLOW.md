@@ -127,7 +127,7 @@ Step 1 → /mf-plan docs/specs/<feature>/<feature>.md "remove stories S-XXX"
 
 Step 2 → Delete production code and related test code.
 
-Step 3 → Run full test suite: bash scripts/build-test.sh (or ~/.claude/scripts/build-test.sh)
+Step 3 → Run the full test suite with the project's native test command.
           Fix any cascading breakage.
 
 Step 4 → /mf-commit
@@ -257,7 +257,7 @@ Use this as a PR review checklist (enforce manually or via CI):
 
 - [ ] **Spec updated?** If production behavior changed, `docs/specs/<feature>/` should have changes.
 - [ ] **Acceptance scenarios updated?** If spec behavior changed, AS in spec should reflect it.
-- [ ] **Tests pass?** `bash scripts/build-test.sh (or ~/.claude/scripts/build-test.sh)` exits 0.
+- [ ] **Tests pass?** The project's test command exits 0.
 - [ ] **No dead tests?** Removed production code → removed corresponding tests.
 - [ ] **Coverage not decreased?** (Optional, per-team decision.)
 - [ ] **No secrets in diff?** No API keys, tokens, passwords in committed code.

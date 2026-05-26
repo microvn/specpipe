@@ -44,9 +44,6 @@ export const COMPONENTS = {
     '.claude/settings.json',
     '.claude/CLAUDE.md',
   ],
-  scripts: [
-    'scripts/build-test.sh',
-  ],
   docs: [
     'docs/WORKFLOW.md',
   ],
@@ -64,7 +61,6 @@ export const PLACEHOLDER_DIRS = [
  * Files that need +x permission.
  */
 export const EXECUTABLE_FILES = [
-  'scripts/build-test.sh',
   '.claude/hooks/path-guard.sh',
   '.claude/hooks/self-review.sh',
   '.claude/hooks/sensitive-guard.sh',
@@ -211,51 +207,6 @@ export function getGlobalHooksDir() {
   return join(homedir(), '.claude', 'hooks');
 }
 
-/**
- * Global scripts directory: ~/.claude/scripts/
- */
-export function getGlobalScriptsDir() {
-  return join(homedir(), '.claude', 'scripts');
-}
-
-/**
- * Copy a script to the global ~/.claude/scripts/ directory.
- * Strips the 'scripts/' prefix so build-test.sh lands at
- * ~/.claude/scripts/build-test.sh.
- * @param {object} [opts.globalFiles] - files section from global manifest, used to detect true customization
- * @returns {{ result: 'copied'|'skipped'|'identical', kitHash: string }}
- */
-export async function installScriptGlobal(scriptRelPath, globalScriptsDir, { force = false, globalFiles = {} } = {}) {
-  const stripped = scriptRelPath.replace(/^scripts\//, '');
-  const src = join(getTemplateDir(), scriptRelPath);
-  const dst = join(globalScriptsDir, stripped);
-
-  const { hashFile } = await import('./hasher.js');
-  const srcHash = await hashFile(src);
-
-  if (existsSync(dst) && !force) {
-    try {
-      const dstHash = await hashFile(dst);
-      if (srcHash === dstHash) {
-        log.same(`~/.claude/scripts/${stripped} (identical)`);
-        return { result: 'identical', kitHash: srcHash };
-      }
-      const savedKitHash = globalFiles[scriptRelPath]?.kitHash;
-      if (savedKitHash && dstHash === savedKitHash) {
-        // fall through to copy
-      } else {
-        log.skip(`~/.claude/scripts/${stripped} (customized — use --force to overwrite)`);
-        return { result: 'skipped', kitHash: srcHash };
-      }
-    } catch { /* hash failed */ }
-  }
-
-  await mkdir(dirname(dst), { recursive: true });
-  await fsCopyFile(src, dst);
-  await chmod(dst, 0o755);
-  log.copy(`~/.claude/scripts/${stripped}`);
-  return { result: 'copied', kitHash: srcHash };
-}
 
 /**
  * Copy a hook to the global ~/.claude/hooks/ directory.

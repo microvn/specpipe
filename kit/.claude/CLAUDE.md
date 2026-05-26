@@ -30,8 +30,7 @@ For detailed workflow steps, templates, and decision trees, see `docs/WORKFLOW.m
 
 ## Testing
 
-- **Run tests:** `bash scripts/build-test.sh [--filter PATTERN]` (per-project) or `bash ~/.claude/scripts/build-test.sh [--filter PATTERN]` (global). Use whichever exists.
-- **Auto-detects:** Swift, Node, Python, Rust, Go, Java, C#, Ruby
+- **Run tests:** use the project's native test command (e.g. `npx vitest run`, `swift test`, `python3 -m pytest`, `cargo test`, `go test ./...`). `/mf-build` and `/mf-fix` auto-detect it from project markers.
 - **Compile/typecheck BEFORE running tests.** Catch syntax errors early.
 - **Max 3 fix loops** for test failures. If tests still fail after 3 attempts, stop and report.
 - **NEVER fix production code** to make a test pass — ask the user first.
