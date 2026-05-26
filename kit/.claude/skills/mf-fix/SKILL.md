@@ -35,7 +35,7 @@ Before locating code, probe whether graphatlas (GA) is connected:
    - Returns `modules` → **GA available.** Use `ga_*` for code discovery, blast-radius, and risk. Grep is fallback only.
    - Error `STALE_INDEX` → call `mcp__graphatlas__ga_reindex` (mode `"full"`), retry once, then treat as available.
    - Tool not found / connection error / any other failure → **GA unavailable.** Use grep/glob throughout this run. Do not re-probe.
-3. After every batch of source edits in Phase 3 (Fix), call `ga_reindex` so later queries reflect the new state.
+3. After edits the graph goes stale. Reindex on demand: when a later `ga_*` call returns `STALE_INDEX`, call `mcp__graphatlas__ga_reindex` (mode `"full"`) once then retry. Don't reindex preemptively after every edit.
 
 ---
 

@@ -22,7 +22,7 @@ Before Phase 0:
    - Returns `modules` → **GA available.** Use `ga_*` for locate / call-graph / impact below. Grep is fallback.
    - Error `STALE_INDEX` → call `mcp__graphatlas__ga_reindex` (mode `"full"`), retry once, then treat as available.
    - Tool not found / connection error / any other failure → **GA unavailable.** Use grep/glob throughout. Do not re-probe.
-3. After each story's GREEN passes and before moving to the next story, call `ga_reindex` so callers/impact queries for subsequent stories reflect the new code. Cheap insurance — skip only if no further `ga_*` queries are planned.
+3. After edits, the graph goes stale. Don't reindex on a schedule — instead, when a later `ga_*` call returns `STALE_INDEX`, call `mcp__graphatlas__ga_reindex` (mode `"full"`) once then retry. On large repos a full reindex is not cheap, so reindex on demand, not per story.
 
 ---
 

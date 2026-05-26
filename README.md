@@ -4,6 +4,7 @@ A lightweight, spec-first development toolkit for [Claude Code](https://claude.a
 
 **Works with:** Swift, TypeScript/JavaScript, Python, Rust, Go, Java/Kotlin, C#, Ruby.
 **Dependencies:** None (requires only Claude Code CLI, Node.js, Git, and Bash).
+**Optional:** [GraphAtlas](https://github.com/microvn/graphatlas) MCP server for graph-based code intelligence — six skills use it automatically when present and fall back to `grep` when it isn't. See [§3 Setup](#3-setup).
 
 ---
 
@@ -172,6 +173,7 @@ That's the 5 minutes. The CLI auto-detected your project (Swift + XCTest here) �
 | **Node.js** (18+) | Yes | File guard hook, JSON parsing |
 | **Bash** (4+) | Yes | Path guard hook, build-test script |
 | **Language toolchain** | Yes | Whatever your project uses (Swift, npm, pytest, etc.) |
+| **[GraphAtlas](https://github.com/microvn/graphatlas)** | Optional | Graph-based code intelligence — skills prefer it over `grep` when connected (see below) |
 
 ### Installation
 
@@ -255,6 +257,16 @@ your-project/
     │       └── snapshots/     ← Version history (managed by /mf-plan)
     └── WORKFLOW.md            ← Process reference
 ```
+
+### Optional: GraphAtlas Code Intelligence
+
+The `mf-*` skills work out of the box with `grep`. But when [GraphAtlas](https://github.com/microvn/graphatlas) (GA) is connected as an MCP server, six skills — `/mf-explore`, `/mf-plan`, `/mf-build`, `/mf-fix`, `/mf-review`, `/mf-investigate` — prefer it over `grep` for code discovery, call-graph tracing, and blast-radius analysis.
+
+**Why it helps:** `grep` can't tell a call site from a string literal, doesn't see polymorphic dispatch, and won't follow re-exports. An agent that edits one function but misses its callers, test files, and overrides in other modules ships a bug. GA indexes the repo once into a local graph with typed `CALL` / `IMPORT` / `OVERRIDE` edges, then answers structural questions deterministically in milliseconds with a small token footprint. It runs 100% locally — no LLM, no embeddings, no telemetry.
+
+**How the skills use it:** each skill runs a one-time probe (`ga_architecture`) at the start. If GA responds, it leans on tools like `ga_impact` (blast radius + affected tests), `ga_callers` / `ga_callees` (call graph), `ga_symbols` (definition lookup), and `ga_rename_safety`. If GA is absent — or the index is stale — the skill falls back to `grep`/`glob` automatically. Nothing breaks; you only lose the precision.
+
+**Setup:** GA is a separate tool, not bundled with this kit. Install and register it as an MCP server following the instructions at [github.com/microvn/graphatlas](https://github.com/microvn/graphatlas). Once registered, the skills detect it on their own — no changes to this kit's config needed.
 
 ### Post-Install Configuration
 
