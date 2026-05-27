@@ -26,8 +26,9 @@ cd "$ROOT_DIR"
 
 # Run test suite — must pass before publish
 echo "running test suite..."
-bash test/hooks.sh || { echo "error: hooks tests failed — aborting publish"; exit 1; }
-bash test/cli.sh   || { echo "error: cli tests failed — aborting publish"; exit 1; }
+bash test/hooks.sh         || { echo "error: hooks tests failed — aborting publish"; exit 1; }
+bash test/cli.sh           || { echo "error: cli tests failed — aborting publish"; exit 1; }
+bash test/coverage-gate.sh || { echo "error: coverage-gate tests failed — aborting publish"; exit 1; }
 echo ""
 
 # Stage + commit any pending changes first
