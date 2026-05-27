@@ -1,17 +1,166 @@
 ---
 description: |
   TDD delivery loop — write failing tests from spec, implement story by story,
-  drive to GREEN. One story → red → green → next story.
+  drive to GREEN. One story → red → green → next story. For a multi-story spec,
+  auto-mode orchestrates the whole spec to done by dispatching one subagent per
+  story (keeps context lean, minimal human-in-loop), stopping only on blockers,
+  spec drift, or checkpoint stories.
   Use when asked to "build this", "implement the spec", "code the feature",
-  "triển khai", "làm tính năng", "code theo spec", or "TDD this".
+  "triển khai", "làm tính năng", "code theo spec", "TDD this", "build hết spec",
+  "build all stories", "implement the whole spec", or "build tự động".
   Proactively invoke this skill (do NOT write code directly) when the user has
   a spec ready in docs/specs/ and wants it implemented, or asks to start coding
   a planned feature.
   Requires a spec from /mf-plan or equivalent — if no spec exists, run /mf-plan
   first instead of jumping into code.
-allowed-tools: Read, Write, Edit, Bash, Glob, Grep, AskUserQuestion, mcp__graphatlas__*
+allowed-tools: Read, Write, Edit, Bash, Glob, Grep, AskUserQuestion, Agent, mcp__graphatlas__*
 ---
 TDD delivery loop — write failing tests from spec AS, implement story by story, drive to GREEN.
+
+This skill has two execution paths, both built on the same **Execution Procedure (Phase 0a–Phase 5)** below. **Inline** runs that procedure directly in the current context (classic behaviour — fine for one story or a small spec, but context grows with every story). **Auto-Mode** turns the current context into an orchestrator that drives a multi-story spec to completion by dispatching a fresh subagent per story — each subagent runs the same procedure scoped to its one story, so the controller's context stays lean. Run Mode Detection first.
+
+---
+
+## Mode Detection (run first)
+
+1. Resolve the target spec at `docs/specs/<feature>/<feature>.md` (from `$ARGUMENTS` or the changed feature). Count the **in-scope** stories: those in `## Stories`, minus any already `done` in `.build-progress`, intersected with any `$ARGUMENTS` story filter. (So a resume with one story left counts as 1.)
+2. Decide:
+   - **No spec / no `## Stories` section** (e.g. ad-hoc build, bug-fix-style work, `$ARGUMENTS` is a bare file) → **Inline.** Run the Execution Procedure directly. No mode question.
+   - **1 story in scope** (single-story spec, or `$ARGUMENTS` scopes to one `S-NNN`) → **Inline.** Run the procedure for that one story. No subagents (inline threshold = 1).
+   - **≥2 stories in scope** → ask the user **once** via AskUserQuestion:
+
+```json
+{
+  "questions": [{
+    "question": "This spec has <N> stories. Run auto-mode (I orchestrate: one subagent per story, gate each, stop only on blockers / spec-drift / checkpoint stories), or inline (build all <N> in this context, classic, you watch each step)?",
+    "header": "Build mode",
+    "multiSelect": false,
+    "options": [
+      {"label": "Auto — build all <N> to done", "description": "Orchestrate with subagents; lean context; stop only on BLOCKED, spec signal S1/S2, or a checkpoint story"},
+      {"label": "Inline — build all in this context", "description": "Classic single-context loop over every story; full visibility, but context grows per story"}
+    ]
+  }]
+}
+```
+
+   - **Auto** → go to **Auto-Mode (Orchestrator)** below.
+   - **Inline** → run the Execution Procedure, looping over the in-scope stories (resume from first `pending` in `.build-progress`).
+
+---
+
+## Auto-Mode (Orchestrator)
+
+The current context is the **controller**. It does not implement — it orders, dispatches, gates, and routes. Keep controller context lean: read status and checklist ticks, never full diffs or full subagent bodies.
+
+### A1 — Plan the run (read spec ONCE)
+
+1. Read the spec once. Extract for every story: ID, priority, full text + its AS, and the `**Execution:**` block (`depends_on`, `parallel_safe`, `files`, `autonomous`, `verify`). Missing block → treat as `depends_on: none, parallel_safe: false, autonomous: true, files: unknown`.
+2. Read `.build-progress` if present. In Auto-Mode it uses **three** states: `done`, `building`, `pending`. The controller flips a story to `building` right before dispatch (A2) and to `done` only after its gates clear (A4/A4b) — so a story interrupted mid-build is left as `building`, never silently `done`. **On resume:**
+   - `building` story → it was in flight when interrupted. Check `git log --all --grep "S-NNN"` — this scans the FULL message including the `Story:` footer (A2 mandates it there). Do NOT use `git log --oneline | grep` — that only sees the subject and will miss the footer, giving a false "no commit" that overwrites finished work. Commit exists → the subagent finished but wasn't gated → gate it (A4) instead of rebuilding. No commit → re-dispatch it.
+   - `pending` → untouched, build normally. `done` → skip.
+   - **Stale worktrees from an interrupted prior run:** run `git worktree list`. For any leftover agent worktree (path under `.claude/worktrees/` or branch `worktree-agent-*`): if its story is `done` and its branch is merged → clean it up (`git worktree remove` + `git branch -d` + `git worktree prune`). If it is **locked** or its work is unmerged → do NOT force-remove; report it ("leftover worktree <path> from an interrupted run — remove with `git worktree remove -f -f` only if you're sure its agent is dead") and leave it. Never blindly `-f -f` on resume.
+3. **Derive the full checklist yourself now.** Dispatched subagents are barred from Phase 0.6, so the controller owns derivation: run Phase 0.6 over the whole spec, give each line an `owner: S-NNN`, and write `.build-checklist`. (On resume, re-derive and diff per Phase 0.6's "checklist already exists" rules.) This must exist before the first dispatch, because A2 pastes each story's `owner` lines into its subagent prompt.
+4. **Validate the dependency graph FIRST.** Every `depends_on` ID must resolve to a story in this spec, and the graph must be a DAG. If any `depends_on` points to a missing/removed ID, or there is a cycle (or at any later point pending stories remain but none is ready) → STOP with `BLOCKED: dependency cycle or dangling ref between <stories>` and tell the user to fix it via `/mf-plan`. Do not loop.
+5. **Compute waves** from priority + `depends_on`:
+   - A story is ready when all its `depends_on` are `done`.
+   - Within a ready set, order by priority (P0 → P1 → P2). **Process the ready set in priority order: run sequential-eligible stories first (one at a time), then dispatch the parallel group.** Never run an inline sequential build at the same time as a worktree wave — finish the sequential story, then start the group.
+   - A set of ready stories runs **in parallel only if** every one is `parallel_safe: true` AND none is `autonomous: checkpoint` (checkpoint stories always run sequentially so the A5 pause fires) AND their `files` are concrete (not `unknown`, not a bare directory hint) AND pairwise disjoint. Any overlap, any `unknown`, any directory-level hint, any dependency, any doubt → that story drops to sequential. A wave can mix: dispatch the parallel-eligible group (in batches, see the concurrency cap below), build the rest one at a time.
+   - **Two implementer subagents must never share one working tree** — git index, `HEAD`, and the build dir are shared even when file *contents* are disjoint. Parallel dispatch therefore uses worktree isolation; see A2 (dispatch) + A4b (integration) for the exact procedure. If `isolation="worktree"` is unavailable in this environment, fall back to sequential for that wave.
+   - **Concurrency cap — never more than 3 implementer subagents at once.** If a parallel-eligible group has >3 stories, dispatch in batches of ≤3: a batch's branches integrate (A4b) before the next batch starts. More than ~3 burns context/tokens in parallel and risks rate limits, while the *sequential* A4b integrate is the real bottleneck — extra concurrency buys little. The cap drops with the context tier (A6): **3** at PEAK, **2** at GOOD, **1 (sequential)** at DEGRADING or worse. It is a ceiling, not a target — 2 disjoint stories run as 2, never padded to 3.
+
+### A2 — Per-story dispatch (approach b — point, don't paste the procedure)
+
+Before dispatching, check the story's `autonomous` field: if it is `checkpoint`, pause and let the human inspect before proceeding (A5) — do not dispatch it silently. Then mark the story (or each member of a parallel group) `building` in `.build-progress` so an interruption is recoverable (A1).
+
+**Dispatch shape:**
+- **Sequential story** → dispatch one **general-purpose subagent** via the Agent tool, working in the current tree.
+- **Parallel-eligible group** (from A1.5) → first capture the wave base: `EXPECTED_BASE=$(git rev-parse HEAD)`. Then dispatch each member subagent with `isolation="worktree"` so each gets its own worktree + branch off HEAD — **at most the A1.5 concurrency cap (≤3) at a time**; if the group is larger, do it in batches, integrating each batch (A4b) before dispatching the next. They run concurrently within a batch; the controller integrates their branches afterward (A4b).
+
+The prompt MUST contain:
+
+1. **Point** the subagent to the procedure: *"Read `.claude/skills/mf-build/SKILL.md` and follow the **Execution Procedure (Phase 0a–Phase 5)** for EXACTLY the one story below. Do NOT invoke the mf-build skill (no recursion), do NOT re-enter Mode Detection, do NOT read or build any other story."*
+2. **The dispatched-subagent contract** (paste verbatim — this is what keeps the controller the single owner of cross-story state):
+   - Build only your assigned story; the Phase 2 loop runs exactly once.
+   - Name every test with the `AS-NNN` it covers (`AS-NNN: <scenario>`), one test node per primary AS — the controller's Spec Coverage Gate (Phase 3.5) counts coverage by that ID, so an untagged test is invisible to it.
+   - Do NOT write `.build-progress` or `.build-checklist` — the controller owns them. Report your checklist ticks in the contract instead.
+   - Do NOT run Phase 3 (full-suite), Phase 4.5 (cross-story checklist review), or Phase 5 (summary/cleanup) — those are the controller's job. Run only your story's filtered tests.
+   - Do NOT surface a spec signal to the user or edit the spec — return it in the `Spec signal` field.
+   - Commit your own work as ONE commit, conventional format, with a `Story: S-NNN` footer line (mf-commit's story-link convention):
+     ```
+     feat(scope): <short desc>
+
+     Story: S-NNN
+     ```
+     The footer is how the controller finds your work on resume (`git log --grep`) — mandatory, not cosmetic.
+   - **If you are running in a git worktree** (parallel dispatch): before any edit, assert `git symbolic-ref HEAD` is your own per-agent branch, NOT a protected ref (`main`/`master`/`develop`/`release/*`) — if it is protected, STOP and report BLOCKED, never `git update-ref` your way onto it. Then confirm your branch was cut from `EXPECTED_BASE` (passed in your prompt); if `git merge-base HEAD <EXPECTED_BASE>` differs from `EXPECTED_BASE`, `git reset --hard <EXPECTED_BASE>` before starting. Stay inside your worktree; touch only your `files`.
+3. **Paste** the story's full text + its AS + the `files` hints + relevant Constraints + **the `.build-checklist` lines whose `owner` is this story** (so the subagent reports ticks against the controller's real line IDs, not IDs it invented) + **`EXPECTED_BASE` if this is a worktree (parallel) dispatch**. The subagent should not have to re-derive scope.
+4. Demand the **report contract** in A3.
+
+Do not paste the whole procedure into the prompt — the subagent reads it from disk.
+
+### A3 — Report contract (what the subagent returns)
+
+```
+Status: DONE | DONE_WITH_CONCERNS | BLOCKED | NEEDS_CONTEXT
+Story: S-NNN
+Files changed: [...]
+Tests added: [exact test names]
+Checklist: [lines ticked]
+Edge compliance: [the 8-row table for this story — each ✓ or N/A+reason] (depth forcing-function; the controller aggregates these into Phase 5)
+Spec signal: none | S1 <gap> | S2 <conflict> | S3 <added guard>
+```
+
+Controller reads this report only — not the diff. (Spec signal definitions = Phase 5 "Spec Update Signal".)
+
+### A4 — Two gates per story (both must pass to continue)
+
+**Gate 1 — Verification.** The controller runs the cheap checks directly: the story's filtered tests + its `verify` command if present (these emit pass/fail, not a diff to read). For the review, **dispatch a reviewer subagent** (mf-review-style, spec-compliance scoped to the story's commit) that reads the diff and returns a one-line verdict — so the controller never loads the diff itself. Any check fails → re-dispatch the implementer subagent **once** with the specific failure. (The subagent already spends its own internal 3-attempt budget per Phase 4 — the controller does not add 3 more on top; that would blow past the project's "max 3 fix loops" rule. One corrective re-dispatch, then stop.) Still failing → BLOCKED.
+
+**Gate 2 — Spec signal** (runs in parallel with Gate 1, enforces the project rule "only /mf-plan touches specs"):
+- `S1` (behaviour/edge case with no AS) or `S2` (code must contradict an AS) → **STOP the run.** Surface the signal and the exact command: `⚠️ Spec drift — run /mf-plan docs/specs/<feature>/<feature>.md '<change>'` then resume `/mf-build`. Do not auto-edit the spec, do not skip the story. **STOP = stop dispatching NEW stories; let any in-flight sibling subagents finish their current story (do not kill them mid-write).** Keep already-committed/merged work — S1/S2 mean the spec is stale, not that the code is wrong; leave those stories `done`, leave their commits, and just don't advance. Resume after `/mf-plan`.
+- `S3` (added guard/constraint not in spec) → record it for the final report, continue.
+
+Only when both gates clear: tick `.build-checklist`, mark the story `done` in `.build-progress`, move on.
+
+For a **sequential** story the subagent committed in the current tree, so gate it directly here. For a **parallel wave**, integrate first (A4b), then gate each story on the integrated tree.
+
+### A4b — Integrate a parallel wave (parallel dispatch only)
+
+After every member of a parallel group returns `DONE` (handle any non-DONE per A5 first), merge their worktree branches into the working branch — the controller does this, sequentially, deterministic order (ascending `S-NNN`):
+
+1. For each branch: `git merge --no-ff <branch>`. Files were declared pairwise-disjoint, so a clean merge is expected.
+2. **On conflict** → the story's `files`/`parallel_safe` was wrong (it overlapped a sibling — often a shared router/index/schema). Do NOT resolve by force: `git merge --abort`, then **rebuild that story sequentially** on top of the already-integrated base (re-dispatch it as a sequential story in the current tree). Record a warning and a spec-fix hint: `⚠️ parallel_safe wrong for <S-NNN> — run /mf-plan to set parallel_safe: false / fix files`. This is the self-correcting safety net for an over-optimistic `parallel_safe`.
+3. After all branches are integrated, run the A4 gates for each story **on the integrated tree** (not on the isolated branch) so cross-story breakage surfaces. If a gate fails here, re-dispatch that implementer **sequentially in the integrated tree** (its worktree may already be gone) under the same one-retry-then-BLOCKED rule. Then mark each `done`.
+4. Tear down each worktree **explicitly** — a worktree the subagent committed to is *changed*, and `isolation="worktree"` only auto-cleans *unchanged* ones, so cleanup is yours. Per member, after its branch is merged: `git worktree remove <path>` → `git branch -d <branch>` (plain `-d`, which only succeeds once merged — a failure means it wasn't integrated, so stop and investigate, do NOT `-D`) → finally `git worktree prune`. **Do not `git worktree remove -f -f` a *locked* worktree** — a lock (`claude agent … pid`) means the agent is still live or the run was interrupted; force-removing it can destroy in-flight work. If a worktree is still locked when you reach teardown, the subagent has not actually returned — wait for it (or treat as BLOCKED), don't force.
+
+### A5 — Stop conditions (otherwise: do NOT pause)
+
+Run continuously. Do **not** ask "continue?" or print progress summaries between stories. Stop only when:
+- a story is `autonomous: checkpoint` → pause via `AskUserQuestion` **twice**: (1) BEFORE dispatch — "S-NNN is a checkpoint (sensitive: <why>). Build it now / skip for now / stop?" and do not dispatch until the user approves; (2) AFTER its gates pass, before marking `done` — show what changed and ask "looks right / needs changes?". A bare text note is not a pause — you must actually stop and wait for the answer,
+- a subagent returns `NEEDS_CONTEXT` → surface its question to the human and answer it, then re-dispatch the SAME story. Do NOT mark it `done` and do NOT skip it,
+- `BLOCKED` you cannot resolve (subagent's 3 internal attempts + your 1 re-dispatch exhausted),
+- a dependency cycle / dangling ref / no-ready-but-pending state (per A1) → `BLOCKED`,
+- spec signal `S1`/`S2`,
+- all stories `done`.
+
+### A6 — Context budget (controller self-monitoring)
+
+- Read frontmatter/status/checklist, never full SUMMARY/diff bodies, unless on a ≥500k-token model and a decision needs it.
+- Track usage tiers: <50% normal; 50–70% economize, frontmatter-only, warn the user "context getting heavy — consider checkpointing"; 70%+ checkpoint progress to `.build-progress` immediately and stop.
+- Watch for degraded subagent output (vagueness like "appropriate handling", reported items fewer than the story's AS) → re-verify against the checklist, don't trust the report.
+
+### A7 — Finish
+
+When all stories `done`: run the full suite once, **then run the Spec Coverage Gate (Phase 3.5) over the whole spec** — any uncovered AS/C → not DONE, reopen the owning story. Then the Phase 5 summary (aggregate: stories built, coverage-gate result, open gaps, S3 signals, deferred items). Delete `.build-progress`/`.build-checklist` only if the gate passed AND checklist is 100% `[x]`/`[N/A]`.
+
+---
+
+## Execution Procedure (Phase 0a–Phase 5)
+
+This procedure builds the story (or stories) in scope.
+
+- **Inline run** (main context): loops over every in-scope story; owns `.build-progress`/`.build-checklist`; runs Phase 3 (full suite) and Phase 5 (summary/cleanup) normally.
+- **Dispatched Auto-Mode subagent**: builds EXACTLY its one assigned story under the dispatched-subagent contract (see A2) — Phase 2 loop runs once; does NOT derive or write `.build-progress`/`.build-checklist` (the controller owns them and pastes this story's checklist lines into the prompt); skips Phase 3 and Phase 5; returns spec signals in its report instead of surfacing them. Wherever a step below says "derive/store `.build-checklist` (Phase 0.6)", "move to the next story", "mark done in `.build-progress`", "tick `.build-checklist`", "run full suite", or "Phase 5 cleanup" — a dispatched subagent skips it and instead works against the pasted checklist lines, reporting its ticks back to the controller.
 
 ## Phase 0a — Graphatlas probe (run once)
 
@@ -34,7 +183,7 @@ Before Phase 0:
    git diff --name-only "$BASE"...HEAD
    ```
    If `$ARGUMENTS` provided → scope to that file or feature only.
-   If no changes → "No source changes found. Specify a file or feature."
+   This scan exists for **regression detection** on code the branch already changed — a fresh build from spec legitimately has no diff yet, which is fine: proceed to step 2. Only stop with "Nothing to build — specify a spec, feature, or file" when there is no spec/`## Stories`, no `$ARGUMENTS` scope, AND no diff.
 
    **Regression auto-detect:** List lines removed or modified from existing code (not pure additions):
    ```
@@ -84,10 +233,13 @@ Output: 2-3 line summary. Feeds into Phase 1.5 Coverage Map.
 
 Derive a checklist from the spec — each "promise" in this build's scope becomes one line. The checklist mirrors the spec; it does not invent new requirements.
 
-**Sources (all in `docs/specs/<feature>/<feature>.md`):**
-- Each noun/field/behavior in the Then clause of each AS → 1 line
-- Each item in Constraints → 1 line
-- Each Not-in-Scope row (to prevent accidental ticking) → 1 line marked `[N/A]`
+**Sources (all in `docs/specs/<feature>/<feature>.md`) — anchor on IDENTITY, not nouns:**
+- **Each `AS-NNN` → at least one line carrying that ID** (`AS-NNN`, or `AS-NNN.Tk` when one AS needs several assertions). This is the primary anchor: the checklist is keyed on the spec's case IDs, not on text it happens to mention. A Then with several fields/effects becomes several `AS-NNN.Tk` lines — but they all carry the same AS-NNN, so the AS is never lost.
+- Each Constraint → one `C-NNN` line.
+- Each open `GAP-NNN` (status not `resolved`) → one `[ ]` line tagged `GAP` (so a parked gap is visible, not silently dropped — see Spec Coverage Gate).
+- Each Not-in-Scope row → one `[N/A]` line (prevents accidental ticking).
+
+**Completeness invariant (checked, not hoped):** every `AS-NNN` and `C-NNN` in the spec's `## Stories`/Constraints MUST appear on ≥1 checklist line. An AS with no line = the checklist is wrong (re-derive), not the spec. Deriving from Then-nouns alone silently drops AS whose Then is verb-shaped ("retries", "must not send") or whose nouns collide with another AS — anchoring on the ID closes that.
 
 **Granularity rule (so two devs produce the same checklist):**
 - 1 line per **observable output field** (appears in Then result, independently assertable)
@@ -133,21 +285,16 @@ Test behavior, not implementation. If the internals change but behavior stays th
 - Trivial getters/setters (unless they have validation)
 - Implementation details (HOW it works — test WHAT it does)
 
-**Edge cases you MUST test:**
-1. **Null/Undefined** input
-2. **Empty** arrays/strings
-3. **Invalid types** passed
-4. **Boundary values** (min/max)
-5. **Error paths** (network failures, DB errors)
-6. **Race conditions** (concurrent operations)
-7. **Large data** (performance with 10k+ items)
-8. **Special characters** (Unicode, SQL chars)
+**Edge cases to consider per story** (these are the rows of the Edge Case Compliance Table below — the depth check, separate from AS-ID coverage):
+- Null/undefined · empty · invalid type · boundary (min/max) · error path · race/concurrency · large data · special chars (unicode/SQL).
+
+For each, add the assertion **inside the owning AS's test** when that AS's behaviour reaches it. This is test DEPTH, not coverage — coverage (every AS has a test) is the Spec Coverage Gate's job; this forces you not to skip edge thinking within a test. A genuinely-missed edge the spec never captured = a **spec signal (S1)**, not a quiet tick.
 
 **Quality check for each test:**
 - Does it test one concept? If it fails, do you know exactly what broke?
 - Is it independent? No test depends on another running first.
 - Is it deterministic? No random, no time-dependent, no external service calls.
-- Does the name describe the scenario? (`returns_error_when_input_is_empty`)
+- **Name embeds the AS-NNN it covers**, then the scenario: `AS-007: returns 403 when role missing`. The ID makes coverage machine-checkable (Spec Coverage Gate); the description keeps it readable. One test node covers exactly one primary AS — shared setup is fine, a shared assertion standing in for several AS is not (it masks under-coverage).
 
 **Completeness Principle:**
 
@@ -162,9 +309,11 @@ AI writes tests significantly faster than humans. When deciding test scope:
 
 Rule: Default to writing the complete test set. AskUserQuestion only when the gap genuinely affects design choice (not effort). Do NOT use self-estimated effort as a justification to skip — LLMs under-estimate when motivated to move on.
 
-**Edge Case Compliance Table (MANDATORY per story):**
+**Edge Case Compliance Table (per story) — a THOROUGHNESS forcing-function, NOT a coverage claim.**
 
-For each story, fill this table in the Phase 5 summary. Every row must be `✓` or `N/A + reason`. Blank rows are not allowed.
+This is orthogonal to the Spec Coverage Gate (Phase 3.5), not a rival: the gate guarantees every AS has a test (breadth, counted on AS-IDs); this table forces each story's tests to consider edge DEPTH — because agents reliably skip edge cases when left to their own judgement, and the gate cannot see that (a test named `AS-005` that only checks the happy path still passes the gate). An `N/A` here means "considered, doesn't apply" — it is never a coverage gap; coverage is the gate's job alone.
+
+Fill this table in the Phase 5 summary for each story. Every row is `✓` (an assertion exists, inside the owning AS's test) or `N/A + 1-line reason`. Blank rows are not allowed.
 
 | Edge case | Status | Test name / Reason if N/A |
 |-----------|--------|---------------------------|
@@ -177,7 +326,7 @@ For each story, fill this table in the Phase 5 summary. Every row must be `✓` 
 | Large data | | |
 | Special characters | | |
 
-`N/A` is valid only with a 1-line reason (e.g., "N/A — function takes enum, invalid type impossible at type layer"). `N/A — not applicable` with no reason is not accepted.
+`N/A` is valid only with a reason (e.g. "N/A — function takes an enum, invalid type impossible at the type layer"). The context-dependent rows (race, large data, special characters) will often be `N/A` for a given story — that is expected and honest, not gaming. The cheap-and-usually-relevant rows (null, empty, boundary, error) should rarely be `N/A`. If filling a row would mean a junk test for behaviour the AS can't reach, mark `N/A + reason` — don't manufacture the test; and if you find a real edge the spec never captured, raise it as a **spec signal (S1)**, don't just tick it here.
 
 **Engineering instincts — apply when deciding test scope:**
 - **Systems over heroes:** Design tests for a tired dev at 3am, not your best engineer. If a test requires knowing internals to understand, it will fail the wrong person at the worst time.
@@ -410,7 +559,7 @@ This rule is **language-agnostic**: the dev decides what counts as an "artifact"
 
 ---
 
-**Before moving to Phase 3, verify:**
+**Before moving to Phase 3, verify** (inline run only — a dispatched Auto-Mode subagent stops after its one story and reports back; the controller runs Phase 3):
 - [ ] All public functions have unit tests
 - [ ] All API endpoints have integration tests
 - [ ] Edge cases covered (null, empty, invalid, boundary)
@@ -430,6 +579,37 @@ Then run all tests:
 ```
 TEST_CMD
 ```
+
+---
+
+## Phase 3.5: Spec Coverage Gate (deterministic — the actual guarantee)
+
+Everything else (checklist ticks, per-story counts, reviewer grep) is LLM judgement and can drift. This gate is the one place coverage is **counted by a command, not hoped for** — it makes "every spec case has ≥1 test" an invariant: the build does not pass while any AS/C is uncovered.
+
+It works because **tests embed their `AS-NNN`/`C-NNN` in the test name** (Phase 1 quality check). The gate is a set-difference: spec IDs minus IDs found in the test files.
+
+```bash
+SPEC=docs/specs/<feature>/<feature>.md
+TESTDIR=<test dir>            # e.g. tests/ or src/ (resolve like TEST_CMD)
+
+# Obligations from the spec: every AS-NNN and C-NNN under ## Stories / Constraints
+# Use -w (word match), NOT \b — \b is a GNU-ism; on BSD/macOS grep it produces
+# phantom short IDs (e.g. "AS-01" out of "AS-010"). -owE is portable and exact.
+grep -owE '(AS|C)-[0-9]+' "$SPEC" | sort -u > /tmp/spec-ids.txt
+# Covered: IDs that actually appear in a test file (tests embed the ID in their name)
+# -h is REQUIRED with -r: without it grep prefixes each match with "file:" and the
+# set-difference never matches (gate would falsely report everything uncovered).
+grep -rowhE '(AS|C)-[0-9]+' "$TESTDIR" | sort -u > /tmp/covered-ids.txt
+# Uncovered = in spec, not in any test
+comm -23 /tmp/spec-ids.txt /tmp/covered-ids.txt
+```
+
+- **Any line printed → BLOCKED.** Those AS/C have no test carrying their ID. List them; do not mark the build DONE. (Single-story / no-formal-spec builds: skip — log `COVERAGE_GATE: no spec`.)
+- **Open gaps:** `grep -E 'GAP-[0-9]+' "$SPEC"` whose status is not `resolved` → list them in the summary as "unresolved gaps (not blocking, but visible)". A gap is never silently dropped: it is either resolved into an AS (via `/mf-plan`, then it gets counted) or shown as open.
+
+**What this gate does and does NOT prove.** It proves identity presence (necessary): no AS is missing a test. It does NOT alone prove the test is meaningful — that's the per-AS rules: one test node per primary AS, with a real assertion (Phase 1), and the strong form, **falsifiability** — negating an AS's Then should turn its test red. Identity gate = cheap and deterministic (run it every build); falsifiability via mutation testing = the north-star, optional/advanced. The gate stops silent *absence*; the assertion rules stop silent *emptiness*.
+
+**Auto-mode:** the controller runs this gate at A7 (finish) over the whole spec, and may run the per-story slice after each story's gates (A4). Dispatched subagents are told (A2 contract) to embed `AS-NNN` in every test name so the gate can see their work.
 
 ---
 
@@ -505,7 +685,9 @@ Files tested: [test files touched]
 Stories: [AS-001 ✓, AS-002 ✓, AS-005 new]
 TDD evidence: [S-001: RED (paste 1st failing assertion raw) → GREEN ✓ | tests added: <names>, S-002: RED (raw output) → GREEN ✓ | tests added: <names>]
 Checklist: X/Y [x], A/Y [~] (destinations: <story-id list or Known-Gap refs>), B/Y [ ] (reasons), C/Y [N/A]
-Edge Case Compliance: [per-story table from Phase 1 — every row ✓ or N/A+reason]
+Coverage gate (Phase 3.5): PASS — all AS/C carry a test | BLOCKED — uncovered: <AS/C ids>   (breadth)
+Edge Case Compliance: [per-story table — every row ✓ or N/A+reason]   (depth)
+Open gaps: [GAP-NNN not yet resolved, or "none"]
 E2E needed: [→E2E gaps from Coverage Map, or "none"]
 Eval needed: [→EVAL gaps from Coverage Map, or "none"]
 Manual needed: [→MANUAL gaps from Coverage Map, or "none"]
