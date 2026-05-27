@@ -98,7 +98,15 @@ Never stage: `.env`, credentials, build artifacts, generated files, binaries > 1
 
 **Breaking changes:** If diff removes/renames a public function, export, or API endpoint → use `feat!` or `fix!` type, or add `BREAKING CHANGE:` footer.
 
-**Rules:** Under 72 chars. Imperative tense ("add" not "added"). No period. WHAT+WHY, not HOW.
+**Story link (optional — only when the commit implements a spec story):** If the change maps to an `S-NNN` story (a `docs/specs/<feature>/.build-progress` exists, or the context/`$ARGUMENTS` names a story), add a footer line `Story: S-NNN`. This lets `/mf-build` find the commit on resume (`git log --grep`). Omit it entirely for ordinary commits — most commits have no story, and their format is unchanged.
+
+```
+feat(auth): add refresh-token rotation
+
+Story: S-003
+```
+
+**Rules:** Subject under 72 chars (the `Story:` footer does not count toward the subject). Imperative tense ("add" not "added"). No period. WHAT+WHY, not HOW.
 
 **Bad examples — avoid:**
 - ❌ `Updated some files` — not descriptive
