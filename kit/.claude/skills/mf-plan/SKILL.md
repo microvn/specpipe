@@ -175,7 +175,7 @@ If splitting:
 
 **Mode A:** Create a new spec at `docs/specs/<feature>/<feature>.md` using the template below. Include stories + acceptance scenarios.
 
-**Mode B:** Read existing spec, add `## Stories` section with AS following depth rules.
+**Mode B:** Read existing spec, add `## Stories` section with AS following depth rules. Give each story you add its `**Execution:**` block; leave untouched legacy stories alone (CC7/CC8 apply to added/modified stories only).
 
 ### Spec Template
 
@@ -198,7 +198,14 @@ If splitting:
 ### S-001: <Story name> (P0)
 
 **Description:** [user story]
-**Source:** [optional: ticket/issue ref]
+**Source:** [the requirement clause(s) this story derives from — quote or reference the description; a ticket/issue ref also counts. This is the story's provenance; its AS inherit it.]
+
+**Execution:**
+- `depends_on:` [S-NNN that must be done first, or `none`]
+- `parallel_safe:` true | false
+- `files:` [path hints this story will touch — or `unknown` if not yet clear]
+- `autonomous:` true | checkpoint
+- `verify:` [optional — command/steps to verify this story independently]
 
 **Acceptance Scenarios:**
 
@@ -217,7 +224,14 @@ AS-002: <short description>
 ### S-002: <Story name> (P1)
 
 **Description:** [user story]
-**Source:** [optional]
+**Source:** [requirement clause(s) this story derives from, or a ticket/issue ref]
+
+**Execution:**
+- `depends_on:` [e.g. S-001, or `none`]
+- `parallel_safe:` true | false
+- `files:` [path hints]
+- `autonomous:` true | checkpoint
+- `verify:` [optional]
 
 **Acceptance Scenarios:**
 
@@ -244,12 +258,33 @@ AS-004: <short description>
 ## Not in Scope
 [work considered but deferred — each item with one-line rationale]
 
+## Gaps
+[behaviour the description triggers but leaves unspecified — NOT acceptance scenarios.
+GAP-NNN (status: open | deferred | resolved): <trigger from the text> — outcome not stated. Source: "<quoted phrase>".
+Every gap carries a mandatory **status**: `open` (needs a decision), `deferred` (accepted on purpose — name owner + reason), or `resolved` (became AS-NNN — note which). `/mf-build`'s Spec Coverage Gate lists every non-`resolved` gap so none is silently dropped. Resolving a gap is a spec edit (Phase 3 / Mode C), never an in-code decision. Omit this section only if there are no gaps.]
+
 ## Change Log
 
 | Date | Change | Ref |
 |------|--------|-----|
 | <$(date +%Y-%m-%d)> | Initial creation | -- |
 ```
+
+### Execution Metadata (per story)
+
+Every story carries an `**Execution:**` block. This is what `/mf-build` reads to order, parallelize, and dispatch work autonomously. Keep it machine-readable — one field per line, lowercase keys.
+
+| Field | Values | How to set it |
+|-------|--------|---------------|
+| `depends_on` | list of `S-NNN`, or `none` | Story B depends on A if B's Given assumes A's Then already happened, or B edits code A creates. Drives build order. |
+| `parallel_safe` | `true` \| `false` | **Default `false`; `true` needs evidence.** Set `true` only when `files` is a concrete file list (not `unknown`, not a bare directory like `src/api/`), AND those files are disjoint from every sibling's, AND you verified shared infra (router/index/schema/barrel files) is not co-edited. Directory-level hints, `unknown`, any overlap, any `depends_on`, any doubt → `false`. Two stories both editing `routes/index.ts` are NOT parallel even if their "main" files differ. |
+| `files` | path hints, or `unknown` | Best-effort list of files/dirs the story touches (from Phase 0 scan). Used both for parallel-safety and to seed the build subagent's context. `unknown` is allowed but forces `parallel_safe: false`. |
+| `autonomous` | `true` \| `checkpoint` | `checkpoint` = the story touches a sensitive/irreversible layer a human should inspect: auth, payment/billing, data migration, deletion, anything not safely revertible. `/mf-build` auto-mode pauses at these. Default `true`. |
+| `verify` | command/steps, or omit | How to confirm this story works on its own (the spec-kit "Independent Test"). A concrete command is best — `/mf-build` Gate 1 runs it without reading the diff. **P0 stories SHOULD provide one** (it's the cheap gate that keeps the field from dying unused); P1/P2 may omit. |
+
+**Derivation order:** set `files` first (from Phase 0), then `depends_on`, then `parallel_safe` falls out of the two. Don't hand-set `parallel_safe: true` without checking file disjointness — that is the field most likely to cause a build conflict.
+
+**Backward compatibility:** specs written before this block existed are still valid. A missing `**Execution:**` block falls back to a safe sequential build — the exact default values are owned by `/mf-build` (its Auto-Mode A1 step), the single source of truth; don't duplicate them here. Mode B/C: add the block only to stories you add or modify this run, never mass-migrate untouched legacy stories.
 
 ### Acceptance Scenario Depth
 
@@ -267,11 +302,30 @@ AS-004: <short description>
 
 Match depth to complexity. Simple CRUD = 3 stories. Complex auth = full template.
 
+### Scenario Derivation — enumerate from the text, assert only what it states
+
+The rule that prevents fabricated tests: **you can enumerate WHEN something happens by reading the description (its triggers, conditions, modals), but you may only assert WHAT happens if the text states it.** Where the two diverge, write a Gap — not a guess.
+
+Before writing AS, list the behavioural atoms the description actually states: triggers (events/actions), conditions ("if / when / unless / only"), rules (modals "must / cannot", thresholds), and stated outcomes. (A quick mental list for a simple feature; write it out when the feature is complex or ambiguous.) Every AS must recombine these atoms — an AS that introduces a noun/concept absent from them is fabrication.
+
+Then cover a scenario class **only when its trigger appears in the text** — never as a fixed checklist to fill. Happy path and stated refusals/errors are already required by the AS rules above; **in addition**, add an AS for each of these *when, and only when, the text triggers it*:
+- **alternate valid path** — the text gives another trigger/event that also succeeds;
+- **state-dependence** — behaviour the text says differs by a named precondition/state;
+- **recovery / rollback** — the story writes or mutates data → what happens on failure or partial write. If the text does NOT state the partial-failure behaviour, that is a **Gap**, not an AS — do not assert atomicity, rollback, or "neither happens without the other" unless the text says so (that is an inference, not a stated outcome).
+
+A class with no trigger in the text → no AS. **Default is absent**: the burden is on *including* an AS (it must trace to a stated atom), never on excluding one. Looking thorough is not a reason to add a scenario.
+
+Two kinds of "missing", handled differently:
+- **Underspecified** — trigger present, outcome not stated → a **Gap** (`GAP-NNN`, see the Gaps section), not a guessed AS — and not an AS shell either: never write an AS whose Then is only "see GAP-NNN". If a minimal safe outcome IS assertable (e.g. "request refused, state unchanged"), write that as the AS and point to the Gap for the unspecified detail; if nothing concrete is assertable, it is a Gap alone.
+- **Out of scope** — no trigger at all → emit nothing. Don't invent "what about concurrent edits?" when the text never mentions concurrency.
+
 ### Writing Instructions
 
 **DO:**
 - Write AS that test one specific behavior each. If it fails, the developer knows exactly what broke.
-- Use concrete values in Given/When/Then — `Given: user with balance $50` not `Given: user with some balance`.
+- Anchor every story to its requirement clause(s) in the `**Source:**` line — that is provenance's single home; each AS derives from its story's source. If a behaviour has no clause to anchor to, don't write the AS — record a Gap. (Constraints→AS mapping and Gap source-quotes are useful extras, but the `**Source:**` line is the one place that must always be present.)
+- Use concrete values in Given/When/Then — `Given: user with balance $50` not `Given: user with some balance`. When a value is genuinely undecided in the requirements, name it as a parameter (`Given: balance equals the <plan_limit>`) rather than inventing a number — the behaviour is specified, the value is deferred.
+- Make every Then observable at the system boundary AND able to distinguish pass from fail — `Then: order status becomes Refunded` / `Then: request refused with "limit reached"`, never `Then: the system works correctly`. Litmus: if you replaced the system with a human doing the task by hand, would the Then still make sense?
 - Name edge cases explicitly — `AS-005: Payment with insufficient funds` not `AS-005: Payment error`.
 - Each AS should be independent — no AS depends on another running first.
 - Include the boundary — `Given: cart with 0 items` and `Given: cart with 999 items`, not just `Given: cart with items`.
@@ -279,7 +333,7 @@ Match depth to complexity. Simple CRUD = 3 stories. Complex auth = full template
 **DO NOT produce:**
 - Vague AS: "Test that the feature works" — every AS must specify Given, When, Then (or a concrete flow for P2).
 - Excessive AS: 30+ scenarios for simple CRUD — over-testing wastes time and creates maintenance burden.
-- Implementation-testing AS: "Test that the database query uses an index" — test behavior, not internals.
+- Implementation-vocabulary AS: do not name API / HTTP status (`429`), DB / table / SQL, `null` / type, thread / lock / race, timeout, cache, or a specific library — these assume a "how" the spec hasn't committed to and can't be reasoned about pre-code. "Test that the DB query uses an index" tests internals, not behaviour. If such a word is the only way to write the AS, it's a build-time concern → omit it or record a Gap.
 - Duplicate AS: two scenarios verifying the same behavior with trivially different inputs.
 - Framework-testing AS: "Test that the router handles the path" — test YOUR logic, not the framework.
 
@@ -298,10 +352,13 @@ Include only sections that apply:
 | CC2 | Every AS belongs to exactly 1 story | Assign orphan AS or delete |
 | CC3 | P0 stories have error path AS | Add error AS if missing |
 | CC4 | No 2 AS test the same behavior | Merge or delete duplicate |
-| CC5 | Constraints have AS verifying them | Add AS for uncovered constraints |
-| CC6 | Story count ≤7, AS count ≤20 | Go back to Phase 1 and split |
+| CC5 | Every constraint AND every stated rule/outcome (from Scenario Derivation) is covered by ≥1 AS — or, if its outcome is unspecified, by a `GAP-NNN` | Add the AS, or record the Gap |
+| CC6 | Story count ≤7, AS count ≤20; AS count tracks the atom count (rules + triggers + outcomes) — far more AS than atoms = bloat | Split (Phase 1) or prune padded AS |
+| CC7 | Every story has an `**Execution:**` block; `parallel_safe: true` only if `files` is concrete (not `unknown`/dir-hint) AND disjoint from siblings AND `depends_on: none` | Fix the block — flip to `false` on any overlap/dependency/uncertainty |
+| CC8 | Every `depends_on` ID resolves to a story in this spec; the graph is a DAG (no cycles) | Fix the ref or break the cycle — `/mf-build` deadlocks on either |
+| CC9 | Every story has a `**Source:**` line anchoring it to a requirement clause (or ticket); no AS has a Then that is only "see GAP-NNN" | Add the Source; convert any gap-shell AS into a pure Gap |
 
-All checks must pass before showing the draft to the user.
+All checks must pass before showing the draft to the user. *(Mode B: apply CC7/CC8 to stories added or modified in this run, not untouched legacy stories — see backward-compat below.)*
 
 Show the draft to the user. Wait for confirmation before proceeding.
 
@@ -309,7 +366,11 @@ Show the draft to the user. Wait for confirmation before proceeding.
 
 ## Phase 3: Clarify Ambiguities
 
-Before finalizing, scan the spec for gaps. Check BOTH the spec content AND the acceptance scenarios:
+**Gaps come first.** Each `GAP-NNN` from Scenario Derivation is a ready-made clarify question (its outcome is the unknown). Resolve each: the user's answer converts it into an AS (keeping provenance), or it stays a Gap if still undecided. Only after gaps, scan for further ambiguity below.
+
+**Stay trigger-gated:** ask about a dimension only if the description triggered it. Do NOT manufacture speculative questions about classes the text never raised (no concurrency mention → don't ask about concurrent edits) — that is the out-of-scope case, and inventing it is the hallucination Scenario Derivation exists to prevent.
+
+Scan the spec for remaining gaps. Check BOTH the spec content AND the acceptance scenarios:
 
 | Lens | What to look for |
 |------|-----------------|
@@ -318,7 +379,7 @@ Before finalizing, scan the spec for gaps. Check BOTH the spec content AND the a
 | Auth & access | Who can do what is unclear, missing role definitions |
 | Non-functional | Vague adjectives without metrics ("fast", "secure", "scalable") — add SC-NNN with concrete numbers |
 | Integration | Third-party API assumptions, unstated dependencies, SLA gaps |
-| Concurrency & edge cases | Multi-user scenarios, boundary conditions, error paths not addressed |
+| Concurrency & edge cases | Boundary conditions and error paths not addressed. Multi-user/concurrency ONLY if the description implies shared/contended resources — don't raise it otherwise |
 | AS completeness | Which AS is missing Given or Then? |
 | AS overlap | Do 2 AS test the same behavior? |
 | Story orphans | Which story has no AS? |
@@ -368,7 +429,7 @@ Show:
 - Story counts (P0/P1/P2)
 - AS count
 - Directory structure created
-- Implementation order: which stories to implement first (by priority + dependency)
+- Implementation order: derive directly from each story's `depends_on` + priority (the same wave logic `/mf-build` Auto-Mode A1 uses) so the summary matches the actual build order — don't infer order from prose
 - Next steps: "Implement stories in order. Use `/mf-build` to verify each story. For complex specs, run `/mf-challenge` first."
 
 **Suggest the HTML view (do NOT auto-render):**
@@ -556,6 +617,8 @@ After updating, verify:
 | CC4 | No 2 AS test the same behavior | Suggest merge or delete duplicate |
 | CC5 | Constraints have AS verifying them | Add AS for uncovered constraints |
 | CC6 | Story count ≤7, AS count ≤20 | Suggest splitting spec (Phase 1) |
+| CC7 | Touched stories have a valid `**Execution:**` block; `parallel_safe` consistent with `files`/`depends_on` | Fix the block (no mass-migration of untouched stories) |
+| CC8 | No `depends_on` anywhere in the spec points to a removed/missing story ID; graph stays a DAG | Fix dangling refs — **when removing a story, scan the WHOLE spec for `depends_on` pointing to its ID** (justified exception to "no mass-migration": a dangling ref deadlocks `/mf-build`) |
 
 > **⛔ Consistency check is NOT optional.**
 > Run CC1-CC6 after EVERY update (Major and Minor).
@@ -613,6 +676,7 @@ docs/specs/<feature>/              ← kebab-case, 2-3 words
 - `AS-NNN` Acceptance Scenario — sequential per spec, across all stories, starting from AS-001
 - `FR-NNN` Functional Requirement — if needed
 - `SC-NNN` Success Criteria — if needed
+- `GAP-NNN` Gap — triggered-but-unspecified behaviour; sequential; carries a mandatory status (`open`/`deferred`/`resolved`). When resolved it converts to an AS (which takes the next `AS-NNN`); the gap's text stays in the Change Log trail.
 - Deleted IDs must never be reused
 - **Sub-spec numbering is local.** Each sub-spec starts its own S-001, AS-001 sequence.
   Sub-specs are self-contained (Phase 1 rule), so IDs need not be globally unique.
