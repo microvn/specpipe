@@ -164,7 +164,7 @@ Mode C does not run Phase 1 — it uses its own flow (see Mode C section).
 | # | Condition | Action |
 |---|-----------|--------|
 | T1 | Feature has >7 expected stories | MUST split |
-| T2 | Feature has >20 expected AS | MUST split |
+| T2 | Feature has >20 expected AS (soft target; up to 30 allowed when G1-driven, see precedence below). Hard cap at 30 | MUST split (or document G1-overage if 21-30) |
 | T3 | Stories belong to different domains (e.g. payment + notification) | SHOULD split |
 | T4 | A story can ship independently without depending on other stories | SHOULD split |
 | T5 | Stories share a data model or state machine | DO NOT split |
@@ -179,9 +179,30 @@ Mode C does not run Phase 1 — it uses its own flow (see Mode C section).
 When T1/T2 fire (oversize) AND T5/T6 also hold (shared data model / state machine / >50% duplication), do NOT jump straight to sub-spec splitting. The rules conflict because the feature is genuinely too big for one slice, not because file-split is the right answer. Resolve in this order:
 
 1. **FIRST: apply Sizing & Phasing** to shrink Phase 1 scope until `stories ≤7` AND `AS ≤20`. Defer lower-value work into `## Not in Scope` as explicit Phase 2/3 items with a one-line rationale. Phase 2 spec is created later via Mode A, referencing the Phase 1 Data Model — no duplication.
-2. **ONLY IF the minimum viable Phase 1 still exceeds the limits** → split into sub-specs as last resort. Duplication is accepted but must be called out in each sub-spec's `## What Already Exists`.
+2. **THEN if phasing is forbidden by the source** (e.g. SRD chốt "ship together, no phase"): try **scope-by-layer** — produce sibling specs along an orthogonal axis (typically backend + frontend, or service + client) that ship together on the same release branch. This is NOT phasing (both ship in the same PR/release), and it usually duplicates far less than sub-spec-by-flow because BE Data Model and FE Component Notes are different surfaces. Each sibling spec is self-contained; cross-spec contract refs use `<sibling-spec>:S-NNN` / `<sibling-spec>:AS-NNN`. Document the "ships together" intent in each spec's Overview.
+3. **ONLY IF neither phasing nor scope-by-layer works** → split into sub-specs by flow as last resort. Duplication is accepted but must be called out in each sub-spec's `## What Already Exists`.
 
-This precedence lets T5/T6 protect tight coupling while T1/T2 still bound scope — phasing is the route that respects both.
+This precedence lets T5/T6 protect tight coupling while T1/T2 still bound scope — phasing or scope-by-layer is the route that respects both before file-duplication is forced.
+
+**G1 vs T2/CC6 precedence — when "no AS gộp" pushes count above 20:**
+
+T2 (>20 AS MUST split) and CC6 (≤20 AS) are **soft targets** for reviewability, not principles. The principle is **no bloat — AS count tracks atom count** (each AS = exactly one stated atom). When G1 (no multi-case AS) forces splitting a merged AS into N atoms, the count goes up but atom count is unchanged — that is NOT bloat, and forcing a re-merge to fit ≤20 produces a *worse* spec.
+
+**Priority when G1 conflicts with T2/CC6:**
+
+1. **G1 always wins.** Never re-merge AS to fit a count target.
+2. **CC5 always wins.** Never drop AS coverage of a constraint to fit a count target.
+3. **T2/CC6 are documented exceptions, not hard caps**, in the range 20 < N ≤ 30 AS (or 7 < N ≤ 10 stories).
+
+**G1-driven overage requires a justification trail** in Phase 1 assessment, naming the splits:
+
+```
+AS count = 21. Target 20. +1 from G1-split (AS-019 split into AS-019a
+zero-match-case + AS-019b ambiguous-match-case, each one atom). No bloat
+— every AS traces to exactly one stated atom.
+```
+
+**Hard cap remains at 30 AS / 10 stories.** Above that, even with G1 justification, the spec is too big to review — MUST phase or scope-by-layer or sub-spec split, regardless of G1.
 
 **Sizing & Phasing — when a feature is large, break it into independently deliverable phases:**
 
@@ -419,7 +440,7 @@ Include only sections that apply:
 | CC3 | P0 stories have error path AS | Add error AS if missing |
 | CC4 | No 2 AS test the same behavior | Merge or delete duplicate |
 | CC5 | Every constraint AND every stated rule/outcome is covered by ≥1 AS — or, if unspecified, by a `GAP-NNN`. Coverage must be explicit: each `C-xxx` line ends with `(AS-###, ...)` or `(GAP-###)`. Story refs `(S-002)` are NOT coverage. `Execution.verify` lines NEVER count. Follow the CC5 enforcement procedure below | Add the AS, or record the Gap |
-| CC6 | Story count ≤7, AS count ≤20; AS count tracks the atom count (rules + triggers + outcomes) — far more AS than atoms = bloat | Split (Phase 1) or prune padded AS |
+| CC6 | Story count ≤7, AS count ≤20 — these are SOFT TARGETS for reviewability, not principles. Principle is "AS count tracks the atom count (rules + triggers + outcomes) — far more AS than atoms = bloat". **G1-driven overage up to 30 AS / 10 stories is allowed** when each excess AS comes from a G1 split (no AS gộp) and Phase 1 assessment carries the justification trail. Above 30 AS / 10 stories is a hard cap — must split regardless | Add the G1 justification (see Phase 1 §G1 vs T2/CC6 precedence), OR prune padded AS, OR split |
 | CC7 | Every story has an `**Execution:**` block; `parallel_safe: true` only if `files` is concrete (not `unknown`/dir-hint) AND disjoint from siblings AND `depends_on: none` | Fix the block — flip to `false` on any overlap/dependency/uncertainty |
 | CC8 | Every `depends_on` ID resolves to a story in this spec; the graph is a DAG (no cycles) | Fix the ref or break the cycle — `/mf-build` deadlocks on either |
 | CC9 | Every story has a `**Source:**` line anchoring it to a requirement clause (or ticket); no AS has a Then that is only "see GAP-NNN" | Add the Source; convert any gap-shell AS into a pure Gap |
@@ -691,7 +712,7 @@ After updating, verify:
 | CC3 | P0 stories have error path AS | Add error AS if missing |
 | CC4 | No 2 AS test the same behavior | Suggest merge or delete duplicate |
 | CC5 | Every constraint AND every stated rule/outcome is covered by ≥1 AS — or, if unspecified, by a `GAP-NNN`. Coverage must be explicit: each `C-xxx` line ends with `(AS-###, ...)` or `(GAP-###)`. Story refs `(S-002)` are NOT coverage. `Execution.verify` does NOT count. Follow the CC5 enforcement procedure (Phase 2 §Consistency Checks above). | Add the AS, or record the Gap |
-| CC6 | Story count ≤7, AS count ≤20 | Suggest splitting spec (Phase 1) |
+| CC6 | Story count ≤7, AS count ≤20 (soft target — G1-driven overage up to 30 AS / 10 stories allowed when documented; see G1 vs T2/CC6 precedence in Phase 1) | Add the G1 justification line in Phase 1 assessment, OR split spec |
 | CC7 | Touched stories have a valid `**Execution:**` block; `parallel_safe` consistent with `files`/`depends_on` | Fix the block (no mass-migration of untouched stories) |
 | CC8 | No `depends_on` anywhere in the spec points to a removed/missing story ID; graph stays a DAG | Fix dangling refs — **when removing a story, scan the WHOLE spec for `depends_on` pointing to its ID** (justified exception to "no mass-migration": a dangling ref deadlocks `/mf-build`) |
 | CC10 | When this Mode C update was driven by a `docs/explore/<feature>.md` (e.g. new explore content), every non-empty explore field used as input has produced spec content (in touched stories/sections) or been recorded as a `GAP-NNN` / Clarification. Empty explore fields and untouched-this-run sections do not fail this check | Re-walk the Explore → Spec mapping (Phase 0); route any non-empty explore field that has no destination, or record it as a Gap |
