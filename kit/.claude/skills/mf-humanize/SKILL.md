@@ -25,6 +25,11 @@ Input: $ARGUMENTS
 Explicit user instructions always override the rules in this file. Asked for
 emoji → use emoji. Asked for formal → formal. Asked to keep bullets → keep them.
 
+Follow-up edits stay inside the skill. When the user asks to adjust an
+already-humanized output ("shorter", "longer", "in English", "more formal"),
+that request still runs through Step 5 + Step 7 before returning. Do not treat
+it as a casual rephrase, that is exactly how em dashes and buzzwords leak back in.
+
 ---
 
 ## Step 1 — Infer target format
@@ -85,8 +90,9 @@ Never paraphrase these: numbers, names of people / products, error codes, file p
 - Did any commitment / deadline disappear or get softened?
 - Did any decision / risk get dropped?
 - Is there any new info (not present in the source)?
+- Any em dash `—` left in body text? Any banned buzzword or hollow opening/closing from Step 7?
 
-If yes to any → fix it.
+If yes to any → fix it. This check runs on every return, including follow-up edits (see below).
 
 Vague input → short, neutral output. Do not invent detail to make sentences flow. Do not add empty sections ("Risks: N/A", "ETA: TBD"). If context is too thin for a format that demands structure (postmortem, RFC) → ask one specific question via `AskUserQuestion` rather than guess.
 
@@ -159,7 +165,7 @@ Illustrative, not a format whitelist.
 
 ```
 Fixing in sprint 24.
-Cause: null pointer at UserService.java:45 — getProfile() is called before the user is loaded.
+Cause: null pointer at UserService.java:45, getProfile() is called before the user is loaded.
 Fix: add a null check before the call.
 ```
 
