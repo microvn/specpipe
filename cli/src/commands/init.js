@@ -400,8 +400,11 @@ async function adoptExisting(targetDir) {
 }
 
 function commandExists(cmd) {
+  // `command -v` is a POSIX shell builtin and is unavailable under Windows
+  // cmd.exe, where execSync runs. Use `where` on Windows, `command -v` elsewhere.
+  const probe = process.platform === 'win32' ? `where ${cmd}` : `command -v ${cmd}`;
   try {
-    execSync(`command -v ${cmd}`, { stdio: 'ignore' });
+    execSync(probe, { stdio: 'ignore' });
     return true;
   } catch {
     return false;

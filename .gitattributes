@@ -1,0 +1,11 @@
+# Keep shell scripts and JS hooks LF-only. bash (including Git Bash on Windows)
+# breaks on CRLF line endings — a \r at the shebang or in `set -euo pipefail`
+# is a parse error. Locking eol=lf prevents core.autocrlf=true from corrupting
+# these on Windows checkouts.
+*.sh   text eol=lf
+*.js   text eol=lf
+*.mjs  text eol=lf
+*.json text eol=lf
+
+# Markdown and docs: normalize to LF too for consistent diffs.
+*.md   text eol=lf
