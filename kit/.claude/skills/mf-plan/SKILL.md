@@ -194,13 +194,21 @@ T2 (>20 AS MUST split) and CC6 (≤20 AS) are **soft targets** for reviewability
 2. **CC5 always wins.** Never drop AS coverage of a constraint to fit a count target.
 3. **T2/CC6 are documented exceptions, not hard caps**, in the range 20 < N ≤ 30 AS (or 7 < N ≤ 10 stories).
 
-**G1-driven overage requires a justification trail** in Phase 1 assessment, naming the splits:
+**G1-driven overage requires a justification trail** — written into the spec body's `## Spec Sizing Notes` section (see Spec Template). The trail names every G1 split that pushed AS count above the soft target, so future Mode C reviewers don't "fix" the overage by re-merging:
 
 ```
-AS count = 21. Target 20. +1 from G1-split (AS-019 split into AS-019a
-zero-match-case + AS-019b ambiguous-match-case, each one atom). No bloat
-— every AS traces to exactly one stated atom.
+## Spec Sizing Notes
+
+Stories=8 (target 7, in G7 overage range ≤10). AS=27 (target 20, in G7 overage range ≤30).
+
+G1 splits producing the excess AS:
+- S-006 reassign: 4 AS for 4 atoms (on-platform happy, off-platform happy, reassign-to-same refused, reassign-from-Requested refused).
+- S-008 backfill: 4 AS for 4 atoms (one-match, no-match, ambiguous-with-warning, empty).
+
+No bloat — each AS traces to one stated atom.
 ```
+
+For specs at or under the soft target (≤7 stories, ≤20 AS), omit the `## Spec Sizing Notes` section entirely.
 
 **Hard cap remains at 30 AS / 10 stories.** Above that, even with G1 justification, the spec is too big to review — MUST phase or scope-by-layer or sub-spec split, regardless of G1.
 
@@ -334,6 +342,20 @@ AS-004: <short description>
 [behaviour the description triggers but leaves unspecified — NOT acceptance scenarios.
 GAP-NNN (status: open | deferred | resolved): <trigger from the text> — outcome not stated. Source: "<quoted phrase>".
 Every gap carries a mandatory **status**: `open` (needs a decision), `deferred` (accepted on purpose — name owner + reason), or `resolved` (became AS-NNN — note which). `/mf-build`'s Spec Coverage Gate lists every non-`resolved` gap so none is silently dropped. Resolving a gap is a spec edit (Phase 3 / Mode C), never an in-code decision. Omit this section only if there are no gaps.]
+
+## Spec Sizing Notes
+[OPTIONAL — include only when a G1-driven overage applies (count > soft target but ≤ hard cap).
+Documents WHY this spec exceeds the 7-story / 20-AS soft target so future Mode C reviewers
+do not "fix" the overage by re-merging G1 splits.
+
+Format:
+- Stories=N (target 7), AS=N (target 20). State whether each is under target, at soft target,
+  or in G7 overage range (≤10 / ≤30).
+- For each over-target dimension: name the G1 splits that produced the excess AS. One bullet
+  per affected story, listing the atoms.
+- Closing line: "No bloat — each AS traces to one stated atom."
+
+Omit this section entirely when stories ≤7 AND AS ≤20.]
 
 ## Change Log
 
