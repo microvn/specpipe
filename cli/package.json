@@ -1,6 +1,6 @@
 {
   "name": "claude-devkit-cli",
-  "version": "1.11.4",
+  "version": "1.12.0",
   "description": "CLI toolkit for spec-first development with Claude Code — hooks, commands, guards, and test runners",
   "bin": {
     "claude-devkit": "./bin/devkit.js",
