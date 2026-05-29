@@ -478,10 +478,59 @@ _<$(date +%Y-%m-%d)>_
 **Trigger:** [user action / system event / external event]
 **UI expectation:** [simple table / form / wizard / dashboard / reference: "like X in App Y"]
 
-**UI sketches:** _(optional — include for features with non-trivial UI structure or when a prototype URL is not yet available)_
-[Free-form layout sketches to help the human visualize workflow + layout. ASCII boxes are fine; bullet outlines are fine; nested lists are fine. Capture: section/component placement, ordering, empty states, modal field order, conditional visibility. NOT a pixel-perfect spec. mf-plan will convert this into a disciplined Component Tree in the spec's `## UI Notes`. Source-of-truth note: if a prototype URL exists elsewhere in this doc, the URL is canonical on any conflict; sketches are offline supplement.
+**UI sketches:** _(optional — include for UI-bearing features when human visualization helps)_
 
-If neither sketches nor a prototype URL exist for a UI-bearing feature, mf-plan will emit a `GAP-NNN (status: open)` about UI structure — UI shape is a stated outcome that needs at least one source.]
+[Free-form layout sketches (ASCII boxes / bullet outlines / nested lists). Each component, section, button, or surface **MUST carry an E/N/X tag**:
+
+- `[E]` existing — already shipped, file path confirmed in codebase
+- `[N]` NEW — must be built this feature
+- `[X]` MISSING / unclear — placeholder, needs clarification
+
+**UI codebase scan — required before tagging:**
+
+*Read budget = 7. What counts:* `ga_symbols` / `ga_callers` / `ga_callees` = 0 reads. `ga_file_summary` / preview = 0.5 read. Full file read = 1 read. Hard cap 7 total.
+
+*3-block flow (Locate → Scan & Match → Verify & Tag):*
+
+1. **LOCATE** — anchor host page/route file(s) from the happy path's "user opens X" sentence (1–2 files).
+2. **SCAN & MATCH** — build candidate list:
+   - Prototype URL (rendered structure) — use for **naming/shape only**. NEVER counts as evidence for `[E]`.
+   - `ga_symbols` on 3–5 keywords from happy-path nouns (GA available)
+   - 1 glob `components/**/<domain>*` + 1 grep (GA unavailable). NO recursive grep over whole repo.
+3. **VERIFY & TAG**:
+   - `[E]` requires **file path evidence** from Verify step (`file_summary` or read). Path attached as `file:path` next to the tag. No evidence → demote to `[X]`.
+   - `[N]` = no match in code AND feature requires it.
+   - `[X]` discipline: (a) only after ≥1 scan step — do NOT skip straight to `[X]`; (b) if >30% of components in the sketch end up `[X]`, STOP and ask user for repo path / route name (the scan was too coarse).
+
+*Anti-patterns* (token-greedy + accuracy-lowering):
+- Full file read when `file_summary` suffices
+- Exhaustive recursive grep
+- Tagging `[E]` on prototype-only evidence ("the prototype shows it") — that's intended UI, not existing code
+- Skipping scan and dumping unclear surfaces into `[X]`
+
+**Example sketch (legend literally embedded):**
+
+```
+┌─ Appointments page [E] components/appointments/page.tsx ─────────┐
+│  Header [E]                                                      │
+│  ╔ Pending Matchups (3) [N] ════════════════════════════════╗   │
+│  ║   Row: trainee + [Assign] [N]                             ║   │
+│  ╚════════════════════════════════════════════════════════════╝   │
+│  Tabs [E]  Filters [E]                                           │
+│  Appointment cards [E] + MatchupStatusBadge [N]                  │
+└──────────────────────────────────────────────────────────────────┘
+
+Legend: [E] existing · [N] NEW · [X] MISSING / clarify
+```
+
+mf-plan reads this sketch and routes by tag:
+- `[N]` → `## UI Notes` Component Tree (build targets)
+- `[E]` → `## What Already Exists § UI Inventory` (reuse refs with evidence path)
+- `[X]` → `## Gaps (status: open)` (unclear surfaces)
+
+ASCII stays in explore as provenance. If sketch carries no E/N/X legend, mf-plan treats all components as `[N]` and emits a Clarification flagging the assumption.
+
+If neither sketches nor a prototype URL exist for a UI-bearing feature → mf-plan emits `GAP-NNN (status: open)` about UI structure.]
 
 **Happy path:**
 1. [Step 1]

@@ -224,7 +224,10 @@ Run after Phase 0. Takes 2 minutes. Checks only what is visible at implementatio
 - **DRY:** Grep for similar logic in existing code. If found, reuse — don't duplicate.
 - **Error paths:** For each story — what can go wrong? (null, empty, network fail, invalid input) Note these upfront so they land in the Coverage Map, not as afterthoughts.
 - **Pattern:** What's the existing pattern for this type of operation in the codebase? Follow it unless there's a reason not to.
-- **UI Notes (FE stories only):** If the spec carries a `## UI Notes` section, read its Component Tree to shape layout / section order / component hierarchy before writing the failing test. **Precedence: AS / Constraints > Prototype URL > UI Notes.** If you detect a contradiction (e.g. AS says "notify user" but the Component Tree has no notification surface, OR Component Tree shows a button the AS never references), STOP and raise a Spec Signal — do NOT build to the UI Notes and ignore the AS. UI Notes is structural reference; the AS is the contract.
+- **UI Notes + UI Inventory (FE stories only):** Read TWO sections before writing the failing test:
+  1. `## What Already Exists § UI Inventory` — list of existing components with paths the spec marked reusable for this feature. **Skim this FIRST** to find reuse candidates before assuming a Component Tree entry needs new scaffolding. Each row in UI Inventory carries a `file:path` you can open to check the actual API.
+  2. `## UI Notes` Component Tree — components this story must produce. Use it to shape layout / section order / hierarchy.
+  **Precedence: AS / Constraints > Prototype URL > UI Notes.** If you detect a contradiction (e.g. AS says "notify user" but the Component Tree has no notification surface, OR Component Tree shows a button the AS never references), STOP and raise a Spec Signal — do NOT build to the UI Notes and ignore the AS. UI Notes is structural reference; the AS is the contract.
 
 Output: 2-3 line summary. Feeds into Phase 1.5 Coverage Map.
 
