@@ -478,6 +478,11 @@ _<$(date +%Y-%m-%d)>_
 **Trigger:** [user action / system event / external event]
 **UI expectation:** [simple table / form / wizard / dashboard / reference: "like X in App Y"]
 
+**UI sketches:** _(optional — include for features with non-trivial UI structure or when a prototype URL is not yet available)_
+[Free-form layout sketches to help the human visualize workflow + layout. ASCII boxes are fine; bullet outlines are fine; nested lists are fine. Capture: section/component placement, ordering, empty states, modal field order, conditional visibility. NOT a pixel-perfect spec. mf-plan will convert this into a disciplined Component Tree in the spec's `## UI Notes`. Source-of-truth note: if a prototype URL exists elsewhere in this doc, the URL is canonical on any conflict; sketches are offline supplement.
+
+If neither sketches nor a prototype URL exist for a UI-bearing feature, mf-plan will emit a `GAP-NNN (status: open)` about UI structure — UI shape is a stated outcome that needs at least one source.]
+
 **Happy path:**
 1. [Step 1]
 2. [Step 2]

@@ -141,6 +141,7 @@ When P0-2b found a `docs/explore/<feature>.md`, route its fields into the spec l
 | Open questions | `## Gaps` as `GAP-NNN (status: open)`, one per question, with `Source:` quoting the explore phrase |
 | Success metrics + Non-functional (Scale/SLA/Availability/Security-compliance) | `SC-NNN` with the explore-stated number. Vague metric → Gap (not an invented number). PII / payment / audit-trail → owning story `autonomous: checkpoint` |
 | Trigger + UI expectation | Fold into AS Given/When/Then content per story (no dedicated section) |
+| UI sketches (explore ASCII / outlines) | `## UI Notes` (spec, optional). **mf-plan converts** the free-form ASCII into a disciplined Component Tree — component names + hierarchy + ordering + conditional rules, NOT markup. ASCII stays in explore as provenance. If a prototype URL exists, cite it in `## UI Notes` and mark it canonical on conflict. If neither sketches nor a prototype URL exist for a UI-bearing feature → emit `GAP-NNN (status: open)` about UI structure (UI shape is a stated outcome with no source). |
 
 **Provenance.** Every story / AS / GAP / SC derived from the explore doc gets a `Source:` pointing at the explore section it came from — `Source: docs/explore/<feature>.md#<nearest-heading>` (heading-level is enough; quote the phrase if the heading covers many bullets). CC9 enforces presence; this rule pins the form.
 
@@ -331,6 +332,25 @@ AS-004: <short description>
 
 ## Constraints & Invariants
 [rules that must ALWAYS hold]
+
+## UI Notes
+[OPTIONAL — include for UI-bearing features. Converts the explore doc's `UI sketches` (free ASCII) into a disciplined Component Tree the build can consume without re-deriving structure.
+
+**Format**: nested markdown list of component names + hierarchy + ordering, with italic annotations for conditional visibility, empty states, reuse markers. NOT JSX, NOT CSS, NOT HTML tags. Component names only.
+
+**Precedence on conflict**: AS / Constraints > Prototype URL > this Component Tree. UI Notes is structural reference; if it contradicts an AS, the AS wins and `/mf-build` raises a Spec Signal so the conflict is resolved through /mf-plan, not in code.
+
+**Carve-out from G5 impl-vocab ban**: this section is allowed to name components, sections, and design tokens (because it's structural reference, not behavioural assertion). It is NOT allowed to contain JSX, HTML tags, CSS class names, function names, file paths, or any vocabulary banned in AS — those still belong in `Execution.files` of the owning story.
+
+Example:
+- `AppointmentsPage`
+  - `PendingMatchupsInbox` *(pinned top, collapsible, hidden when empty per C-NNN)*
+    - `PendingMatchupRow`: trainee + context + `[Assign Trainer]`
+  - `AwaitingResponseInbox` *(pinned below, viewer-conditional)*
+    - `AwaitingMatchupRow`: trainee + context + `[Accept]` `[Decline]`
+  - `AppointmentList` *(existing feed; each card gains `MatchupStatusBadge`)*
+
+> Source-of-truth: prototype URL `<url>` (canonical on conflict). Tree above is build-time summary.]
 
 ## What Already Exists
 [existing code/flows that partially solve sub-problems — reusing or rebuilding?]
