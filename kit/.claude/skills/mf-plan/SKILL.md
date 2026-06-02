@@ -185,6 +185,39 @@ When T1/T2 fire (oversize) AND T5/T6 also hold (shared data model / state machin
 
 This precedence lets T5/T6 protect tight coupling while T1/T2 still bound scope — phasing or scope-by-layer is the route that respects both before file-duplication is forced.
 
+**Linked fields — pin cross-spec contracts when you split.**
+
+Whenever a split produces sibling / sub-specs along a producer↔consumer line (scope-by-layer BE/FE, service/client, or by-flow where one spec reads what another writes), each split protects internal consistency but opens a new failure mode: a field one spec READS but another spec PRODUCES can mismatch on **surface** (read on the list, served only on single-get) or on **lifecycle** (read after refetch, served only in a transient create-response). Both sides pass their own consistency checks — only integration shows the field arriving absent / wrong-shape / silently empty.
+
+So every field / endpoint / contract that one spec reads but another produces is a **linked field**, and you MUST pin it on BOTH sides before the split is done — internal self-consistency is not enough:
+
+- **Consumer side:** name the exact surface it reads the field on (list / single-get / feed-row / event payload / create-response …) AND when (persisted + served on later reads, or only transient in one response).
+- **Producer side:** there MUST be an AS (or Constraint) delivering THAT field on THAT surface at THAT time. List the surfaces by name — never "every response".
+
+Record the pins explicitly so Mode C reviewers and `/mf-build` can see them — add a `## Linked Fields` block to each spec on the producer/consumer split (see Spec Template), e.g.:
+
+```
+## Linked Fields
+- `matchupStatus` — consumed by appointments-fe:AS-012 on the appointment-list row
+  (persisted, served on every list fetch). Produced by appointments-be:AS-004 on the
+  list surface. ✔ surface + lifecycle match.
+- `assignedTrainer` — consumed by appointments-fe:AS-014 on single-get (read after refetch).
+  Produced by appointments-be:AS-007 only in the transition response. ✘ lifecycle mismatch → GAP-003.
+```
+
+Two traps to flag, never pass:
+
+| Trap | What it looks like | Why it slips |
+|------|--------------------|--------------|
+| **"Every response"** | Producer prose says "carries X on every matchup response" but its AS only list 2 of 3 surfaces. | Prose wider than the AS is NOT coverage. Only AS-listed surfaces count; the unlisted surface is undelivered. |
+| **Lifecycle** | Field appears in the create / transition response; consumer reads it on a later get / refetch. | "Transient-in-response" ≠ "persisted + served". A field present once at create is not readable later unless an AS says it is persisted and served on the read surface. |
+
+When a spec writes "consumes the additive fields defined in `<sibling>` Data Model", VERIFY each named field actually exists in that sibling's `## Data Model` — do not trust the reference. A field listed but not defined there is a concrete spec error.
+
+**Every linked-field mismatch is a spec bug**, fixed by editing the spec (add the producer AS on the right surface, or narrow / correct the consumer side), never by patching code — the code usually already matches its own spec. CC11 enforces this; this subsection pins the form.
+
+**Mode applicability:** the *pinning step above* runs whenever a split is produced — Mode A, or Mode B if a spec it touches participates in a split. The *coverage check* (CC11) runs in **every mode's** consistency pass: Phase 2 for Mode A/B, C6 for Mode C — Mode C is where producer/consumer drift most often enters (a new sibling spec, a new story that reads a field, or a `Then` whose surface changes). Mode B/C audit only the linked fields added or modified this run, never untouched legacy ones (same backward-compat rule as CC7/CC8/CC9).
+
 **G1 vs T2/CC6 precedence — when "no AS gộp" pushes count above 20:**
 
 T2 (>20 AS MUST split) and CC6 (≤20 AS) are **soft targets** for reviewability, not principles. The principle is **no bloat — AS count tracks atom count** (each AS = exactly one stated atom). When G1 (no multi-case AS) forces splitting a merged AS into N atoms, the count goes up but atom count is unchanged — that is NOT bloat, and forcing a re-merge to fit ≤20 produces a *worse* spec.
@@ -332,6 +365,18 @@ AS-004: <short description>
 
 ## Constraints & Invariants
 [rules that must ALWAYS hold]
+
+## Linked Fields
+[OPTIONAL — include ONLY when this spec is one side of a producer/consumer split
+(sibling specs from scope-by-layer, service/client, or sub-spec-by-flow). Omit entirely
+for a standalone spec with no cross-spec field dependency.
+
+One bullet per linked field. Each names the consuming side (`<sibling>:AS-NNN` + surface + lifecycle)
+and the producing side (`<sibling>:AS-NNN` or `C-NNN` + surface), then a ✔/✘ verdict. A ✘ must
+point to a `GAP-NNN`. See Phase 1 §"Linked fields — pin cross-spec contracts when you split".
+
+- `<field>` — consumed by `<sibling>:AS-NNN` on <surface> (<persisted+served | transient-in-response>).
+  Produced by `<sibling>:AS-NNN` on <surface>. ✔ match. | ✘ <surface|lifecycle> mismatch → GAP-NNN.]
 
 ## UI Notes
 [OPTIONAL — include for UI-bearing features. Converts the explore doc's `UI sketches` (free ASCII) into a disciplined Component Tree the build can consume without re-deriving structure.
@@ -502,6 +547,7 @@ Include only sections that apply:
 | CC8 | Every `depends_on` ID resolves to a story in this spec; the graph is a DAG (no cycles) | Fix the ref or break the cycle — `/mf-build` deadlocks on either |
 | CC9 | Every story has a `**Source:**` line anchoring it to a requirement clause (or ticket); no AS has a Then that is only "see GAP-NNN" | Add the Source; convert any gap-shell AS into a pure Gap |
 | CC10 | When a `docs/explore/<feature>.md` was used as input, every **non-empty** explore field listed in the Explore → Spec mapping has either produced spec content or been recorded as a `GAP-NNN` / Clarification. Empty explore sections do not fail this check | Re-walk the mapping; if a non-empty explore field has no destination, route it (or record it as a Gap) — closes the "format compliance hides meaning leak" risk |
+| CC11 | **(producer/consumer splits only)** Every linked field a consumer side reads has a producer AS (or Constraint) delivering it on the SAME surface at the SAME lifecycle point; the `## Linked Fields` block pins both sides; every "consumes fields defined in `<sibling>`" reference resolves to a real field in that sibling's `## Data Model`. Skip entirely for a standalone spec with no cross-spec field dependency | Pin both sides (Phase 1 §"Linked fields"); on surface/lifecycle mismatch record a `GAP-NNN` and fix the producer AS or correct the consumer — never code. Verify each named field exists in the sibling Data Model |
 
 **CC5 enforcement procedure (mandatory, no exceptions):**
 1. Enumerate every `C-xxx` line in `## Constraints & Invariants`.
@@ -773,6 +819,7 @@ After updating, verify:
 | CC7 | Touched stories have a valid `**Execution:**` block; `parallel_safe` consistent with `files`/`depends_on` | Fix the block (no mass-migration of untouched stories) |
 | CC8 | No `depends_on` anywhere in the spec points to a removed/missing story ID; graph stays a DAG | Fix dangling refs — **when removing a story, scan the WHOLE spec for `depends_on` pointing to its ID** (justified exception to "no mass-migration": a dangling ref deadlocks `/mf-build`) |
 | CC10 | When this Mode C update was driven by a `docs/explore/<feature>.md` (e.g. new explore content), every non-empty explore field used as input has produced spec content (in touched stories/sections) or been recorded as a `GAP-NNN` / Clarification. Empty explore fields and untouched-this-run sections do not fail this check | Re-walk the Explore → Spec mapping (Phase 0); route any non-empty explore field that has no destination, or record it as a Gap |
+| CC11 | **(producer/consumer splits only)** For every linked field this run ADDS or MODIFIES — a new/changed consumer read, a new/changed producer AS, or a `Then` whose surface or lifecycle moves — a producer AS still delivers it on the SAME surface at the SAME lifecycle point, and the `## Linked Fields` block reflects the change. Untouched legacy linked fields are not re-audited. Skip if the spec has no cross-spec field dependency | Re-pin the touched field both sides (Phase 1 §"Linked fields"); on surface/lifecycle mismatch record a `GAP-NNN` and fix the producer AS or correct the consumer — never code. A linked-field change is behavioural (M4/M5 if it moves a Given/When/Then) → classify Major and snapshot |
 
 > **⛔ Consistency check is NOT optional.**
 > Run CC1-CC6 after EVERY update (Major and Minor).
