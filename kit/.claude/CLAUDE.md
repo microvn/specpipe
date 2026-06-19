@@ -13,6 +13,7 @@ Every change follows this cycle: **SPEC (with acceptance scenarios) → CODE + T
 
 | Trigger | Commands | Details |
 |---------|----------|---------|
+| New project (no codebase yet) | `/mf-explore` (greenfield) → `/mf-scaffold` → `/mf-plan` → `/mf-build` | Scaffolds a runnable skeleton + ARCHITECTURE/ADRs before the first spec; `/mf-build` Foundation Gate blocks the TDD loop until a runnable harness exists |
 | Feature unclear / complex | `/mf-explore` → `/mf-plan` | Clarify requirements before writing spec |
 | New feature | `/mf-plan` → `/mf-challenge` (optional) → code in chunks → `/mf-build` each chunk | Start with spec or description |
 | Update feature | `/mf-plan <spec-path> "changes"` → code → `/mf-build` | Do NOT manually edit spec before /mf-plan |

@@ -229,6 +229,15 @@ your-project/
 │   │   └── self-review.sh     ← Quality checklist on stop
 │   └── skills/
 │       ├── mf-explore/SKILL.md      ← /mf-explore skill
+│       ├── mf-scaffold/             ← /mf-scaffold skill (greenfield bootstrap)
+│       │   ├── SKILL.md
+│       │   └── references/          ← ARCHITECTURE/DESIGN templates, ADR template,
+│       │       │                       stack-profiles/ seeds (copy to ~/.claude or
+│       │       │                       ./.claude to customize — bundled copy is overwritten on upgrade)
+│       │       ├── ARCHITECTURE.md.tmpl
+│       │       ├── DESIGN.md.tmpl
+│       │       ├── adr/NNNN-template.md
+│       │       └── stack-profiles/react.md
 │       ├── mf-plan/SKILL.md         ← /mf-plan skill
 │       ├── mf-challenge/SKILL.md    ← /mf-challenge skill
 │       ├── mf-build/SKILL.md        ← /mf-build skill
@@ -305,6 +314,23 @@ This removes hooks, skills, and settings. It preserves `CLAUDE.md` (which you ma
 ---
 
 ## 4. Daily Workflows
+
+### New Project (Greenfield)
+
+> When: Brand-new project — no codebase yet (empty repo, no package manager / `src/`).
+
+```
+1. /mf-explore "what you're building"
+   → Detects greenfield, also decides app-type + stack (researched, current),
+     emits a Bootstrap Brief in docs/explore/<feature>.md.
+
+2. /mf-scaffold
+   → Generator-first runnable skeleton (core/ + one pattern-demonstrating module +
+     tests), smoke-gated (install→build→start GREEN), + ARCHITECTURE.md / ADRs.
+     Hands off only when it RUNS.
+
+3. /mf-plan → /mf-build   → normal New Feature flow, now on a runnable base.
+```
 
 ### Explore Before Planning
 
@@ -432,6 +458,31 @@ This removes hooks, skills, and settings. It preserves `CLAUDE.md` (which you ma
 **Output:** `docs/explore/<feature>.md` — auto-detected by `/mf-plan`, which skips redundant discovery and maps explore findings directly to spec sections.
 
 **Token cost:** 10–20k
+
+---
+
+### /mf-scaffold — Greenfield Project Bootstrap
+
+**Usage:**
+```
+/mf-scaffold                                # bootstrap from the Bootstrap Brief in docs/explore/
+/mf-scaffold "Next.js + Nest pnpm monorepo" # standalone: gather app-type/stack itself
+```
+
+**When to use:** A brand-new project with no runnable codebase yet. Runs between `/mf-explore` (greenfield branch) and `/mf-plan`: `mf-explore → mf-scaffold → mf-plan → mf-build`. Skip if a runnable project already exists — go straight to `/mf-plan`. `/mf-build`'s Foundation Gate refuses to start the TDD loop until this has produced a runnable harness.
+
+**How it works:**
+
+1. **Precondition** — confirms greenfield; resumes a partial repo without clobbering user files.
+2. **App-type + stack** — taken from the Bootstrap Brief (or asked); never silently defaulted; **current versions researched**, not recalled from training memory. Optional layered stack profiles (`./.claude/` > `~/.claude/` > kit seed) supply opinionated defaults; the Brief always wins.
+3. **Skeleton (generator-first)** — official `create-*` CLIs give real pinned deps (defends against hallucinated/typosquatted packages); monorepos orchestrated root-first; imposes `core/` + `modules/` + co-located tests; seeds ONE module that **demonstrates the architecture pattern** (the template every feature copies).
+4. **Smoke gate (non-negotiable)** — `install → build → start/smoke` must be GREEN, with ≥1 real passing test (this resolves `TEST_CMD` for `/mf-build`). Not green → BLOCKED; never a half-scaffold.
+5. **Docs** — fills `ARCHITECTURE.md` (codemap + invariants), one ADR per major stack choice, optional `DESIGN.md`.
+6. **Hygiene & handoff** — secret scan, `.gitignore`, `.env.example`; reports the resolved `TEST_CMD`.
+
+**Output:** a runnable walking skeleton + canonical docs. Thin by design — features come later via `/mf-plan` → `/mf-build`.
+
+**Token cost:** 15–40k + real install/build time (heavier than other skills — it runs generators and builds).
 
 ---
 
@@ -1110,6 +1161,7 @@ Then use: `/deploy staging`
 
 | Activity | Tokens | Frequency |
 |----------|--------|-----------|
+| `/mf-scaffold` (greenfield bootstrap) | 15–40k + install/build time | Once per new project, before the first spec |
 | `/mf-build` (incremental, 1-3 files) | 5–10k | Every code chunk |
 | `/mf-investigate` (complex bug) | 8–15k | OPTIONAL before /mf-fix — complex/outage only |
 | `/mf-fix` (single bug) | 3–5k | As needed |

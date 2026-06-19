@@ -54,6 +54,8 @@ The current context is the **controller**. It does not implement — it orders, 
 
 ### A1 — Plan the run (read spec ONCE)
 
+**0. Foundation Gate (before any dispatch).** Run the Phase 0b Foundation Gate once: if there is no runnable harness (no project markers / runner not invocable), STOP and report BLOCKED pointing to `/mf-scaffold` — never dispatch stories onto an empty repo. Then:
+
 1. Read the spec once. Extract for every story: ID, priority, full text + its AS, and the `**Execution:**` block (`depends_on`, `parallel_safe`, `files`, `autonomous`, `verify`). Missing block → treat as `depends_on: none, parallel_safe: false, autonomous: true, files: unknown`.
 2. Read `.build-progress` if present. In Auto-Mode it uses **three** states: `done`, `building`, `pending`. The controller flips a story to `building` right before dispatch (A2) and to `done` only after its gates clear (A4/A4b) — so a story interrupted mid-build is left as `building`, never silently `done`. **On resume:**
    - `building` story → it was in flight when interrupted. Check `git log --all --grep "S-NNN"` — this scans the FULL message including the `Story:` footer (A2 mandates it there). Do NOT use `git log --oneline | grep` — that only sees the subject and will miss the footer, giving a false "no commit" that overwrites finished work. Commit exists → the subagent finished but wasn't gated → gate it (A4) instead of rebuilding. No commit → re-dispatch it.
@@ -212,6 +214,30 @@ Before Phase 0:
 4. **Locate related code.** **If GA available (per Phase 0a):** `ga_symbols` on the main function/type names from the spec → definitions; `ga_callers`/`ga_callees` → dependency chain; `ga_impact(symbol=...)` → blast radius + affected tests; `ga_architecture` → confirm module/layer (auth, payment, core); `ga_file_summary` before reading a file in full. **If GA unavailable:** grep for the main function/type names in the changed files.
 
 5. **Read existing tests** for the changed files — find patterns, fixtures, naming conventions. Don't duplicate.
+
+---
+
+## Phase 0b: Foundation Gate (a runnable harness must exist)
+
+Runs once, after Phase 0, before any test work (Phase 0.5 onward). This is a **precondition, not a build step**: it refuses to enter the TDD loop on a repo with no runnable harness, where Phase 2's RED would error — or worse, report a **false green** (a filtered run matching 0 tests exits 0 on many frameworks; see Test Command §"Filter pattern verification"). mf-build does **NOT** scaffold; that is `/mf-scaffold`'s job. This gate only checks, and points there.
+
+**Check (cheap — NOT the full suite, that's Phase 3):**
+1. **`TEST_CMD` resolves** from a project marker (per the Test Command section). No marker at all → fail.
+2. **The runner is invocable** — its list/collect command runs without "command not found" / "no config" (reuse the per-framework list commands from Test Command §"Filter pattern verification"). A runner that can't even list tests is not a harness.
+3. **Dependencies are present / installable** — the project's deps are installed, or `install` succeeds.
+
+A fresh build from a spec legitimately has no diff yet — that's fine (Phase 0 already handles it). This gate is about the **harness**, not about whether code changed.
+
+**Outcomes:**
+- **Pass** (markers present, runner invocable) → proceed to Phase 0.5. For an existing project this is a fast no-op — nothing changes (backward compatible).
+- **Fail** (no markers / runner not invocable / empty repo) → **STOP, report BLOCKED:**
+  > "No runnable harness — the TDD loop can't start. Run `/mf-scaffold` first to stand up a runnable skeleton (brand-new project: `/mf-explore` greenfield → `/mf-scaffold`), then re-run `/mf-build`."
+
+  Do NOT scaffold here, and do NOT proceed into Phase 2 — proceeding would produce false greens on an empty repo, which is exactly the failure this gate exists to stop.
+
+**Recorded `TEST_CMD`:** if `/mf-scaffold` ran, it recorded the resolved `TEST_CMD` + run command (handoff / ARCHITECTURE §13). Use that as the expected marker — a mismatch (scaffold said `vitest`, the repo has none) is a fail, not something to paper over.
+
+**Auto-Mode:** the controller runs this gate ONCE in A1 (before the first dispatch); dispatched per-story subagents assume the harness exists and skip it.
 
 ---
 
@@ -399,6 +425,8 @@ GAPS: 4 paths need tests (1 need E2E, 1 need eval)
 | Mocking hides real failures (API→queue→worker→DB) | Internal helper, no side effects |
 | Auth / payment / data destruction | Single-function edge case (null, empty) |
 
+**E2E is AUTHORED, not just flagged.** A `[→E2E]` path is NOT a TODO you list and move on. For **critical flows — auth, payment, data-destruction, and each story's primary cross-component happy path** — you WRITE the E2E test and drive it RED→GREEN on `E2E_CMD` (see Test Command), exactly like a unit test. Modern E2E is cheap and scriptable (Playwright/Cypress/Detox) — "it spans components" is a reason to write the E2E, not skip it. Only a **non-critical** `[→E2E]` flow may be DEFERRED to Phase 5 "E2E" with a one-line reason (budget/env). A **critical** `[→E2E]` left unwritten makes the build **DONE_WITH_CONCERNS**, never DONE. (Mocking a critical cross-component flow at unit level is the vacuous-test trap — the decision matrix routed it to E2E precisely because mocks hide its failures. The same applies to a Linked-Field seam: real E2E/integration, never mocked.)
+
 **Testability Classification — classify by what the code does, not what framework it uses:**
 
 | Code category | Examples | Strategy | Tag |
@@ -415,6 +443,8 @@ Rule: If a view/template contains conditional logic (if/else, loops with filteri
 If every path is already covered, the diagram will have zero `[GAP]` rows — that is fine. Write it anyway and proceed to Phase 2.
 
 **REGRESSION RULE:** If the diff changes existing behavior AND no test covers that path → a regression test is a **CRITICAL requirement. No asking. No skipping.**
+
+**LINKED-FIELD SEAM RULE:** If the spec has a `## Linked Fields` block (it is one side of a producer/consumer split), each linked field's **seam AS is a real-integration test** — run it against the ACTUAL producer (build the producer side first; the consumer spec's seam tests run against it), **never a mocked consumer**. A mocked seam is a vacuous test: the mismatch it exists to catch — field on the wrong surface (list vs single-get) or wrong lifecycle (transient-in-response vs persisted+served) — is exactly what the mock hides. Do NOT mark a consumer story `done` on a mocked seam. **Auto-Mode:** a single-side subagent cannot see the seam — the controller runs the cross-spec seam tests after both sibling specs are built (A4b/A7).
 
 ---
 
@@ -435,6 +465,8 @@ Resolve once before running tests. Auto-detect from project markers:
 | Gemfile | `bundle exec rspec` | `bundle exec rspec -e "<pattern>"` |
 
 All test commands below use `TEST_CMD` to mean the resolved command. For filtered runs, use the framework's native filter flag from the table above.
+
+**E2E runner (separate from the unit/integration `TEST_CMD`).** A flow tagged `[→E2E]` runs on the project's E2E harness, NOT the unit runner — resolve it from project markers and call it `E2E_CMD`: Playwright (`playwright.config.*` → `npx playwright test`), Cypress (`cypress.config.*` → `npx cypress run`), Detox / Maestro (mobile), or the e2e package's own script (`pnpm --filter e2e test`). E2E lives in its own package/dir with its own config (per the test-layout rule). If a critical flow needs E2E and no E2E harness exists, that's a scaffold gap → report it (`/mf-scaffold` sets up the e2e package); do NOT silently downgrade a payment/auth/data-destruction flow to a mocked unit test.
 
 **Filter pattern verification (MANDATORY before trusting a filtered run):**
 
@@ -475,7 +507,7 @@ TEST_CMD --filter "<story test name>"
 
 ### Step 2 — GREEN: Implement minimal production code
 
-Write the minimum production code needed to make the failing tests pass. No more, no less.
+Write the production code that makes **ALL** the story's failing tests pass — every AS test and every edge assertion you wrote in RED. **"Minimal" = the YAGNI guard** (no speculative code, no gold-plating, no handling for a case that no test exercises) — it is **NOT "the least to pass one test"**. Completeness comes from the **test set being complete** (Phase 1 + the Coverage Map already wrote a test for every case); the code then rises to satisfy all of them. If you find yourself wanting to write code for a case that has *no test*, STOP — that is a missing test: go back to RED (or it's a Phase-1 / Coverage-Map gap, or an S1 spec gap). Never silently over-build past the tests, and never under-build below them.
 
 > **TDD GREEN vs "NEVER fix production code" (Phase 4) — disambiguation:**
 > - Writing NEW production code to satisfy a NEW failing TDD test: **REQUIRED** (this is GREEN).
@@ -692,7 +724,7 @@ Checklist: X/Y [x], A/Y [~] (destinations: <story-id list or Known-Gap refs>), B
 Coverage gate (Phase 3.5): PASS — all AS/C carry a test | BLOCKED — uncovered: <AS/C ids>   (breadth)
 Edge Case Compliance: [per-story table — every row ✓ or N/A+reason]   (depth)
 Open gaps: [GAP-NNN not yet resolved, or "none"]
-E2E needed: [→E2E gaps from Coverage Map, or "none"]
+E2E: [authored + green: <test names> | deferred non-critical (with reason): <flows> | none]. A critical [→E2E] left unwritten → status is DONE_WITH_CONCERNS, not DONE.
 Eval needed: [→EVAL gaps from Coverage Map, or "none"]
 Manual needed: [→MANUAL gaps from Coverage Map, or "none"]
 ```

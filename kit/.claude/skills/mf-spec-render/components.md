@@ -105,6 +105,9 @@ Each `### S-NNN: Title (Pn)` becomes one `<article>`.
   </header>
   <div class="story-body">
     <p class="story-desc">{{description, wrap identifiers in <code>}}</p>
+    {{ if the story has **Applies Constraints**:
+    <p class="story-desc"><b>Applies:</b> {{one <code>C-NNN</code> per bound constraint, space-separated}}</p>
+    }}
     <div class="as-list">
       // §5 AS entries here
     </div>
@@ -182,9 +185,15 @@ Each `AS-NNN` becomes a `<details>`. The first AS of each story is `open`; the r
   <div>
     <p class="callout-title">{{C-NNN · short name}}</p>
     <p>{{constraint body, wrap identifiers in <code>}}</p>
+    {{ if cross-surface invariant (has scope/surfaces/coverage):
+    <p><b>Cross-surface invariant.</b> Scope: {{<code>S-NNN</code> …}}. Surfaces: {{<code>surface</code> …}}. Coverage: {{per surface, <code>surface</code> → <code>AS-NNN</code> | <code>GAP-NNN</code>}}.</p>
+    }}
   </div>
 </div>
 ```
+
+// Cross-surface invariant block: reuses the callout's plain `<p>` (no new class, no inline style).
+// Render it ONLY for a constraint carrying scope/surfaces/coverage; omit for ordinary constraints.
 
 ### §6b — Grouped constraints (multi-spec, more than 5 constraints per sub-spec)
 

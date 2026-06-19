@@ -4,7 +4,29 @@
 
 ---
 
-## 1. Four Workflow Types
+## 1. Workflow Types
+
+### New Project (Greenfield)
+
+When: Brand-new project — no codebase yet (empty repo, no package manager / `src/`).
+
+```
+Step 1 → /mf-explore "what you're building"
+          Detects greenfield → ALSO decides app-type + stack (versions researched,
+          current — not recalled from memory) and emits a Bootstrap Brief.
+          Output: docs/explore/<feature>.md (with ## Bootstrap Brief)
+
+Step 2 → /mf-scaffold
+          Reads the Bootstrap Brief → generator-first runnable skeleton:
+          core/ + ONE pattern-demonstrating module + co-located tests.
+          Smoke-gated (install → build → start/smoke must be GREEN, ≥1 real test —
+          this resolves TEST_CMD for /mf-build). Writes ARCHITECTURE.md + ADRs.
+          Hands off ONLY when it actually runs; otherwise BLOCKED.
+
+Step 3 → /mf-plan → /mf-build
+          Normal New Feature flow, now on a runnable base. /mf-build's Foundation
+          Gate confirms the harness exists before the first RED.
+```
 
 ### Explore Before Planning
 
@@ -140,6 +162,10 @@ Step 4 → /mf-commit
 Use this to decide which workflow to follow:
 
 ```
+Is there a runnable project yet (package manager / src / build)?
+├─ No → New Project (Greenfield). /mf-explore (greenfield) → /mf-scaffold → then /mf-plan.
+└─ Yes ↓
+
 Is this a brand new feature (no existing spec or code)?
 ├─ Yes
 │   ├─ Are requirements clear and approach decided?
@@ -233,6 +259,7 @@ Files to delete: [list]
 | Workflow | Estimated Tokens | When |
 |----------|-----------------|------|
 | `/mf-explore` | 10–20k | Before /mf-plan when requirements are unclear |
+| `/mf-scaffold` | 15–40k + real install/build time | Greenfield only — once, to stand up a runnable skeleton before the first spec |
 | `/mf-build` (incremental) | 5–10k | Daily, after each code chunk |
 | `/mf-investigate` (complex bug) | 8–15k | OPTIONAL before /mf-fix — complex/outage only |
 | `/mf-fix` (single bug) | 3–5k | As bugs arise |

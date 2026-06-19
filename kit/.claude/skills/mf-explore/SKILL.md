@@ -9,7 +9,8 @@ description: |
   describes a new feature in vague or ambiguous terms — running /mf-plan with
   unclear requirements produces unclear specs.
   Skip if the user already has detailed acceptance criteria written down.
-  Hands off to /mf-plan when discovery is complete.
+  Hands off to /mf-plan when discovery is complete — or, for a brand-new project
+  with no codebase yet, also decides app-type + stack and hands off to /mf-scaffold first.
 allowed-tools: Read, Glob, Grep, Bash, AskUserQuestion, WebSearch, mcp__graphatlas__*
 ---
 
@@ -133,6 +134,8 @@ Internal classification (if scan succeeds):
 - **Already implemented:** ask "what's broken, or what behavior needs to change?"
 
 → This classification shapes the opening question in Phase 1.
+
+**Project-level greenfield check (run with S1)** — distinct from "virgin territory" above (which is no code for THIS feature). If the repo has NO runnable project at all — no `package.json` / `pyproject.toml` / `Cargo.toml` / `go.mod` / equivalent, no real `src/`, and CLAUDE.md has no stack filled in — there is no codebase to build on. Set **GREENFIELD PROJECT = true**: discovery must ALSO decide app-type + stack (Phase 2.6) and emit a **Bootstrap Brief** (Phase 7) so `/mf-scaffold` can stand up a runnable skeleton BEFORE `/mf-plan`. Pipeline becomes **mf-explore → /mf-scaffold → /mf-plan → /mf-build**. (Existing codebase → leave the flag false; the brief and Phase 2.6 are skipped.)
 
 Also note the **project domain** from CLAUDE.md (payment, booking, content, healthcare, logistics...) → used for domain-specific edge cases in Phase 4.
 
@@ -286,6 +289,34 @@ Ask after understanding the flow, before getting into technical boundaries.
 - Complex drag-and-drop → "Sortable list (reorder items) or kanban board (drag between columns)? A sortable list is 5x simpler than kanban."
 
 **Purpose:** "Simple table" vs "interactive dashboard" is a 5x effort difference. This must be clear before writing the spec.
+
+---
+
+## Phase 2.6 — Greenfield: app-type & stack  _(only if GREENFIELD PROJECT, per Phase 0)_
+
+There is no codebase yet, so before boundaries/data, decide WHAT KIND of app this is and WHICH stack — this pre-fills the **Bootstrap Brief** that `/mf-scaffold` consumes to stand up a runnable skeleton. By Phase 1–2 you know the problem and the flow; that's enough to pick a stack. Keep it light — propose sensible defaults and let the client confirm, same posture as Phase 2.5. The canonical stack-decision matrix lives in `/mf-scaffold`; here you only pin the answers.
+
+**Research current stack first (WebSearch) — do NOT propose from training memory.** Model knowledge of versions and "current best practice" goes stale fast. Before proposing any default, search the *current* stable/LTS releases and current best practice for the candidate area — using the current year from the system clock (`date +%Y`), never a hardcoded year (so this stays correct when the skill runs next year). The proposed stack + its rationale must reflect what you find, not cutoff memory. (This is exactly the WebSearch trigger "pattern you're not confident about / specific library status" applied to the whole stack choice.)
+
+1. **App-type** — if not already obvious from the flow, ask (one question):
+
+```json
+{"questions":[{"question":"What kind of application is this? (decides how it's scaffolded and run)","header":"App type","multiSelect":false,"options":[
+  {"label":"Full-stack web","description":"Frontend + backend + DB"},
+  {"label":"Backend API only","description":"Service/API, no UI in this repo"},
+  {"label":"Web frontend only","description":"UI talking to an existing/external API"},
+  {"label":"Other","description":"Mobile / desktop / CLI / library — specify"}]}]}
+```
+
+2. **Stack** — propose a full default stack WITH a one-line rationale per major choice, then confirm. Decide each axis that applies: language/runtime · framework · datastore (if any) · repo shape (single vs monorepo) · test runner · **architecture conventions** (state mgmt · validation · data layer · forms · UI kit · API/response shape — the patterns every feature will follow). Default heuristics: the app-type's mainstream language; a framework that has an official scaffolder; Postgres for relational; single package unless ≥2 deployable units. **Conventions:** if the project / CLAUDE.md already states house conventions, adopt them; otherwise the research step above proposes current best-practice for the stack. If the client says "up to you" → pick the defaults and state them; don't stall.
+
+```json
+{"questions":[{"question":"Proposed stack: <one-line summary>. RECOMMENDATION: <X> because <reason>. Confirm or adjust?","header":"Stack","multiSelect":false,"options":[
+  {"label":"Confirm","description":"<stack> — proceed"},
+  {"label":"Adjust","description":"I'll change a piece"}]}]}
+```
+
+Record every choice + its reason — this becomes the Bootstrap Brief (Phase 7). A choice without a reason is a future regret (Decision-rationale principle).
 
 ---
 
@@ -478,6 +509,14 @@ _<$(date +%Y-%m-%d)>_
 **Trigger:** [user action / system event / external event]
 **UI expectation:** [simple table / form / wizard / dashboard / reference: "like X in App Y"]
 
+**Bootstrap Brief:** _(GREENFIELD PROJECT only — consumed by `/mf-scaffold`; omit entirely for a feature on an existing codebase)_
+- **App-type:** [web-frontend | backend-API | full-stack | mobile | desktop | CLI | library] (+ monorepo? yes/no)
+- **Stack:** language/runtime [X — why] · framework [X — why] · datastore [X | none — why] · repo shape [single | monorepo+tool — why] · test runner [X]
+- **Conventions:** state mgmt [X] · validation [X] · data layer [X] · forms [X] · UI kit [X] · API/response shape [X] — the patterns the scaffold's example module demonstrates and every feature follows (from house conventions, else researched best-practice)
+- **Scaffold command:** [official create-* / framework CLI / degit template, or "freeform — no blessed generator"]
+- **Smoke contract:** [what "runs" means for this app-type — see /mf-scaffold Phase 3]
+- **Known constraints:** [deploy target, must-use libs, anything that pins the skeleton]
+
 **UI sketches:** _(optional — include for UI-bearing features when human visualization helps)_
 
 [Free-form layout sketches (ASCII boxes / bullet outlines / nested lists). Each component, section, button, or surface **MUST carry an E/N/X tag**:
@@ -626,7 +665,7 @@ After writing the summary, confirm via AskUserQuestion:
     "header": "Handoff",
     "multiSelect": false,
     "options": [
-      {"label": "Yes, save & hand off", "description": "Write to docs/explore/ and pass to /mf-plan"},
+      {"label": "Yes, save & hand off", "description": "Write to docs/explore/; greenfield → /mf-scaffold, else → /mf-plan"},
       {"label": "Needs additions", "description": "Point out what's missing before saving"},
       {"label": "Open questions first", "description": "Work through unresolved questions first"}
     ]
@@ -634,7 +673,7 @@ After writing the summary, confirm via AskUserQuestion:
 }
 ```
 
-If A → write to `docs/explore/<feature-slug>.md`. `/mf-plan` will auto-detect this file and skip redundant discovery when run on the same feature.
+If A → write to `docs/explore/<feature-slug>.md`. **If GREENFIELD PROJECT:** next step is `/mf-scaffold` (it reads the Bootstrap Brief to stand up the runnable skeleton), THEN `/mf-plan` for the first feature spec. Otherwise hand straight to `/mf-plan` — it auto-detects this file and skips redundant discovery when run on the same feature.
 
 If B or C → resolve and confirm again.
 
@@ -660,6 +699,7 @@ Self-check before writing the output file:
 - [ ] Decision rationale recorded for every significant choice
 - [ ] Client confirmed the handoff summary
 - [ ] Handoff summary is structured enough for /mf-plan to use directly without re-asking basic discovery questions
+- [ ] If GREENFIELD PROJECT: app-type + stack decided with rationale; Bootstrap Brief filled for /mf-scaffold
 
 If any item is unchecked → return to the corresponding phase and ask more — do not write the file.
 

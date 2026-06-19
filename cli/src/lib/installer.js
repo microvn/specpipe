@@ -22,6 +22,11 @@ export const COMPONENTS = {
   ],
   skills: [
     '.claude/skills/mf-explore/SKILL.md',
+    '.claude/skills/mf-scaffold/SKILL.md',
+    '.claude/skills/mf-scaffold/references/ARCHITECTURE.md.tmpl',
+    '.claude/skills/mf-scaffold/references/DESIGN.md.tmpl',
+    '.claude/skills/mf-scaffold/references/adr/NNNN-template.md',
+    '.claude/skills/mf-scaffold/references/stack-profiles/react.md',
     '.claude/skills/mf-plan/SKILL.md',
     '.claude/skills/mf-build/SKILL.md',
     '.claude/skills/mf-challenge/SKILL.md',

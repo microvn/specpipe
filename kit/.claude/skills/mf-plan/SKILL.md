@@ -127,7 +127,7 @@ When P0-2b found a `docs/explore/<feature>.md`, route its fields into the spec l
 |---|---|
 | Feature + Happy path | Overview + Stories (happy-path AS) |
 | Unhappy paths + Edge cases + Input validation + External integration failure | Stories (error-path AS) via Scenario Derivation triggers. If the outcome lives in the explore's *Open questions* instead of being stated → emit a Gap, not a guessed AS |
-| Business rules | Constraints & Invariants |
+| Business rules | Constraints & Invariants. **A business rule that must hold across MORE THAN ONE endpoint/surface (idempotency / at-most-once / money-conservation / exactly-once / authorization) → a Constraint carrying `scope:`/`surfaces:` (cross-surface invariant); the Scenario Derivation "Cross-surface invariant pass" then forces per-surface coverage (CC5).** |
 | Data impact | Data Model. A migration / irreversible mutation also flips its owning story to `autonomous: checkpoint` |
 | Out of scope | Not in Scope |
 | Permissions | Story description. Auth / payment / admin-only roles on a destructive story → `autonomous: checkpoint` |
@@ -180,7 +180,7 @@ Mode C does not run Phase 1 — it uses its own flow (see Mode C section).
 When T1/T2 fire (oversize) AND T5/T6 also hold (shared data model / state machine / >50% duplication), do NOT jump straight to sub-spec splitting. The rules conflict because the feature is genuinely too big for one slice, not because file-split is the right answer. Resolve in this order:
 
 1. **FIRST: apply Sizing & Phasing** to shrink Phase 1 scope until `stories ≤7` AND `AS ≤20`. Defer lower-value work into `## Not in Scope` as explicit Phase 2/3 items with a one-line rationale. Phase 2 spec is created later via Mode A, referencing the Phase 1 Data Model — no duplication.
-2. **THEN if phasing is forbidden by the source** (e.g. SRD chốt "ship together, no phase"): try **scope-by-layer** — produce sibling specs along an orthogonal axis (typically backend + frontend, or service + client) that ship together on the same release branch. This is NOT phasing (both ship in the same PR/release), and it usually duplicates far less than sub-spec-by-flow because BE Data Model and FE Component Notes are different surfaces. Each sibling spec is self-contained; cross-spec contract refs use `<sibling-spec>:S-NNN` / `<sibling-spec>:AS-NNN`. Document the "ships together" intent in each spec's Overview.
+2. **THEN if phasing is forbidden by the source** (e.g. SRD chốt "ship together, no phase"): try **scope-by-layer** — produce sibling specs along an orthogonal axis (typically backend + frontend, or service + client) that ship together on the same release branch. This is NOT phasing (both ship in the same PR/release), and it usually duplicates far less than sub-spec-by-flow because BE Data Model and FE Component Notes are different surfaces. Each sibling spec is self-contained; cross-spec contract refs use `<sibling-spec>:S-NNN` / `<sibling-spec>:AS-NNN`. Document the "ships together" intent in each spec's Overview. **Scope-by-layer is the seam-risk path** — the two sides build in isolation, so every cross-spec field MUST become a Linked Field carrying a build-time **seam integration test** (not just the static pin); see §Linked Fields. This is exactly why it ranks below phasing and below keeping the behaviour whole (vertical slice): prefer those to avoid the seam risk.
 3. **ONLY IF neither phasing nor scope-by-layer works** → split into sub-specs by flow as last resort. Duplication is accepted but must be called out in each sub-spec's `## What Already Exists`.
 
 This precedence lets T5/T6 protect tight coupling while T1/T2 still bound scope — phasing or scope-by-layer is the route that respects both before file-duplication is forced.
@@ -215,6 +215,8 @@ Two traps to flag, never pass:
 When a spec writes "consumes the additive fields defined in `<sibling>` Data Model", VERIFY each named field actually exists in that sibling's `## Data Model` — do not trust the reference. A field listed but not defined there is a concrete spec error.
 
 **Every linked-field mismatch is a spec bug**, fixed by editing the spec (add the producer AS on the right surface, or narrow / correct the consumer side), never by patching code — the code usually already matches its own spec. CC11 enforces this; this subsection pins the form.
+
+**Beyond the static pin, each linked field MUST designate a consumer-side *seam integration AS*** — an AS that `/mf-build` runs as a REAL integration (producer side built + running), asserting the field actually arrives on the consumer's named surface at the named lifecycle. The pin proves the *spec* is internally consistent; the seam test proves the *running system* is. A linked field with a paper pin but no seam test is exactly the hole that ships the absent-field / empty-list bug — the FE↔BE analogue of the cross-surface invariant gap. These seam AS are real-dependency tests, **never mocked** (a mocked seam is vacuous — mocking hides the very surface/lifecycle mismatch). In a layer-split, the controller (not a single-side build) runs the cross-spec seam tests after both sides are built.
 
 **Mode applicability:** the *pinning step above* runs whenever a split is produced — Mode A, or Mode B if a spec it touches participates in a split. The *coverage check* (CC11) runs in **every mode's** consistency pass: Phase 2 for Mode A/B, C6 for Mode C — Mode C is where producer/consumer drift most often enters (a new sibling spec, a new story that reads a field, or a `Then` whose surface changes). Mode B/C audit only the linked fields added or modified this run, never untouched legacy ones (same backward-compat rule as CC7/CC8/CC9).
 
@@ -291,6 +293,12 @@ If you believe you need "foundation" work:
 
 **EXCEPTION — scaffold-as-side-effect is allowed.** A story whose AS describes user-visible behavior IS allowed even if its `Execution.files` introduces a new module / router / schema. The ban is on stories whose AS-text *itself* reads as scaffold (e.g. "S-001: Set up payment module" with AS about table creation). Module creation is a side effect of building behavior; it never belongs in the AS-text.
 
+### Story shape — vertical slice (one behaviour, all its layers)
+
+A story is a **vertical slice**: its AS describe ONE behaviour end-to-end across every layer it touches — backend + frontend together where both exist, grouped by the behaviour, not by a layer. **Do NOT split one behaviour into a separate FE-only story and a BE-only story** — that orphans the **seam** (the field one side produces and the other consumes): `/mf-build` then builds the two halves in isolation, each half's own tests pass, and the integration silently breaks (field on the wrong surface / wrong lifecycle). `Execution.files` of a vertical-slice story legitimately spans both `back-end/...` and `front-end/...`.
+
+**Layer-split is a LAST RESORT, not the per-story default.** Splitting a feature into sibling BE/FE specs (scope-by-layer, Phase 1) happens ONLY when the feature is genuinely oversize (hard cap >30 AS / >10 stories) AND phasing is forbidden by the source. When it does, every cross-spec field becomes a **Linked Field carrying a build-time seam test** (Phase 1 §Linked Fields). Within one spec, keep the behaviour whole.
+
 ### Spec Template
 
 ```markdown
@@ -313,6 +321,7 @@ If you believe you need "foundation" work:
 
 **Description:** [user story]
 **Source:** [the requirement clause(s) this story derives from — quote or reference the description; a ticket/issue ref also counts. This is the story's provenance; its AS inherit it.]
+**Applies Constraints:** [OPTIONAL — the `C-NNN` cross-surface invariants this story's behaviour can exercise (e.g. `C-002`). A binding, NOT a new ID. Each bound constraint must be covered by an AS (or Gap) in THIS story at the surface it touches — see CC5. Omit if none apply.]
 
 **Execution:**
 - `depends_on:` [S-NNN that must be done first, or `none`]
@@ -364,7 +373,22 @@ AS-004: <short description>
 - [flow description + expected behavior]
 
 ## Constraints & Invariants
-[rules that must ALWAYS hold]
+[rules that must ALWAYS hold.
+
+A constraint that must hold across MORE THAN ONE story/surface — a **cross-surface invariant**
+(idempotency / at-most-once / money-conservation / exactly-once / authorization) — carries two
+OPTIONAL fields so its coverage is checked at every surface, not once globally:
+- `scope:` the stories whose behaviour can exercise it (e.g. `S-003, S-007`)
+- `surfaces:` the named operations it must hold at (e.g. `createIntent, pay, webhook`)
+Per CC5, such a constraint then needs an `AS-###` (or `GAP-###`) PER listed surface — one AS somewhere
+does NOT satisfy it. Omit both fields for an ordinary single-point constraint (CC5 then needs ≥1 AS, as before).
+OPTIONAL metadata: legacy specs and single-point constraints stay valid without it.
+
+C-001: <ordinary rule>. (AS-###)
+C-002: <cross-surface rule — e.g. a repeated submit causes at most one charge>.
+  - scope: S-003, S-007
+  - surfaces: createIntent, pay
+  - coverage: createIntent → AS-014, pay → GAP-003]
 
 ## Linked Fields
 [OPTIONAL — include ONLY when this spec is one side of a producer/consumer split
@@ -503,6 +527,10 @@ Two kinds of "missing", handled differently:
 - **Underspecified** — trigger present, outcome not stated → a **Gap** (`GAP-NNN`, see the Gaps section), not a guessed AS — and not an AS shell either: never write an AS whose Then is only "see GAP-NNN". If a minimal safe outcome IS assertable (e.g. "request refused, state unchanged"), write that as the AS and point to the Gap for the unspecified detail; if nothing concrete is assertable, it is a Gap alone. *Explore-doc case:* if a trigger appears in the description (Happy path / Edge cases / Permissions / Integration) but its outcome lives in the explore's `Open questions` or `Assumptions` rather than being stated, that is still Underspecified — emit `GAP-NNN (status: open)` with `Source:` quoting the explore phrase; do not invent an AS.
 - **Out of scope** — no trigger at all → emit nothing. Don't invent "what about concurrent edits?" when the text never mentions concurrency.
 
+**Cross-surface invariant pass (run after the atom list).** For every constraint stated as a system-wide rule (or carrying `scope:`/`surfaces:` in `## Constraints & Invariants`), enumerate EVERY story whose `When` can exercise it. Each such story binds it via `**Applies Constraints:**` and carries an AS asserting the invariant's OUTCOME at that surface. **For a stated cross-surface invariant the minimal-safe outcome (at-most-once: a repeat at this surface causes ≤1 effect) IS assertable** — it is the stated invariant applied to the surface, not a new requirement — so write the outcome AS; do NOT downgrade the whole surface to a bare Gap. If the surface's *mechanism* is unstated (e.g. a provider idempotency-key vs a server-side guard), attach a `GAP-NNN` from that AS for the mechanism detail — outcome asserted, mechanism deferred. A surface becomes a *bare* Gap (no AS) only when no minimal-safe outcome is assertable at all. This removes the AS-vs-Gap coin-flip: a money/effect surface under a stated invariant ALWAYS gets an outcome AS (+ a mechanism Gap if needed), never a bare Gap by default. This does NOT invent the invariant — it is already stated; it forces a stated invariant to be acknowledged at every surface it reaches, closing the "stated once, silently dropped at a second endpoint" hole (an idempotency rule that guarded one endpoint but not a second one — the class of bug this pass exists to kill). Still derive-or-Gap for any genuinely unstated outcome: never a guessed one.
+
+**Do NOT add a universal canned edge checklist** (always-ask concurrency / duplicate-submit / deleted-item / stale-session) to every story — that manufactures requirements the text never stated, the exact fabrication this section forbids. Only stated atoms + stated constraints drive AS derivation here. The non-obvious adversarial cases are `/mf-challenge`'s job (its Failure-Mode lens); code-path/branch (if/else) depth is `/mf-build`'s Coverage Map. Three skills, three different questions — `/mf-plan` owns only what the spec states.
+
 ### Writing Instructions
 
 **DO:**
@@ -541,17 +569,18 @@ Include only sections that apply:
 | CC2 | Every AS belongs to exactly 1 story | Assign orphan AS or delete |
 | CC3 | P0 stories have error path AS | Add error AS if missing |
 | CC4 | No 2 AS test the same behavior | Merge or delete duplicate |
-| CC5 | Every constraint AND every stated rule/outcome is covered by ≥1 AS — or, if unspecified, by a `GAP-NNN`. Coverage must be explicit: each `C-xxx` line ends with `(AS-###, ...)` or `(GAP-###)`. Story refs `(S-002)` are NOT coverage. `Execution.verify` lines NEVER count. Follow the CC5 enforcement procedure below | Add the AS, or record the Gap |
+| CC5 | Every constraint AND every stated rule/outcome is covered by ≥1 AS — or, if unspecified, by a `GAP-NNN`. Coverage must be explicit: each `C-xxx` line ends with `(AS-###, ...)` or `(GAP-###)`. Story refs `(S-002)` are NOT coverage. `Execution.verify` lines NEVER count. **A constraint carrying `scope:`/`surfaces:` is covered PER listed surface — each surface needs its own `AS-###`/`GAP-###`; one global AS does NOT satisfy a cross-surface invariant.** Follow the CC5 enforcement procedure below | Add the AS (per surface), or record the Gap |
 | CC6 | Story count ≤7, AS count ≤20 — these are SOFT TARGETS for reviewability, not principles. Principle is "AS count tracks the atom count (rules + triggers + outcomes) — far more AS than atoms = bloat". **G1-driven overage up to 30 AS / 10 stories is allowed** when each excess AS comes from a G1 split (no AS gộp) and Phase 1 assessment carries the justification trail. Above 30 AS / 10 stories is a hard cap — must split regardless | Add the G1 justification (see Phase 1 §G1 vs T2/CC6 precedence), OR prune padded AS, OR split |
 | CC7 | Every story has an `**Execution:**` block; `parallel_safe: true` only if `files` is concrete (not `unknown`/dir-hint) AND disjoint from siblings AND `depends_on: none` | Fix the block — flip to `false` on any overlap/dependency/uncertainty |
 | CC8 | Every `depends_on` ID resolves to a story in this spec; the graph is a DAG (no cycles) | Fix the ref or break the cycle — `/mf-build` deadlocks on either |
 | CC9 | Every story has a `**Source:**` line anchoring it to a requirement clause (or ticket); no AS has a Then that is only "see GAP-NNN" | Add the Source; convert any gap-shell AS into a pure Gap |
 | CC10 | When a `docs/explore/<feature>.md` was used as input, every **non-empty** explore field listed in the Explore → Spec mapping has either produced spec content or been recorded as a `GAP-NNN` / Clarification. Empty explore sections do not fail this check | Re-walk the mapping; if a non-empty explore field has no destination, route it (or record it as a Gap) — closes the "format compliance hides meaning leak" risk |
-| CC11 | **(producer/consumer splits only)** Every linked field a consumer side reads has a producer AS (or Constraint) delivering it on the SAME surface at the SAME lifecycle point; the `## Linked Fields` block pins both sides; every "consumes fields defined in `<sibling>`" reference resolves to a real field in that sibling's `## Data Model`. Skip entirely for a standalone spec with no cross-spec field dependency | Pin both sides (Phase 1 §"Linked fields"); on surface/lifecycle mismatch record a `GAP-NNN` and fix the producer AS or correct the consumer — never code. Verify each named field exists in the sibling Data Model |
+| CC11 | **(producer/consumer splits only)** Every linked field a consumer side reads has a producer AS (or Constraint) delivering it on the SAME surface at the SAME lifecycle point; the `## Linked Fields` block pins both sides; every "consumes fields defined in `<sibling>`" reference resolves to a real field in that sibling's `## Data Model`; **AND each linked field designates a consumer-side seam integration AS (tested as a real integration, not mocked)**. Skip entirely for a standalone spec with no cross-spec field dependency | Pin both sides (Phase 1 §"Linked fields"); on surface/lifecycle mismatch record a `GAP-NNN` and fix the producer AS or correct the consumer — never code. Verify each named field exists in the sibling Data Model. Add the seam AS if missing |
 
 **CC5 enforcement procedure (mandatory, no exceptions):**
 1. Enumerate every `C-xxx` line in `## Constraints & Invariants`.
 2. For EACH constraint, append explicit IDs at end of line: `(AS-###, AS-###)` for stated outcomes, OR `(GAP-###)` if unspecified. Story refs `(S-002)` are NOT coverage.
+2b. **If the constraint carries `scope:`/`surfaces:`** (cross-surface invariant) — require one `AS-###` (or `GAP-###`) PER listed surface, written `surface → AS-###`. A surface with neither AS nor Gap = FAIL (this is the cross-surface-invariant gate — the createIntent class). For every story in `scope`, confirm its `**Applies Constraints:**` lists this constraint. **An AS counts for a surface ONLY if it actually ASSERTS the invariant at that surface** — a story that binds the constraint but whose AS do not assert it there ⇒ that surface needs an AS or a `GAP-###`, NOT "covered" by binding alone. **Prefer the outcome AS:** for a stated cross-surface invariant the per-surface at-most-once outcome is a stated atom (the invariant applied to the surface), so it MUST be an AS; a *bare* Gap (no AS) at a surface is correct only when even the minimal-safe outcome is genuinely unassertable — otherwise write the outcome AS plus, if the mechanism is unstated, a Gap from it. (This makes the per-surface catch mechanical AND deterministic — no AS-vs-Gap coin-flip between runs.)
 3. If no AS exists yet:
    - Stated outcome → write a new AS (split if multi-case per Writing Instructions §"one specific behavior").
    - Trigger present, outcome unspecified → write `GAP-NNN (status: open)` and reference it.
@@ -684,7 +713,7 @@ Walk through table M1-M6. If ANY condition is true → Major.
 | M3 | Story priority changed | S-002 from P1 → P0 |
 | M4 | Story's main flow changed (Given or When changed) | AS-003 Given changes state, or When changes action |
 | M5 | Expected behavior changed (Then changed) for a P0 story | AS-001 Then changes result |
-| M6 | Constraint/invariant added or removed | Adding "balance must not be negative" |
+| M6 | Constraint/invariant added or removed; or a constraint's `scope`/`surfaces` widened (it now must hold at a new surface → new coverage obligation) | Adding "balance must not be negative"; adding `pay` to C-002's `surfaces` |
 
 Minor = NONE of M1-M6 apply. Examples: typo fix, rewording without meaning change, adding/editing Data fields, formatting, adding Source ref.
 
@@ -814,12 +843,12 @@ After updating, verify:
 | CC2 | Every AS belongs to exactly 1 story | Assign orphan AS or delete |
 | CC3 | P0 stories have error path AS | Add error AS if missing |
 | CC4 | No 2 AS test the same behavior | Suggest merge or delete duplicate |
-| CC5 | Every constraint AND every stated rule/outcome is covered by ≥1 AS — or, if unspecified, by a `GAP-NNN`. Coverage must be explicit: each `C-xxx` line ends with `(AS-###, ...)` or `(GAP-###)`. Story refs `(S-002)` are NOT coverage. `Execution.verify` does NOT count. Follow the CC5 enforcement procedure (Phase 2 §Consistency Checks above). | Add the AS, or record the Gap |
+| CC5 | Every constraint AND every stated rule/outcome is covered by ≥1 AS — or, if unspecified, by a `GAP-NNN`. Coverage must be explicit: each `C-xxx` line ends with `(AS-###, ...)` or `(GAP-###)`. Story refs `(S-002)` are NOT coverage. `Execution.verify` does NOT count. **Constraint with `scope:`/`surfaces:` → covered PER surface (each surface its own `AS-###`/`GAP-###`); one global AS is NOT enough.** Follow the CC5 enforcement procedure (Phase 2 §Consistency Checks above). | Add the AS (per surface), or record the Gap |
 | CC6 | Story count ≤7, AS count ≤20 (soft target — G1-driven overage up to 30 AS / 10 stories allowed when documented; see G1 vs T2/CC6 precedence in Phase 1) | Add the G1 justification line in Phase 1 assessment, OR split spec |
 | CC7 | Touched stories have a valid `**Execution:**` block; `parallel_safe` consistent with `files`/`depends_on` | Fix the block (no mass-migration of untouched stories) |
 | CC8 | No `depends_on` anywhere in the spec points to a removed/missing story ID; graph stays a DAG | Fix dangling refs — **when removing a story, scan the WHOLE spec for `depends_on` pointing to its ID** (justified exception to "no mass-migration": a dangling ref deadlocks `/mf-build`) |
 | CC10 | When this Mode C update was driven by a `docs/explore/<feature>.md` (e.g. new explore content), every non-empty explore field used as input has produced spec content (in touched stories/sections) or been recorded as a `GAP-NNN` / Clarification. Empty explore fields and untouched-this-run sections do not fail this check | Re-walk the Explore → Spec mapping (Phase 0); route any non-empty explore field that has no destination, or record it as a Gap |
-| CC11 | **(producer/consumer splits only)** For every linked field this run ADDS or MODIFIES — a new/changed consumer read, a new/changed producer AS, or a `Then` whose surface or lifecycle moves — a producer AS still delivers it on the SAME surface at the SAME lifecycle point, and the `## Linked Fields` block reflects the change. Untouched legacy linked fields are not re-audited. Skip if the spec has no cross-spec field dependency | Re-pin the touched field both sides (Phase 1 §"Linked fields"); on surface/lifecycle mismatch record a `GAP-NNN` and fix the producer AS or correct the consumer — never code. A linked-field change is behavioural (M4/M5 if it moves a Given/When/Then) → classify Major and snapshot |
+| CC11 | **(producer/consumer splits only)** For every linked field this run ADDS or MODIFIES — a new/changed consumer read, a new/changed producer AS, or a `Then` whose surface or lifecycle moves — a producer AS still delivers it on the SAME surface at the SAME lifecycle point, the `## Linked Fields` block reflects the change, **and a consumer-side seam integration AS (real integration, not mocked) exists for it**. Untouched legacy linked fields are not re-audited. Skip if the spec has no cross-spec field dependency | Re-pin the touched field both sides (Phase 1 §"Linked fields"); on surface/lifecycle mismatch record a `GAP-NNN` and fix the producer AS or correct the consumer — never code; add the seam AS if the touched field lacks one. A linked-field change is behavioural (M4/M5 if it moves a Given/When/Then) → classify Major and snapshot |
 
 > **⛔ Consistency check is NOT optional.**
 > Run CC1-CC6 after EVERY update (Major and Minor).

@@ -85,8 +85,9 @@ For each `.md`, extract:
   - `priority` (P0/P1/P2 from the `(Pn)` suffix)
   - `title`
   - `description` (the paragraph after `**Description:**`)
+  - `applies_constraints` (the `C-NNN` list after `**Applies Constraints:**`, if the story has that line — optional)
   - `acceptance_scenarios[]` — each `AS-NNN:` produces an object with `id`, `desc` (the 1-line summary after the ID), `given`, `when`, `then`, `data` (optional), `setup` (optional)
-- **Constraints** — each `- C-NNN:` bullet becomes a callout. If a single spec has more than 10, group them collapsed by sub-spec.
+- **Constraints** — each constraint (a line `C-NNN:` OR a bullet `- C-NNN:` / `- **C-NNN:**`) becomes a callout. A **cross-surface invariant** carries indented `scope:` / `surfaces:` / `coverage:` sub-lines (e.g. `coverage: createIntent → AS-008, pay → GAP-001`) — capture them so the callout can show per-surface coverage. If a single spec has more than 10, group them collapsed by sub-spec.
 - **What Already Exists** — paragraph or bullet list.
 - **Not in Scope** — bullet list.
 - **Change Log** — table of entries.
@@ -151,9 +152,10 @@ Replace the slot between `<!-- CONTENT_START -->` and `<!-- CONTENT_END -->` wit
 4. **Per sub-spec** (multi-spec) or **Stories** section (single):
    - Sub-spec header: `<h2 class="subspec-head">` with an eyebrow `SUB-SPEC` / `STEP 1..4` / `ROOT` (§7).
    - Brief overview paragraph below the header.
-   - Story cards (§4) in the order from spec.md. Within each story, the first AS is `open` and the rest are collapsed (§5).
+   - Story cards (§4) in the order from spec.md. Within each story, the first AS is `open` and the rest are collapsed (§5). If the story has `**Applies Constraints:**`, render the bound `C-NNN` chips on the card (§4).
 5. **Constraints** (§6):
    - Single spec → flat list of callouts.
+   - A **cross-surface invariant** (has `scope:`/`surfaces:`/`coverage:`) renders that per-surface coverage block inside its callout (§6a) — so the reader sees each money/effect surface mapped to its own `AS-NNN`/`GAP-NNN`.
    - Multi-spec → grouped by sub-spec; each group is a `<details class="collapsible">`. The Root group defaults to `open`, sub-spec groups default closed.
 6. **What Already Exists** (§10a) — plain prose section.
 7. **Not in Scope** (§10d) — bullet list with `<b>` around each item name.

@@ -121,22 +121,25 @@ if command -v codex &>/dev/null; then
 else
   echo "CODEX: ✗"
 fi
-# Gemini needs binary AND auth (one of: $GEMINI_API_KEY or ~/.gemini/oauth_creds.json
-# from `gemini auth login`). Binary alone isn't enough — same shape as Codex above.
-if command -v gemini &>/dev/null; then
-  if [ -n "$GEMINI_API_KEY" ] || [ -f "$HOME/.gemini/oauth_creds.json" ]; then
-    echo "GEMINI_CLI: available"
-  else
-    echo "GEMINI: ✗ (binary present, no auth — run 'gemini auth login')"
-  fi
-elif [ -n "$GEMINI_API_KEY" ]; then
-  echo "GEMINI_API: key set"
-else
-  echo "GEMINI: ✗"
-fi
+# Gemini API (generativelanguage / AI Studio) is a hosted REST endpoint — needs
+# $GEMINI_API_KEY. NOTE: the standalone `gemini` CLI was retired 2026-06-18 and
+# folded into Antigravity CLI (`agy`) — probe that separately below, not here.
+[ -n "$GEMINI_API_KEY" ] && echo "GEMINI_API: key set" || echo "GEMINI: ✗"
 [ -n "$PERPLEXITY_API_KEY" ] && echo "PERPLEXITY: available" || echo "PERPLEXITY: ✗"
-# Antigravity is Google's IDE, not a REST API — only probe if a CLI bridge exists
-command -v antigravity &>/dev/null && echo "ANTIGRAVITY_CLI: available" || echo "ANTIGRAVITY: ✗ (IDE only)"
+# Antigravity CLI (`agy`) — Google's agentic terminal coding agent, the successor
+# to the retired `gemini` CLI. Agentic like Codex: reads code, runs commands.
+# Needs binary AND auth (one of: $ANTIGRAVITY_API_KEY, $GEMINI_API_KEY — both
+# accepted by agy — or OS-keyring/OAuth state from a prior interactive `agy`
+# login under ~/.gemini/antigravity-cli/). Binary alone isn't enough.
+if command -v agy &>/dev/null; then
+  if [ -n "$ANTIGRAVITY_API_KEY" ] || [ -n "$GEMINI_API_KEY" ] || [ -d "$HOME/.gemini/antigravity-cli" ]; then
+    echo "ANTIGRAVITY_CLI: available"
+  else
+    echo "ANTIGRAVITY: ✗ (binary present, no auth — run 'agy' once to log in)"
+  fi
+else
+  echo "ANTIGRAVITY: ✗"
+fi
 [ -n "$ANTHROPIC_API_KEY" ] && echo "ANTHROPIC_API: key set" || echo "ANTHROPIC: host only"
 command -v ollama &>/dev/null && echo "OLLAMA: available" || echo "OLLAMA: ✗"
 command -v claude &>/dev/null && echo "SELF_SPAWN: available" || echo "SELF_SPAWN: ✗"
@@ -170,15 +173,20 @@ if [ -n "$PERPLEXITY_API_KEY" ]; then
   echo "PERPLEXITY_AUTH: assumed valid (probe skipped — would cost money)"
 fi
 
-# Gemini — use header auth (x-goog-api-key) to keep the key out of URLs/logs.
-# If no API key but CLI is OAuth-authenticated, trust it (Phase 3.4 routes to CLI).
+# Gemini API — use header auth (x-goog-api-key) to keep the key out of URLs/logs.
 if [ -n "$GEMINI_API_KEY" ]; then
   _GEM_STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
     -H "x-goog-api-key: $GEMINI_API_KEY" \
     https://generativelanguage.googleapis.com/v1beta/models 2>/dev/null)
   [ "$_GEM_STATUS" = "200" ] && echo "GEMINI_AUTH: valid" || echo "GEMINI_AUTH: FAILED ($_GEM_STATUS)"
-elif command -v gemini &>/dev/null && [ -f "$HOME/.gemini/oauth_creds.json" ]; then
-  echo "GEMINI_AUTH: assumed valid (CLI OAuth — probe skipped)"
+fi
+
+# Antigravity CLI — no cheap REST auth-probe endpoint; it authenticates the agent
+# harness on first call. If $ANTIGRAVITY_API_KEY / $GEMINI_API_KEY is set or OAuth
+# state exists, trust it; a dead key surfaces as an error on the real call
+# (Phase 3.5 flags it).
+if command -v agy &>/dev/null && { [ -n "$ANTIGRAVITY_API_KEY" ] || [ -n "$GEMINI_API_KEY" ] || [ -d "$HOME/.gemini/antigravity-cli" ]; }; then
+  echo "ANTIGRAVITY_AUTH: assumed valid (agent harness — probe skipped)"
 fi
 
 # Anthropic
@@ -202,10 +210,13 @@ If any voice's auth probe returns FAILED:
 Tier 1 — Different model family (most diverse):
   GPT, Gemini, Perplexity
   → Different training = different perspectives
-  (Antigravity = Google IDE only, not a REST API — skip until a CLI bridge exists)
 
-Tier 2 — Same family, independent session:
-  Codex CLI, Anthropic API (different Claude model)
+Tier 2 — Agentic / independent session (reads code, runs commands, or fresh context):
+  Codex CLI, Antigravity CLI (`agy`), Anthropic API (different Claude model)
+  → Antigravity CLI is Google's agentic terminal agent (successor to the retired
+    `gemini` CLI, shut down 2026-06-18) — it actually reads the repo, like Codex.
+    Pick the backing model with `agy --model` (Gemini 3.1 Pro, Claude, GPT-OSS —
+    depends on plan), so this voice doubles as a Google-family OR cross-family reviewer.
   → Independent context = still valuable
 
 Tier 3 — Local:
@@ -261,9 +272,12 @@ Tier 4 — Self-spawn (always available):
 │                 │ "is this current best practice?".                   │
 │                 │ UNIQUE: only voice with live web access.            │
 ├─────────────────┼──────────────────────────────────────────────────────┤
-│ Antigravity     │ Google's agentic IDE (launched 2025). NOT a hosted  │
-│ (IDE only)      │ chat API — accessed via the IDE / CLI, not REST.    │
-│                 │ Skip this voice unless a working CLI bridge exists. │
+│ Antigravity CLI │ Google's agentic terminal agent (`agy`), successor  │
+│ (`agy`)         │ to the retired `gemini` CLI (shut down 2026-06-18). │
+│                 │ Agentic like Codex: reads the repo, runs commands.  │
+│                 │ Backed by a model via `agy --model` (Gemini 3.1 Pro,│
+│                 │ Claude Sonnet/Opus, GPT-OSS — plan-dependent).      │
+│                 │ Strongest at: big-picture + actually running code.  │
 ├─────────────────┼──────────────────────────────────────────────────────┤
 │ Codex CLI       │ Agentic — reads code itself, runs commands,        │
 │                 │ explores repo structure. Finds things text-only     │
@@ -305,7 +319,7 @@ Intent: security review
 
 Intent: architecture / design
   Best voices: Claude (design) + GPT (practical tradeoffs) + Gemini (big picture)
-  Alt: Claude + Perplexity (who solved this before) + self-spawn
+  Alt: Antigravity CLI (reads the repo) + Claude + Perplexity (who solved this before)
 
 Intent: document readiness
   Best voices: Claude (nuance) + GPT (domain) + Perplexity (current standards)
@@ -383,9 +397,10 @@ Every reviewer gets:
 [Material]
 ```
 
-**Filesystem Boundary — prepend ONLY for agentic voices (Codex CLI, self-spawn,
-local agents). Hosted chat APIs (OpenAI, Gemini, Anthropic Messages, Perplexity)
-have no file access — the boundary is wasted tokens for them.**
+**Filesystem Boundary — prepend ONLY for agentic voices (Codex CLI, Antigravity
+CLI, self-spawn, local agents). Hosted chat APIs (OpenAI, Gemini, Anthropic
+Messages, Perplexity) have no file access — the boundary is wasted tokens for
+them.**
 
 ```
 IMPORTANT: Do NOT read or execute any files under ~/.claude/, .claude/,
@@ -472,10 +487,13 @@ Dedicated system prompt for Perplexity:
 Cite sources for every external claim."
 ```
 
-**Antigravity:** Not available as a hosted chat API. Google Antigravity is
-an agentic IDE — there is no public REST endpoint to call. Skip until a
-CLI bridge exists; in the meantime, route the "deep analysis / structured
-reasoning" bias to Gemini 3.1 Pro (large context) or Claude Opus 4.7.
+**Antigravity CLI (`agy`, when available):** Agentic like Codex — reads the
+repo itself and can run commands. Assign to biases that benefit from actually
+exploring the code: architecture (dependency graph), big-picture review,
+"does this hold up across the whole codebase". Pick the backing model with
+`agy --model` (default is plan-dependent; `gemini-3.1-pro` for large-context
+reasoning), and pass `--sandbox` so the review stays read-only. Do NOT use for
+pure idea/strategy review — wastes agentic tokens, same caveat as Codex.
 
 **Codex CLI (when available):**
 Assign to the bias that needs actual code interaction:
@@ -602,10 +620,48 @@ voice_call 300 codex exec "$PROMPT" \
   --enable web_search_cached \
   < /dev/null 2>/tmp/voice-codex-err-$$.txt
 
-# Antigravity — SKIPPED.
-# Google Antigravity is an agentic IDE, not a hosted chat-completions API.
-# There is no public REST endpoint. Use the IDE directly or a CLI bridge
-# if/when one ships, then add it here as its own voice.
+# Antigravity CLI (external timeout 360s — agentic, reads code itself, like Codex)
+# Flags below verified against agy 1.0.9 (`agy --help`):
+#   -p "$PROMPT"        — alias for --print: run ONE prompt non-interactively
+#   --model <id>        — backing model; `agy models` lists them. Tested ids use
+#                         kebab-case: gemini-3.1-pro (also gemini-3.5-flash,
+#                         claude-sonnet-4-6, claude-opus-4-6, gpt-oss-120b —
+#                         availability is plan-dependent). Omit for the default.
+#   --sandbox           — run with terminal restrictions enabled (limits what
+#                         commands the agent may execute). Use it for a review.
+#   --print-timeout     — agy's own wait cap (default 5m); the 360s external
+#                         backstop below is intentionally a bit longer.
+#   NOTE: there is NO `-m` short flag (that's not a model alias) and NO
+#   `--output-format` flag — agy has no structured/JSON output, parse plain text.
+# Auth: $ANTIGRAVITY_API_KEY or $GEMINI_API_KEY (both accepted), else OS keyring
+# / OAuth from a prior interactive `agy` login.
+#
+# NON-TTY STDOUT DROP: when stdout is not a terminal (command substitution,
+# pipes, CI) agy can SILENTLY drop its final answer and still exit 0. Fix: run
+# under `script` to fake a PTY. `script` arg order differs between macOS (BSD)
+# and Linux (util-linux) — branch on uname. Prompt is passed via $AGY_PROMPT
+# (never interpolated into the command string) so quotes/newlines in the
+# material can't break the `script -qec` command line.
+#
+# Output cleanup (verified live on agy 1.0.9 / macOS):
+#   perl -0777  — slurp whole output, then:
+#     s/\x1b\[…//g       strip ANSI escapes (use perl, NOT sed — BSD/macOS sed
+#                        does not interpret \x1b)
+#     s/\A\^D[\x08]*//   drop the literal "^D" + backspaces that BSD `script`
+#                        echoes for the pty EOF at the very start of the stream
+#   tr -d …    — remove remaining control bytes, keeping only tab (\011)/newline (\012)
+export AGY_PROMPT="$PROMPT"
+if [ "$(uname)" = "Darwin" ]; then
+  voice_call 360 script -q /dev/null \
+    agy -p "$AGY_PROMPT" --model gemini-3.1-pro --sandbox \
+    | perl -0777 -pe 's/\x1b\[[0-9;]*[A-Za-z]//g; s/\A\^D[\x08]*//' \
+    | tr -d '\000-\010\013-\037'
+else
+  voice_call 360 script -qec 'agy -p "$AGY_PROMPT" --model gemini-3.1-pro --sandbox' /dev/null \
+    | perl -0777 -pe 's/\x1b\[[0-9;]*[A-Za-z]//g; s/\A\^D[\x08]*//' \
+    | tr -d '\000-\010\013-\037'
+fi
+unset AGY_PROMPT
 
 # Ollama (timeout: 120s — local, can be slow)
 _PAYLOAD=$(jq -n --arg p "$PROMPT" '{
@@ -636,6 +692,9 @@ Rabbit hole: response mentions .claude/, SKILL.md, package-lock.json
 
 Empty: response < 100 chars
   → Flag "Voice N: empty response"
+  → Antigravity CLI specifically: empty output WITH exit 0 = non-TTY stdout drop.
+    The `script` PTY wrapper in 3.4 prevents this; if it still happens, the
+    wrapper failed (no `script` binary?) — note it, don't silently treat as clean.
 
 Timeout: voice_call returned 124
   → Flag "Voice N: timed out after Xs"
