@@ -90,7 +90,9 @@ Never paraphrase these: numbers, names of people / products, error codes, file p
 - Did any commitment / deadline disappear or get softened?
 - Did any decision / risk get dropped?
 - Is there any new info (not present in the source)?
-- Any em dash `—` left in body text? Any banned buzzword or hollow opening/closing from Step 7?
+- Any em dash `—` in body text, or leftover typographic unicode (en dash `–`, curly quotes, `…`, `•`, decorative emoji) anywhere?
+- Any antithesis shape ("not X, it's Y" / "không phải X mà là Y")?
+- Any banned buzzword or hollow opening/closing from Step 7?
 
 If yes to any → fix it. This check runs on every return, including follow-up edits (see below).
 
@@ -112,6 +114,21 @@ Vague input → short, neutral output. Do not invent detail to make sentences fl
 - Em dash is fine in subjects or headings.
 - No emoji unless the user asks or the channel genuinely uses them (friendly slack, social post).
 - Limit consecutive semicolons / colons.
+
+**Keyboard symbols only** — normalize typographic unicode to plain ASCII everywhere, including headings. These are silent AI/word-processor tells:
+- en dash `–` → `-`
+- curly quotes `“ ” ‘ ’` → straight `"` `'`
+- ellipsis `…` → `...`
+- unicode bullet `•` → `-` or `*`
+- decorative emoji (✨ 🚀 ✅ ❌ ➡ …) → remove, unless the user asked or the channel genuinely uses them
+Exception: keep a character if the user's source deliberately used it and asked to preserve formatting.
+
+**No antithesis** — do not manufacture contrast to create rhythm. Banned shapes and their variants:
+- "It's not X, it's Y"
+- "Not just X, but Y"
+- "X isn't the problem, Y is"
+- "không phải X, mà là Y"
+State the claim directly. "Y is what matters" beats "It's not X, it's Y" — the X half is usually filler the writer never needed.
 
 **Format**
 - Do not bullet-ize 1-3 sentences that can be prose.
