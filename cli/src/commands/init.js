@@ -15,9 +15,9 @@ import {
   verifySettingsJson, PLACEHOLDER_DIRS, COMPONENTS,
   getTemplateDir, installSkillGlobal, getGlobalSkillsDir,
   installHookGlobal, getGlobalHooksDir, mergeGlobalSettings,
-  installAgentSkills, installAgentRules,
+  installAgentSkills, installAgentRules, installSkillForAgent,
 } from '../lib/installer.js';
-import { resolveAgents, AGENTS } from '../lib/agents.js';
+import { resolveAgents, AGENTS, parseSkillPath } from '../lib/agents.js';
 import { computeDesired } from '../lib/reconcile.js';
 import { hashContent } from '../lib/hasher.js';
 import { readFile, writeFile } from 'node:fs/promises';
@@ -185,11 +185,13 @@ export async function initCommand(path, opts) {
     log.info('Dry run — no changes will be made');
     log.blank();
     for (const file of files) {
-      const dst = resolve(targetDir, file);
+      const sk = parseSkillPath(file);
+      const rel = sk ? AGENTS.claude.skillTarget(sk.skill, sk.inner) : file;
+      const dst = resolve(targetDir, rel);
       if (existsSync(dst) && !opts.force) {
-        log.skip(`${file} (exists)`);
+        log.skip(`${rel} (exists)`);
       } else {
-        log.copy(`${file} (would copy)`);
+        log.copy(`${rel} (would copy)`);
       }
     }
     return;
@@ -204,20 +206,30 @@ export async function initCommand(path, opts) {
   let identical = 0;
 
   for (const file of files) {
-    const result = await installFile(file, targetDir, { force: opts.force });
-    if (result === 'copied') copied++;
-    else if (result === 'identical') identical++;
-    else skipped++;
+    // Skills are emitted through the Claude target (canonical skills/ → .claude/skills/);
+    // hooks/config/docs are copied verbatim at their own path.
+    const isSkill = !!parseSkillPath(file);
+    let outPath = file;
+    if (isSkill) {
+      const { result, path } = await installSkillForAgent('claude', file, targetDir, { force: opts.force });
+      outPath = path || file;
+      if (result === 'copied') copied++;
+      else if (result === 'identical') identical++;
+      else skipped++;
+    } else {
+      const result = await installFile(file, targetDir, { force: opts.force });
+      if (result === 'copied') copied++;
+      else if (result === 'identical') identical++;
+      else skipped++;
+    }
 
-    // Record in manifest
-    const templatePath = resolve(getTemplateDir(), file);
-    const installedPath = resolve(targetDir, file);
-    const kitHash = await hashFile(templatePath);
+    // Record in manifest (keyed by on-disk path; Claude emit is byte-identical to source).
+    const kitHash = await hashFile(resolve(getTemplateDir(), file));
     let installedHash = kitHash;
     try {
-      installedHash = await hashFile(installedPath);
+      installedHash = await hashFile(resolve(targetDir, outPath));
     } catch { /* file might not exist if skipped */ }
-    setFileEntry(manifest, file, kitHash, installedHash);
+    setFileEntry(manifest, outPath, kitHash, installedHash, { agent: 'claude', templateRel: file });
   }
 
   // Placeholder directories
@@ -476,7 +488,10 @@ async function adoptExisting(targetDir) {
   let adopted = 0;
 
   for (const file of allFiles) {
-    const installedPath = resolve(targetDir, file);
+    // Skills live at the Claude output path (.claude/skills/) on disk; map from canonical skills/.
+    const sk = parseSkillPath(file);
+    const outRel = sk ? AGENTS.claude.skillTarget(sk.skill, sk.inner) : file;
+    const installedPath = resolve(targetDir, outRel);
     const templatePath = resolve(getTemplateDir(), file);
 
     if (!existsSync(installedPath)) continue;
@@ -488,8 +503,8 @@ async function adoptExisting(targetDir) {
     } catch {
       kitHash = installedHash; // Template doesn't exist, treat as matching
     }
-    setFileEntry(manifest, file, kitHash, installedHash);
-    log.adopt(file);
+    setFileEntry(manifest, outRel, kitHash, installedHash, { agent: 'claude', templateRel: file });
+    log.adopt(outRel);
     adopted++;
   }
 

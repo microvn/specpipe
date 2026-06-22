@@ -1,7 +1,8 @@
 # Multi-Agent Support
 
-agentpipe authors each skill once in the **canonical Claude form**
-(`kit/.claude/skills/<skill>/SKILL.md`) and emits per-agent variants on install.
+agentpipe authors each skill once in an **agent-neutral source**
+(`kit/skills/<skill>/SKILL.md`) and emits per-agent variants on install — Claude is
+just one target (its emitter keeps the frontmatter verbatim), not the privileged source.
 The markdown **body is identical** across agents; only the install path, file name,
 and frontmatter change. See `cli/src/lib/agents.js` for the registry and emitters.
 
@@ -25,7 +26,7 @@ skills only; their guard story is future work (see Phases below).
 | Antigravity | `.agents/skills/<n>/` | `SKILL.md` | `name` + `description` | none (rules) |
 | OpenClaw | `skills/<n>/` | `SKILL.md` | `name` + `description` | none |
 | Hermes-Agent | `optional-skills/agentpipe/<n>/` | `SKILL.md` | `name` + `description` + `version` + `metadata.hermes.tags` | none |
-| Codex CLI | `.codex/skills/<n>/` | `SKILL.md` | `name` + `description` | AGENTS.md |
+| Codex CLI | `.agents/skills/<n>/` | `SKILL.md` | `name` + `description` | AGENTS.md |
 | Cursor | `.cursor/rules/` | `<n>.mdc` | `description` + `globs` + `alwaysApply` | none |
 
 `allowed-tools` (Claude-specific) is stripped for every non-Claude agent.
@@ -34,8 +35,8 @@ Cursor reference files (templates/examples) land under `.cursor/rules/<n>/`.
 ### Sources
 - Claude Code skills/memory: https://code.claude.com/docs/en/skills , https://code.claude.com/docs/en/memory
 - Cursor rules: https://cursor.com/docs/rules
-- Codex AGENTS.md / skills: https://developers.openai.com/codex/guides/agents-md , https://developers.openai.com/codex/skills
-- Antigravity skills: https://ai.google.dev/gemini-api/docs/antigravity-agent ; path `.agents/skills` confirmed via GitHub code search (26.8k vs 7.1k for singular)
+- Codex skills/AGENTS.md: https://developers.openai.com/codex/skills , /concepts/customization , /guides/agents-md — skills live in `.agents/skills/` (NOT `.codex/skills/`, a non-working path per openai/codex#15136)
+- Antigravity skills: https://codelabs.developers.google.com/getting-started-with-antigravity-skills (`.agents/skills/`); rules `.agent/rules/` per atamel.dev (Google DevRel)
 - OpenClaw: https://github.com/openclaw/openclaw (skills/<n>/SKILL.md, `metadata.openclaw` block)
 - Hermes-Agent: https://github.com/NousResearch/hermes-agent (optional-skills/<cat>/<n>/SKILL.md; persona in `SOUL.md`)
 
@@ -48,7 +49,7 @@ manifest fields. Backward compatible — no `--agents` behaves exactly as before
 Every other agent gets the same guard *intent* as an always-on rule, emitted from
 one canonical source (`kit/rules/agentpipe-guards.md`):
 - Cursor → `.cursor/rules/agentpipe-guards.mdc` (`alwaysApply: true`)
-- Antigravity → `.agents/rules/agentpipe-guards.md` (`trigger: always_on`)
+- Antigravity → `.agent/rules/agentpipe-guards.md` (plain markdown — no documented trigger/glob frontmatter)
 - Codex → a marked section merged into a shared `AGENTS.md` (preserves user content; stripped cleanly on remove)
 - OpenClaw / Hermes → `AGENTPIPE-GUARDS.md` advisory doc (no rules system)
 
@@ -70,8 +71,8 @@ model (`computeDesired`). The manifest lives at the neutral `.agentpipe/manifest
 (legacy `.claude/` read as a fallback) and records `{ agent, templateRel }` per file.
 
 **Other open items**
-- Codex Agent Skills project path (`.codex/skills/`) is a reasonable default but not
-  yet verified against a real Codex install.
+- Codex + Antigravity skills share the vendor-neutral `.agents/skills/` standard, so
+  installing for either lands the same files there (one emission serves the family).
 - Global install (`init --global`) is still Claude-only; multi-agent global is future work.
 - The skill *bodies* still reference "Claude Code" where they describe Claude
   capabilities — intentional. The adaptation section explains the gap rather than

@@ -647,7 +647,7 @@ assert_exists "claude settings.json present" "$PROJECT_DIR/.claude/settings.json
 assert_exists "claude skill present" "$PROJECT_DIR/.claude/skills/ap-plan/SKILL.md"
 assert_exists "openclaw skill present" "$PROJECT_DIR/skills/ap-plan/SKILL.md"
 assert_exists "hermes skill present" "$PROJECT_DIR/optional-skills/agentpipe/ap-plan/SKILL.md"
-assert_exists "codex skill present" "$PROJECT_DIR/.codex/skills/ap-plan/SKILL.md"
+assert_exists "codex skill present" "$PROJECT_DIR/.agents/skills/ap-plan/SKILL.md"
 
 teardown
 
@@ -714,7 +714,7 @@ setup
 
 cli init "$PROJECT_DIR" --agents cursor,antigravity,openclaw
 assert_exists "cursor guards .mdc"        "$PROJECT_DIR/.cursor/rules/agentpipe-guards.mdc"
-assert_exists "antigravity guards rule"   "$PROJECT_DIR/.agents/rules/agentpipe-guards.md"
+assert_exists "antigravity guards rule"   "$PROJECT_DIR/.agent/rules/agentpipe-guards.md"
 assert_exists "openclaw advisory doc"     "$PROJECT_DIR/AGENTPIPE-GUARDS.md"
 CR=$(cat "$PROJECT_DIR/.cursor/rules/agentpipe-guards.mdc")
 assert_contains "cursor guards alwaysApply" "alwaysApply: true" "$CR"

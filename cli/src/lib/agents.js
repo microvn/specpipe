@@ -2,7 +2,7 @@
  * Agent registry + skill emitters.
  *
  * The canonical source of truth is the Claude-form skill:
- *   kit/.claude/skills/<skill>/SKILL.md  (frontmatter: description [+ allowed-tools], body markdown)
+ *   kit/skills/<skill>/SKILL.md  (agent-neutral source; frontmatter: description [+ allowed-tools], body markdown)
  *
  * Each target agent gets its own emitter that rewrites the install path, the
  * file name, and the frontmatter to that agent's native convention — while
@@ -46,11 +46,13 @@ function compose(frontmatter, body) {
 
 /**
  * Split a canonical skill relative path into its skill name + inner path.
- *   '.claude/skills/ap-plan/SKILL.md'            -> { skill: 'ap-plan', inner: 'SKILL.md' }
- *   '.claude/skills/ap-scaffold/references/x.md' -> { skill: 'ap-scaffold', inner: 'references/x.md' }
+ * Canonical skills live in the agent-neutral `kit/skills/` (relative: `skills/`);
+ * each agent's emitter maps them to its own output location.
+ *   'skills/ap-plan/SKILL.md'            -> { skill: 'ap-plan', inner: 'SKILL.md' }
+ *   'skills/ap-scaffold/references/x.md' -> { skill: 'ap-scaffold', inner: 'references/x.md' }
  */
 export function parseSkillPath(rel) {
-  const m = rel.replace(/\\/g, '/').match(/^\.claude\/skills\/([^/]+)\/(.+)$/);
+  const m = rel.replace(/\\/g, '/').match(/^skills\/([^/]+)\/(.+)$/);
   if (!m) return null;
   return { skill: m[1], inner: m[2] };
 }
@@ -132,11 +134,13 @@ export const AGENTS = {
   },
   codex: {
     label: 'OpenAI Codex CLI',
-    // Codex Agent Skills (custom-prompts deprecated). Project-scoped skills dir.
-    skillTarget: (name, inner) => `.codex/skills/${name}/${inner}`,
-    globalRoot: '.codex/skills',
+    // Verified (developers.openai.com/codex/skills + openai/codex repo): Codex Agent
+    // Skills live in the vendor-neutral `.agents/skills/` (NOT `.codex/skills/`, which
+    // is a known non-working path — openai/codex#15136). Custom-prompts are deprecated.
+    skillTarget: (name, inner) => `.agents/skills/${name}/${inner}`,
+    globalRoot: '.agents/skills',
     skillFile: 'SKILL.md',
-    hooks: 'agents-md', // guard-intent folds into AGENTS.md in a later phase
+    hooks: 'agents-md', // guards fold into AGENTS.md (plain markdown, no frontmatter)
     capabilities: 'router-no-hooks',
     emitFrontmatter: fmNameDesc,
   },
@@ -209,29 +213,52 @@ function toolsOf(parsed) {
   return block.replace(/^allowed-tools:\s*/, '').split(',').map((s) => s.trim()).filter(Boolean);
 }
 
+// Phrase-level rewrites that turn Claude's `AskUserQuestion` tool references into
+// an explicit, mechanism-named instruction every conversational agent can follow:
+// present one structured multiple-choice question in plain text and wait. Ordered
+// most-specific first so the result stays grammatical (not a bare token swap).
+const ASK = 'a single plain-text multiple-choice question';
+const ASK_SUBS = [
+  [/go through the `?AskUserQuestion`? tool\s+—\s+never ask inline in text/gi, `be presented as ${ASK} (wait for the reply — don't bury choices in prose)`],
+  [/\bthe `?AskUserQuestion`? tool\b/gi, ASK],
+  [/\b(a single|one) `?AskUserQuestion`? call\b/gi, ASK],
+  [/`?AskUserQuestion`? call\b/gi, ASK],
+  [/`?AskUserQuestion`? format\b/gi, 'question format'],
+  [/\bEvery `?AskUserQuestion`?\b/g, 'Every question'],
+  [/\b(via|through|with|using) `?AskUserQuestion`?/gi, `$1 ${ASK}`],
+  [/\b[Uu]se `?AskUserQuestion`?/g, `ask ${ASK}`],
+  [/`?AskUserQuestion`?/g, ASK],
+];
+
+function rewriteAsk(body) {
+  return ASK_SUBS.reduce((s, [re, to]) => s.replace(re, to), body);
+}
+
 /**
- * Keep the body verbatim, but append a capability-adaptation section when the
- * skill declares Claude-specific tools the target agent may not have. This is
- * how a skill "degrades gracefully" instead of silently assuming Claude's
- * tool surface (Phase 3). Claude itself gets the body unchanged.
+ * Adapt a skill body for a non-Claude agent (Phase 3). Claude gets the body
+ * verbatim. For other agents:
+ *  - AskUserQuestion references are rewritten in place into an explicit
+ *    "plain-text multiple-choice question" instruction (mechanism named, so the
+ *    agent knows exactly what to do — not vague prose).
+ *  - Subagent orchestration can't be fixed by wording (it's an execution model),
+ *    so it gets an honest caveat appended.
+ *  - GraphAtlas already self-degrades in the body ("if GA available … else grep"),
+ *    so it needs no adaptation.
  */
 function adaptBody(agentId, body, tools) {
   if (agentId === 'claude') return body;
 
   const has = (name) => tools.some((t) => t === name || t.startsWith(name));
-  const notes = [];
-  if (has('AskUserQuestion')) {
-    notes.push('- **Asking the user:** written for Claude\'s `AskUserQuestion` tool. Present the same choices in plain text and wait for the answer before proceeding.');
-  }
-  if (has('Agent') || has('Task')) {
-    notes.push('- **Subagents:** this skill may dispatch subagents (Claude\'s `Task`/`Agent`). If your runtime can\'t spawn subagents, perform each delegated step yourself, sequentially, in this same session.');
-  }
-  if (has('mcp__graphatlas')) {
-    notes.push('- **GraphAtlas MCP:** optional code-graph tool. If unavailable, fall back to `grep` and file search.');
-  }
-  if (!notes.length) return body;
+  let out = rewriteAsk(body);
 
-  return `${body.replace(/\s*$/, '')}\n\n---\n\n## Running outside Claude Code\n\nThis skill was authored for Claude Code. On ${AGENTS[agentId].label}:\n\n${notes.join('\n')}\n`;
+  if (has('Agent') || has('Task')) {
+    out = `${out.replace(/\s*$/, '')}\n\n---\n\n## Running on ${AGENTS[agentId].label}\n\n` +
+      '- **Subagents:** parts of this skill describe Claude subagent orchestration ' +
+      '(parallel waves, worktrees, auto-mode dispatch). If your runtime has no ' +
+      'subagents, do that work yourself — one item at a time, sequentially, in this ' +
+      'session — and skip the parallel/worktree mechanics.\n';
+  }
+  return out;
 }
 
 /**
@@ -257,11 +284,9 @@ const RULES = {
     path: '.cursor/rules/agentpipe-guards.mdc',
     frontmatter: 'description: agentpipe guardrails — always-on engineering constraints\nglobs:\nalwaysApply: true',
   },
-  antigravity: {
-    mode: 'file',
-    path: '.agents/rules/agentpipe-guards.md',
-    frontmatter: 'trigger: always_on\nglobs: ["**/*"]',
-  },
+  // Antigravity rules are plain markdown (no documented trigger/glob frontmatter);
+  // official Google DevRel uses the singular `.agent/rules/` path.
+  antigravity: { mode: 'doc', path: '.agent/rules/agentpipe-guards.md' },
   codex: { mode: 'agents-md', path: 'AGENTS.md' },
   openclaw: { mode: 'doc', path: 'AGENTPIPE-GUARDS.md' },
   hermes: { mode: 'doc', path: 'AGENTPIPE-GUARDS.md' },

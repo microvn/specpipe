@@ -47,7 +47,7 @@ Every code change — feature, fix, or removal — follows this cycle. The spec 
 
 - **Prevents drift.** Acceptance scenarios live inside the spec — no separate test plan to fall out of sync.
 - **Tests have purpose.** Scenarios derived from specs test behavior, not implementation details. This means tests survive refactoring.
-- **AI writes better code.** When Claude Code has a spec with concrete Given/When/Then scenarios, it generates more accurate implementations and more meaningful tests.
+- **AI writes better code.** When an agent has a spec with concrete Given/When/Then scenarios, it generates more accurate implementations and more meaningful tests.
 - **Reviews are grounded.** Reviewers can check code against the spec rather than guessing at intent.
 
 ### Principles
@@ -65,9 +65,16 @@ Every code change — feature, fix, or removal — follows this cycle. The spec 
 **Time needed: 5 minutes.** Below is a realistic transcript — user input, what each skill actually asks, what it actually outputs. Nothing embellished.
 
 ```bash
-npx agentpipe init .   # one-time install
-claude                          # open Claude Code
+npx agentpipe init .              # install for Claude Code (default)
+# or target other agents:
+npx agentpipe init . --agents cursor,codex
+npx agentpipe init . --agents all
+
+claude                            # open your agent (claude, codex, cursor, …)
 ```
+
+> The transcript below is on Claude Code. The same skills install for Codex, Cursor,
+> Antigravity, OpenClaw, and Hermes — see [§ Supported agents](#supported-agents).
 
 ### Step 1 — Spec the feature (`/ap-plan`)
 
@@ -176,7 +183,7 @@ That's the 5 minutes. The CLI auto-detected your project (Swift + XCTest here) �
 
 | Tool | Required | Why |
 |------|----------|-----|
-| **Claude Code CLI** | Yes | Runs the commands and hooks |
+| **A supported agent CLI** | Yes | Runs the skills — Claude Code, Codex, Cursor, Antigravity, OpenClaw, or Hermes |
 | **Git** | Yes | Change detection, commit workflow |
 | **Node.js** (18+) | Yes | File guard hook, JSON parsing |
 | **Bash** (4+) | Yes | Path guard hook, shell-based hooks |
@@ -222,10 +229,43 @@ npx agentpipe init --force .
 npx agentpipe init --only hooks,skills .
 ```
 
+**Option E: Multi-agent install** (one agent, several, or all)
+
+```bash
+npx agentpipe init --agents cursor .            # one
+npx agentpipe init --agents claude,codex .      # several
+npx agentpipe init --agents all .               # every supported agent
+```
+
+### Supported agents
+
+The skills are authored once and emitted into each agent's native format on install.
+The markdown body is identical across agents; only the file location, name, and
+frontmatter change. Only Claude Code has a native hook system — every other agent
+gets the same guardrails as **always-on advisory rules** instead of enforced hooks.
+
+| Agent | Install location | Guardrails |
+|-------|------------------|-----------|
+| **Claude Code** | `.claude/skills/ap-*/SKILL.md` + `.claude/hooks/` | Hook-enforced |
+| **Antigravity** | `.agents/skills/ap-*/SKILL.md` | `.agents/rules/` (advisory) |
+| **OpenClaw** | `skills/ap-*/SKILL.md` | `AGENTPIPE-GUARDS.md` (advisory) |
+| **Hermes** | `optional-skills/agentpipe/ap-*/SKILL.md` | `AGENTPIPE-GUARDS.md` (advisory) |
+| **Codex CLI** | `.codex/skills/ap-*/SKILL.md` | `AGENTS.md` section (advisory) |
+| **Cursor** | `.cursor/rules/ap-*.mdc` | `.cursor/rules/` (advisory) |
+
+Skills that use Claude-only tools (`AskUserQuestion`, subagents) get a "Running outside
+Claude Code" note appended for the other agents, so they degrade gracefully. The specs
+and workflow themselves are tool-agnostic. Full details: [docs/multi-agent.md](docs/multi-agent.md).
+
 ### What Gets Installed
+
+The tree below is the **Claude Code** layout (`--agents claude`, the default). Other
+agents install the same skills into their own locations — see [Supported agents](#supported-agents).
 
 ```
 your-project/
+├── .agentpipe/
+│   └── manifest.json          ← install manifest (tracks files per agent; used by upgrade/remove)
 ├── .claude/
 │   ├── CLAUDE.md              ← Project rules hub
 │   ├── settings.json          ← Hook wiring

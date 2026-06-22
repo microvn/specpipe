@@ -43,20 +43,20 @@ console.log('\n── parseSkill ──');
 
 console.log('\n── parseSkillPath ──');
 {
-  eq('skill name', parseSkillPath('.claude/skills/ap-plan/SKILL.md').skill, 'ap-plan');
-  eq('inner SKILL.md', parseSkillPath('.claude/skills/ap-plan/SKILL.md').inner, 'SKILL.md');
-  eq('nested inner', parseSkillPath('.claude/skills/ap-scaffold/references/x.md').inner, 'references/x.md');
+  eq('skill name', parseSkillPath('skills/ap-plan/SKILL.md').skill, 'ap-plan');
+  eq('inner SKILL.md', parseSkillPath('skills/ap-plan/SKILL.md').inner, 'SKILL.md');
+  eq('nested inner', parseSkillPath('skills/ap-scaffold/references/x.md').inner, 'references/x.md');
   eq('non-skill path -> null', parseSkillPath('docs/WORKFLOW.md'), null);
 }
 
 console.log('\n── emitSkillFile: paths ──');
-const REL = '.claude/skills/ap-plan/SKILL.md';
+const REL = 'skills/ap-plan/SKILL.md';
 {
   eq('claude path', emitSkillFile('claude', REL, SKILL).path, '.claude/skills/ap-plan/SKILL.md');
   eq('antigravity path', emitSkillFile('antigravity', REL, SKILL).path, '.agents/skills/ap-plan/SKILL.md');
   eq('openclaw path', emitSkillFile('openclaw', REL, SKILL).path, 'skills/ap-plan/SKILL.md');
   eq('hermes path', emitSkillFile('hermes', REL, SKILL).path, 'optional-skills/agentpipe/ap-plan/SKILL.md');
-  eq('codex path', emitSkillFile('codex', REL, SKILL).path, '.codex/skills/ap-plan/SKILL.md');
+  eq('codex path', emitSkillFile('codex', REL, SKILL).path, '.agents/skills/ap-plan/SKILL.md');
   eq('cursor path -> .mdc flat', emitSkillFile('cursor', REL, SKILL).path, '.cursor/rules/ap-plan.mdc');
 }
 
@@ -88,7 +88,7 @@ console.log('\n── emitSkillFile: frontmatter transforms ──');
 
 console.log('\n── emitSkillFile: reference files copy verbatim ──');
 {
-  const refRel = '.claude/skills/ap-scaffold/references/react.md';
+  const refRel = 'skills/ap-scaffold/references/react.md';
   const refContent = '# react profile\nstuff';
   const ag = emitSkillFile('antigravity', refRel, refContent);
   eq('ref path under skill dir', ag.path, '.agents/skills/ap-scaffold/references/react.md');
@@ -119,19 +119,42 @@ console.log('\n── registry invariants ──');
   eq('every agent has required fields', allHaveFields, true);
 }
 
+console.log('\n── AskUserQuestion rewrite on real skills ──');
+{
+  const dir = new URL('../kit/skills/', import.meta.url);
+  const { readFileSync, readdirSync } = await import('node:fs');
+  let leaks = 0, claudeId = 0, total = 0;
+  for (const s of readdirSync(dir)) {
+    let src;
+    try { src = readFileSync(new URL(`${s}/SKILL.md`, dir), 'utf8'); } catch { continue; }
+    total++;
+    const rel = `skills/${s}/SKILL.md`;
+    if (!/AskUserQuestion/.test(emitSkillFile('cursor', rel, src).content)) {} else { leaks++; }
+    if (emitSkillFile('claude', rel, src).content === src) claudeId++;
+  }
+  eq('no AskUserQuestion leaks in non-Claude output', leaks, 0);
+  eq('every skill is byte-identical for Claude', claudeId, total);
+  eq('found the real skill set', total >= 13, true);
+}
+
 console.log('\n── capability adaptation (Phase 3) ──');
 {
   // SKILL fixture declares AskUserQuestion + Agent in allowed-tools.
   const cu = emitSkillFile('cursor', REL, SKILL).content;
-  has('non-claude gets adaptation section', cu, 'Running outside Claude Code');
-  has('AskUserQuestion note injected', cu, 'Asking the user');
-  has('Subagent note injected', cu, 'Subagents:');
-  has('note names the agent', cu, 'On Cursor:');
-  not('claude body has no adaptation section', emitSkillFile('claude', REL, SKILL).content, 'Running outside Claude Code');
+  has('non-claude gets a Running-on section', cu, 'Running on Cursor');
+  has('subagent caveat present', cu, 'Subagents:');
+  not('claude has no Running-on section', emitSkillFile('claude', REL, SKILL).content, 'Running on');
+
+  // AskUserQuestion references are rewritten in place, not left as the tool name.
+  const asking = `---\ndescription: |\n  d\nallowed-tools: Read, AskUserQuestion\n---\n# body\nUse the \`AskUserQuestion\` tool to confirm; pass all in a single \`AskUserQuestion\` call.`;
+  const askCu = emitSkillFile('cursor', REL, asking).content;
+  not('cursor: AskUserQuestion rewritten away', askCu, 'AskUserQuestion');
+  has('cursor: explicit plain-text instruction', askCu, 'plain-text multiple-choice question');
+  has('claude: AskUserQuestion kept verbatim', emitSkillFile('claude', REL, asking).content, 'AskUserQuestion');
 
   // A skill with no Claude-specific tools gets no adaptation section.
   const plain = `---\ndescription: |\n  Plain skill.\nallowed-tools: Read, Grep\n---\n# body\ntext`;
-  not('plain skill: no adaptation section', emitSkillFile('cursor', REL, plain).content, 'Running outside Claude Code');
+  not('plain skill: no adaptation section', emitSkillFile('cursor', REL, plain).content, 'Running on');
   has('plain skill body preserved', emitSkillFile('cursor', REL, plain).content, 'text');
 }
 
@@ -147,8 +170,8 @@ console.log('\n── emitRules (guardrails) ──');
   has('cursor rules carries body', cu.content, 'rule one');
 
   const ag = emitRules('antigravity', BODY);
-  eq('antigravity rules path', ag.path, '.agents/rules/agentpipe-guards.md');
-  has('antigravity trigger always_on', ag.content, 'trigger: always_on');
+  eq('antigravity rules path (singular .agent, official)', ag.path, '.agent/rules/agentpipe-guards.md');
+  not('antigravity rules: no fabricated frontmatter', ag.content, 'trigger:');
 
   const oc = emitRules('openclaw', BODY);
   eq('openclaw advisory doc path', oc.path, 'AGENTPIPE-GUARDS.md');
