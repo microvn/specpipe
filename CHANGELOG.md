@@ -21,6 +21,13 @@ All notable changes to this project are documented here. The format is based on
 ### Changed
 - Rebrand `claude-devkit-cli` → `agentpipe`; skills `mf-*` → `ap-*`.
 - Codex skills target corrected to the cross-tool `.agents/skills/` standard.
+- Refactor: split `installer.js` (→ `agent-install.js`, `claude-global.js`) and
+  `init.js` (→ `init-agents.js`, `init-global.js`); every source file is now under the
+  350-line guard the kit ships.
+
+### Planned (post-1.0)
+- Subagent conditional content for orchestration skills (currently an advisory caveat).
+- Unify the default and `--agents` install paths into one.
 
 ## [1.0.0] — unreleased (first public release)
 

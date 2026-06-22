@@ -5,114 +5,18 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { log } from '../lib/logger.js';
 import { detectProject } from '../lib/detector.js';
-import { readManifest, writeManifest, createManifest, setFileEntry } from '../lib/manifest.js';
+import { writeManifest, createManifest, setFileEntry } from '../lib/manifest.js';
 import { hashFile } from '../lib/hasher.js';
-import { homedir } from 'node:os';
-import { mkdir } from 'node:fs/promises';
 import {
   getAllFiles, getFilesForComponents, installFile,
   ensurePlaceholderDir, setPermissions, fillTemplate,
   verifySettingsJson, PLACEHOLDER_DIRS, COMPONENTS,
-  getTemplateDir, installSkillGlobal, getGlobalSkillsDir,
-  installHookGlobal, getGlobalHooksDir, mergeGlobalSettings,
-  installAgentSkills, installAgentRules, installSkillForAgent,
+  getTemplateDir, installSkillForAgent,
 } from '../lib/installer.js';
-import { resolveAgents, AGENTS, parseSkillPath } from '../lib/agents.js';
-import { computeDesired } from '../lib/reconcile.js';
-import { hashContent } from '../lib/hasher.js';
-import { readFile, writeFile } from 'node:fs/promises';
+import { AGENTS, parseSkillPath } from '../lib/agents.js';
+import { initMultiAgent } from './init-agents.js';
+import { readGlobalManifest, writeGlobalManifest, initGlobal } from './init-global.js';
 
-const GLOBAL_MANIFEST = join(homedir(), '.claude', '.devkit-manifest.json');
-
-async function readGlobalManifest() {
-  try {
-    return JSON.parse(await readFile(GLOBAL_MANIFEST, 'utf-8'));
-  } catch {
-    return null;
-  }
-}
-
-async function writeGlobalManifest(data) {
-  await mkdir(join(homedir(), '.claude'), { recursive: true });
-  await writeFile(GLOBAL_MANIFEST, JSON.stringify(data, null, 2) + '\n');
-}
-
-export async function initGlobal({ force = false, hooks = false } = {}) {
-  const globalSkillsDir = getGlobalSkillsDir();
-  await mkdir(globalSkillsDir, { recursive: true });
-
-  const existing = await readGlobalManifest() || {};
-  const globalFiles = existing.files || {};
-  const updatedFiles = { ...globalFiles };
-
-  log.blank();
-  console.log('--- Installing global skills ---');
-
-  let copied = 0; let skipped = 0; let identical = 0;
-  for (const relPath of COMPONENTS.skills) {
-    const { result, kitHash } = await installSkillGlobal(relPath, globalSkillsDir, { force, globalFiles });
-    if (result === 'copied') copied++;
-    else if (result === 'identical') identical++;
-    else skipped++;
-    if (result !== 'skipped') updatedFiles[relPath] = { kitHash };
-  }
-
-  const parts = [`${copied} copied`];
-  if (identical > 0) parts.push(`${identical} identical`);
-  if (skipped > 0) parts.push(`${skipped} customized (use --force to overwrite)`);
-  log.pass(`Global skills: ${parts.join(', ')}`);
-  log.info('Skills available in all projects via ~/.claude/skills/');
-
-  if (hooks) {
-    await initGlobalHooks({ force, _globalFiles: updatedFiles, _skipManifestWrite: true });
-  }
-
-  await writeGlobalManifest({
-    ...existing,
-    globalInstalled: true,
-    globalHooksInstalled: hooks || existing.globalHooksInstalled || false,
-    files: updatedFiles,
-    updatedAt: new Date().toISOString(),
-  });
-}
-
-export async function initGlobalHooks({ force = false, _globalFiles, _skipManifestWrite = false } = {}) {
-  const globalHooksDir = getGlobalHooksDir();
-  await mkdir(globalHooksDir, { recursive: true });
-
-  const existing = _skipManifestWrite ? null : (await readGlobalManifest() || {});
-  const globalFiles = _globalFiles || existing?.files || {};
-  const updatedFiles = { ...globalFiles };
-
-  log.blank();
-  console.log('--- Installing global hooks ---');
-
-  let copied = 0; let skipped = 0; let identical = 0;
-  for (const relPath of COMPONENTS.hooks) {
-    const { result, kitHash } = await installHookGlobal(relPath, globalHooksDir, { force, globalFiles });
-    if (result === 'copied') copied++;
-    else if (result === 'identical') identical++;
-    else skipped++;
-    if (result !== 'skipped') updatedFiles[relPath] = { kitHash };
-  }
-
-  await mergeGlobalSettings(globalHooksDir);
-
-  const parts = [`${copied} copied`];
-  if (identical > 0) parts.push(`${identical} identical`);
-  if (skipped > 0) parts.push(`${skipped} customized (use --force to overwrite)`);
-  log.pass(`Global hooks: ${parts.join(', ')}`);
-  log.info('Hooks registered in ~/.claude/settings.json — active in all projects');
-
-  if (!_skipManifestWrite) {
-    await writeGlobalManifest({
-      ...existing,
-      globalHooksInstalled: true,
-      files: updatedFiles,
-      updatedAt: new Date().toISOString(),
-    });
-  }
-}
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const pkg = JSON.parse(readFileSync(resolve(__dirname, '../../package.json'), 'utf-8'));
@@ -377,102 +281,6 @@ async function trackProjectPath(projectPath) {
   const projects = new Set(meta.projects || []);
   projects.add(projectPath);
   await writeGlobalManifest({ ...meta, projects: [...projects] });
-}
-
-/**
- * Multi-agent install. Each selected agent gets its skill set emitted to its
- * native path + frontmatter. Claude additionally gets the full base
- * (hooks, config, docs) since it's the only agent with a native hook system.
- */
-async function initMultiAgent(targetDir, opts, warnings = 0) {
-  let agents;
-  try {
-    agents = resolveAgents(opts.agents);
-  } catch (e) {
-    log.fail(e.message);
-    process.exit(1);
-  }
-  const claudeSelected = agents.includes('claude');
-  const labels = agents.map((a) => AGENTS[a].label).join(', ');
-
-  if (opts.dryRun) {
-    log.info('Dry run — no changes will be made');
-    log.info(`Target agents: ${labels}`);
-    return;
-  }
-
-  log.blank();
-  console.log(`--- Installing for: ${labels} ---`);
-
-  const manifest = createManifest(pkg.version, null, Object.keys(COMPONENTS));
-  manifest.agents = agents;
-
-  // Claude base: hooks + config + docs (only Claude has a native hook system).
-  if (claudeSelected) {
-    log.blank();
-    console.log('  Claude base (hooks, config, docs):');
-    for (const file of [...COMPONENTS.hooks, ...COMPONENTS.config, ...COMPONENTS.docs]) {
-      await installFile(file, targetDir, { force: opts.force });
-    }
-    for (const dir of PLACEHOLDER_DIRS) await ensurePlaceholderDir(dir, targetDir);
-    await setPermissions(targetDir);
-  }
-
-  // Skills + guardrails, emitted per agent into each agent's native location.
-  const results = [];
-  for (const agent of agents) {
-    log.blank();
-    console.log(`  ${AGENTS[agent].label} skills:`);
-    results.push(await installAgentSkills(agent, targetDir, { force: opts.force }));
-    const rules = await installAgentRules(agent, targetDir, { force: opts.force });
-    if (rules?.mode === 'agents-md') manifest.agentsMdGuards = true;
-  }
-
-  // Project detection only fills Claude's CLAUDE.md template.
-  if (claudeSelected) {
-    const projectInfo = detectProject(targetDir);
-    if (projectInfo) {
-      manifest.projectType = { lang: projectInfo.lang, framework: projectInfo.framework };
-      await fillTemplate(targetDir, projectInfo);
-    } else {
-      warnings++;
-    }
-  }
-
-  // Record every installed file (all agents) keyed by on-disk path, with the
-  // hash of what's actually on disk so customization/skip is detected later.
-  const desired = await computeDesired(agents);
-  for (const [relPath, d] of desired) {
-    let installedHash = d.kitHash;
-    try { installedHash = hashContent(await readFile(resolve(targetDir, relPath), 'utf-8')); } catch { /* skipped/missing */ }
-    setFileEntry(manifest, relPath, d.kitHash, installedHash, { agent: d.agent, templateRel: d.templateRel });
-  }
-
-  await writeManifest(targetDir, manifest);
-
-  // Summary
-  log.blank();
-  console.log('=== Setup Complete ===');
-  log.blank();
-  for (const r of results) {
-    const parts = [`${r.copied} copied`];
-    if (r.identical > 0) parts.push(`${r.identical} identical`);
-    if (r.skipped > 0) parts.push(`${r.skipped} conflicted`);
-    console.log(`  ${r.label}: ${parts.join(', ')}`);
-  }
-  if (claudeSelected) {
-    log.blank();
-    console.log('  Claude hooks active via .claude/settings.json.');
-  }
-  const noHook = agents.filter((a) => AGENTS[a].hooks !== 'native');
-  if (noHook.length) {
-    log.blank();
-    log.warn(`${noHook.map((a) => AGENTS[a].label).join(', ')}: guards installed as always-on rules (advisory — not hook-enforced like Claude).`);
-  }
-  if (warnings > 0) {
-    log.blank();
-    console.log(`⚠ ${warnings} warning(s) above — review before proceeding.`);
-  }
 }
 
 /**
