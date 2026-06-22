@@ -1,6 +1,16 @@
-# agentpipe
+<!-- Cover banner: save the generated image at docs/cover.png and uncomment the block below.
+<p align="center">
+  <img src="docs/cover.png" alt="Agentpipe" width="100%">
+</p>
+-->
 
-A lightweight, spec-first development toolkit for agentic AI coding agents. It enforces the cycle **spec (with acceptance scenarios) → code + tests → build pass** through skills, always-on guardrails, and a universal test runner.
+<h1 align="center">Agentpipe</h1>
+
+<p align="center">
+  A lightweight, spec-first development toolkit for agentic AI coding agents.
+</p>
+
+It enforces the cycle **spec (with acceptance scenarios) → code + tests → build pass** through skills, always-on guardrails, and a universal test runner.
 
 **Agents:** [Claude Code](https://claude.ai/code) (full hook enforcement) plus Codex, Cursor, Antigravity, OpenClaw, and Hermes (skills + advisory guard rules). Install for one or all: `agentpipe init --agents <list>|all`. See [docs/multi-agent.md](docs/multi-agent.md).
 **Works with:** Swift, TypeScript/JavaScript, Python, Rust, Go, Java/Kotlin, C#, Ruby.
