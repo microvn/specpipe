@@ -30,12 +30,9 @@
     <text x="640" y="262" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="94" font-weight="800" letter-spacing="-3.2" fill="#E6EDF3">Agentpipe</text>
 
     <!-- connectors -->
-    <line x1="382" y1="350" x2="519" y2="350" stroke="url(#c1)" stroke-width="1.5"/>
-    <line x1="569" y1="350" x2="705" y2="350" stroke="url(#c2)" stroke-width="1.5"/>
-    <line x1="755" y1="350" x2="892" y2="350" stroke="url(#c3)" stroke-width="1.5"/>
-    <text x="516" y="355" font-size="15" fill="#6E7681">&#8250;</text>
-    <text x="702" y="355" font-size="15" fill="#7d8a86">&#8250;</text>
-    <text x="889" y="355" font-size="15" fill="#2EE6A6">&#8250;</text>
+    <line x1="382" y1="350" x2="525" y2="350" stroke="url(#c1)" stroke-width="1.5"/>
+    <line x1="569" y1="350" x2="711" y2="350" stroke="url(#c2)" stroke-width="1.5"/>
+    <line x1="755" y1="350" x2="898" y2="350" stroke="url(#c3)" stroke-width="1.5"/>
 
     <!-- step 1: spec -->
     <circle cx="360" cy="350" r="22" fill="#0D1117" stroke="#6E7681" stroke-width="1.5"/>
