@@ -19,6 +19,7 @@ export function cli(argv) {
     .description('Initialize a project with the dev-kit')
     .option('-f, --force', 'Overwrite existing files')
     .option('-g, --global', 'Install skills globally to ~/.claude/skills/ (available in all projects)')
+    .option('--agents <list>', 'Target agent(s): claude,codex,cursor,antigravity,openclaw,hermes or "all" (default: claude)')
     .option('--only <components>', 'Install only specific components (comma-separated: hooks,skills,scripts,docs,config)')
     .option('--adopt', 'Adopt existing kit files without overwriting (migration from setup.sh)')
     .option('--dry-run', 'Show what would be done without making changes')

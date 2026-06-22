@@ -615,6 +615,51 @@ assert_contains "settings: commands reference TEST_HOME/.claude/hooks/" \
 
 teardown
 
+# ── multi-agent: --agents emits per-agent skills ────────────────────────────
+section "init --agents (non-claude) emits native paths, no .claude"
+setup
+
+cli init "$PROJECT_DIR" --agents cursor,antigravity
+assert_exists "cursor .mdc emitted" "$PROJECT_DIR/.cursor/rules/ap-plan.mdc"
+assert_exists "antigravity SKILL.md emitted" "$PROJECT_DIR/.agents/skills/ap-plan/SKILL.md"
+# Manifest still lives at .claude/.devkit-manifest.json (neutral location is future work),
+# but no Claude *content* is installed when Claude isn't selected.
+assert_absent "no claude settings.json when claude not selected" "$PROJECT_DIR/.claude/settings.json"
+assert_absent "no claude skills when claude not selected" "$PROJECT_DIR/.claude/skills"
+
+AG=$(cat "$PROJECT_DIR/.agents/skills/ap-plan/SKILL.md")
+assert_contains "antigravity adds name from dir" "name: ap-plan" "$AG"
+if printf '%s' "$AG" | grep -q "allowed-tools"; then
+  fail "antigravity drops allowed-tools"
+else pass "antigravity drops allowed-tools"; fi
+
+CU=$(cat "$PROJECT_DIR/.cursor/rules/ap-plan.mdc")
+assert_contains "cursor .mdc has alwaysApply" "alwaysApply: false" "$CU"
+
+teardown
+
+# ── multi-agent: --agents all installs Claude base too ───────────────────────
+section "init --agents all installs Claude base (settings.json) + every agent"
+setup
+
+cli init "$PROJECT_DIR" --agents all
+assert_exists "claude settings.json present" "$PROJECT_DIR/.claude/settings.json"
+assert_exists "claude skill present" "$PROJECT_DIR/.claude/skills/ap-plan/SKILL.md"
+assert_exists "openclaw skill present" "$PROJECT_DIR/skills/ap-plan/SKILL.md"
+assert_exists "hermes skill present" "$PROJECT_DIR/optional-skills/agentpipe/ap-plan/SKILL.md"
+assert_exists "codex skill present" "$PROJECT_DIR/.codex/skills/ap-plan/SKILL.md"
+
+teardown
+
+# ── multi-agent: unknown agent fails ─────────────────────────────────────────
+section "init --agents bogus exits non-zero"
+setup
+
+CODE=$(cli_exit init "$PROJECT_DIR" --agents bogus)
+[[ "$CODE" != "0" ]] && pass "unknown agent rejected (exit $CODE)" || fail "unknown agent should fail"
+
+teardown
+
 # ══════════════════════════════════════════════════════════════════════════════
 # Summary
 # ══════════════════════════════════════════════════════════════════════════════

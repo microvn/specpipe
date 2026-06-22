@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url';
 import { chmod } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { log } from './logger.js';
+import { emitSkillFile, AGENTS } from './agents.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -130,6 +131,52 @@ export async function installFile(relativePath, targetDir, { force = false } = {
   await fsCopyFile(src, dst);
   log.copy(relativePath);
   return 'copied';
+}
+
+/**
+ * Emit one canonical skill file for a target agent and write it to targetDir.
+ * Transforms path + frontmatter per the agent's convention (see agents.js).
+ * @returns {{ result: 'copied'|'skipped'|'identical', path?: string }}
+ */
+export async function installSkillForAgent(agentId, canonicalRel, targetDir, { force = false } = {}) {
+  const src = join(getTemplateDir(), canonicalRel);
+  const content = await readFile(src, 'utf-8');
+  const emitted = emitSkillFile(agentId, canonicalRel, content);
+  if (!emitted) return { result: 'skipped' };
+
+  const dst = join(targetDir, emitted.path);
+  if (existsSync(dst) && !force) {
+    try {
+      if ((await readFile(dst, 'utf-8')) === emitted.content) {
+        log.same(`${emitted.path} (identical)`);
+        return { result: 'identical', path: emitted.path };
+      }
+    } catch { /* unreadable — treat as conflict */ }
+    log.warn(`${emitted.path} (exists with different content — use --force to overwrite)`);
+    return { result: 'skipped', path: emitted.path };
+  }
+
+  await mkdir(dirname(dst), { recursive: true });
+  await writeFile(dst, emitted.content);
+  log.copy(emitted.path);
+  return { result: 'copied', path: emitted.path };
+}
+
+/**
+ * Install the full skill set for one agent into targetDir.
+ * @returns {{ agent: string, copied: number, skipped: number, identical: number, paths: string[] }}
+ */
+export async function installAgentSkills(agentId, targetDir, { force = false } = {}) {
+  let copied = 0, skipped = 0, identical = 0;
+  const paths = [];
+  for (const relPath of COMPONENTS.skills) {
+    const { result, path } = await installSkillForAgent(agentId, relPath, targetDir, { force });
+    if (result === 'copied') copied++;
+    else if (result === 'identical') identical++;
+    else skipped++;
+    if (path) paths.push(path);
+  }
+  return { agent: agentId, label: AGENTS[agentId].label, copied, skipped, identical, paths };
 }
 
 /**
