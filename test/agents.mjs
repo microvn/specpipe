@@ -3,6 +3,7 @@
 // Run from repo root: node test/agents.mjs
 import {
   parseSkill, parseSkillPath, emitSkillFile, resolveAgents,
+  emitRules, agentRulesMode, GUARDS_BEGIN, GUARDS_END,
   AGENTS, AGENT_IDS, DEFAULT_AGENT,
 } from '../cli/src/lib/agents.js';
 
@@ -116,6 +117,32 @@ console.log('\n── registry invariants ──');
     if (!a.label || !a.skillTarget || !a.emitFrontmatter || !a.hooks || !a.capabilities) allHaveFields = false;
   }
   eq('every agent has required fields', allHaveFields, true);
+}
+
+console.log('\n── emitRules (guardrails) ──');
+{
+  const BODY = '- rule one\n- rule two\n';
+  eq('claude has no rules (native hooks)', emitRules('claude', BODY), null);
+  eq('claude rules mode is null', agentRulesMode('claude'), null);
+
+  const cu = emitRules('cursor', BODY);
+  eq('cursor rules path', cu.path, '.cursor/rules/agentpipe-guards.mdc');
+  has('cursor rules alwaysApply', cu.content, 'alwaysApply: true');
+  has('cursor rules carries body', cu.content, 'rule one');
+
+  const ag = emitRules('antigravity', BODY);
+  eq('antigravity rules path', ag.path, '.agents/rules/agentpipe-guards.md');
+  has('antigravity trigger always_on', ag.content, 'trigger: always_on');
+
+  const oc = emitRules('openclaw', BODY);
+  eq('openclaw advisory doc path', oc.path, 'AGENTPIPE-GUARDS.md');
+  eq('openclaw mode is doc', oc.mode, 'doc');
+
+  const cx = emitRules('codex', BODY);
+  eq('codex targets AGENTS.md', cx.path, 'AGENTS.md');
+  eq('codex mode is agents-md', cx.mode, 'agents-md');
+  has('codex section has begin marker', cx.content, GUARDS_BEGIN);
+  has('codex section has end marker', cx.content, GUARDS_END);
 }
 
 console.log(`\n══════════════════════════════════`);

@@ -1,11 +1,11 @@
-import { copyFile as fsCopyFile, mkdir, readFile, writeFile, access, constants } from 'node:fs/promises';
+import { copyFile as fsCopyFile, mkdir, readFile, writeFile, access, constants, unlink } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { join, dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { chmod } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { log } from './logger.js';
-import { emitSkillFile, AGENTS } from './agents.js';
+import { emitSkillFile, emitRules, AGENTS, GUARDS_BEGIN, GUARDS_END } from './agents.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -177,6 +177,70 @@ export async function installAgentSkills(agentId, targetDir, { force = false } =
     if (path) paths.push(path);
   }
   return { agent: agentId, label: AGENTS[agentId].label, copied, skipped, identical, paths };
+}
+
+const GUARDS_TEMPLATE_REL = 'rules/agentpipe-guards.md';
+
+function guardsSectionRegex() {
+  const esc = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return new RegExp(esc(GUARDS_BEGIN) + '[\\s\\S]*?' + esc(GUARDS_END) + '\\n?', '');
+}
+
+/** Merge (or replace) the agentpipe guards section in a shared AGENTS.md. */
+export async function mergeAgentsMdGuards(targetDir, section) {
+  const p = join(targetDir, 'AGENTS.md');
+  let existing = '';
+  try { existing = await readFile(p, 'utf-8'); } catch { /* new file */ }
+  const re = guardsSectionRegex();
+  existing = re.test(existing)
+    ? existing.replace(re, section)
+    : (existing.trim() ? existing.trimEnd() + '\n\n' : '') + section;
+  await writeFile(p, existing);
+}
+
+/** Remove the agentpipe guards section from AGENTS.md (deletes file if now empty). */
+export async function stripAgentsMdGuards(targetDir) {
+  const p = join(targetDir, 'AGENTS.md');
+  let existing;
+  try { existing = await readFile(p, 'utf-8'); } catch { return false; }
+  const stripped = existing.replace(guardsSectionRegex(), '').trim();
+  if (stripped === existing.trim()) return false;
+  if (stripped) await writeFile(p, stripped + '\n');
+  else await unlink(p);
+  return true;
+}
+
+/**
+ * Install an agent's guardrails: an owned rules file (Cursor/Antigravity/
+ * OpenClaw/Hermes) or a merged section in a shared AGENTS.md (Codex).
+ * Claude returns null — it uses native hooks instead.
+ */
+export async function installAgentRules(agentId, targetDir, { force = false } = {}) {
+  const body = await readFile(join(getTemplateDir(), GUARDS_TEMPLATE_REL), 'utf-8');
+  const r = emitRules(agentId, body);
+  if (!r) return null;
+
+  if (r.mode === 'agents-md') {
+    await mergeAgentsMdGuards(targetDir, r.content);
+    log.copy(`${r.path} (agentpipe guards section)`);
+    return { mode: 'agents-md', path: r.path };
+  }
+
+  const dst = join(targetDir, r.path);
+  if (existsSync(dst) && !force) {
+    try {
+      if ((await readFile(dst, 'utf-8')) === r.content) {
+        log.same(`${r.path} (identical)`);
+        return { mode: r.mode, path: r.path };
+      }
+    } catch { /* unreadable — treat as conflict */ }
+    log.warn(`${r.path} (exists with different content — use --force to overwrite)`);
+    return { mode: r.mode, path: r.path };
+  }
+  await mkdir(dirname(dst), { recursive: true });
+  await writeFile(dst, r.content);
+  log.copy(r.path);
+  return { mode: r.mode, path: r.path };
 }
 
 /**

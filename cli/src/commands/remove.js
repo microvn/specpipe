@@ -4,7 +4,7 @@ import { existsSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { log } from '../lib/logger.js';
 import { readManifest, MANIFEST_FILE, LEGACY_MANIFEST_FILE } from '../lib/manifest.js';
-import { removeGlobalHooksFromSettings } from '../lib/installer.js';
+import { removeGlobalHooksFromSettings, stripAgentsMdGuards } from '../lib/installer.js';
 
 const PRESERVE = [
   '.claude/CLAUDE.md',
@@ -107,6 +107,11 @@ export async function removeCommand(path, opts = {}) {
       let d = dirname(rel);
       while (d && d !== '.' && d !== '/') { removedDirs.add(d); d = dirname(d); }
     }
+  }
+
+  // Codex guards live as a section in a shared AGENTS.md — strip just that section.
+  if (manifest.agentsMdGuards) {
+    if (await stripAgentsMdGuards(targetDir)) log.del('AGENTS.md (agentpipe guards section)');
   }
 
   // Legacy: older installs placed build-test.sh under scripts/.

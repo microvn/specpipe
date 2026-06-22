@@ -15,7 +15,7 @@ import {
   verifySettingsJson, PLACEHOLDER_DIRS, COMPONENTS,
   getTemplateDir, installSkillGlobal, getGlobalSkillsDir,
   installHookGlobal, getGlobalHooksDir, mergeGlobalSettings,
-  installAgentSkills,
+  installAgentSkills, installAgentRules,
 } from '../lib/installer.js';
 import { resolveAgents, AGENTS } from '../lib/agents.js';
 import { computeDesired } from '../lib/reconcile.js';
@@ -406,12 +406,14 @@ async function initMultiAgent(targetDir, opts, warnings = 0) {
     await setPermissions(targetDir);
   }
 
-  // Skills, emitted per agent into each agent's native location.
+  // Skills + guardrails, emitted per agent into each agent's native location.
   const results = [];
   for (const agent of agents) {
     log.blank();
     console.log(`  ${AGENTS[agent].label} skills:`);
     results.push(await installAgentSkills(agent, targetDir, { force: opts.force }));
+    const rules = await installAgentRules(agent, targetDir, { force: opts.force });
+    if (rules?.mode === 'agents-md') manifest.agentsMdGuards = true;
   }
 
   // Project detection only fills Claude's CLAUDE.md template.
@@ -453,7 +455,7 @@ async function initMultiAgent(targetDir, opts, warnings = 0) {
   const noHook = agents.filter((a) => AGENTS[a].hooks !== 'native');
   if (noHook.length) {
     log.blank();
-    log.warn(`No native hook enforcement for: ${noHook.map((a) => AGENTS[a].label).join(', ')} (skills only — guards are Claude-specific).`);
+    log.warn(`${noHook.map((a) => AGENTS[a].label).join(', ')}: guards installed as always-on rules (advisory — not hook-enforced like Claude).`);
   }
   if (warnings > 0) {
     log.blank();

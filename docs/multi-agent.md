@@ -44,10 +44,16 @@ Cursor reference files (templates/examples) land under `.cursor/rules/<n>/`.
 **P1 (done): format + install.** Per-agent emitters, `--agents` flag, multi-agent
 manifest fields. Backward compatible — no `--agents` behaves exactly as before.
 
-**P2 (todo): hooks/guards per agent.** Translate Claude hook guards into native
-constraints where possible (Cursor/Antigravity `rules`, Codex `AGENTS.md`); document
-the gap where no equivalent exists (OpenClaw, Hermes). Each agent has a different
-*completeness level* — `list` should surface it.
+**P2 (done): hooks/guards per agent.** Claude keeps its native hook enforcement.
+Every other agent gets the same guard *intent* as an always-on rule, emitted from
+one canonical source (`kit/rules/agentpipe-guards.md`):
+- Cursor → `.cursor/rules/agentpipe-guards.mdc` (`alwaysApply: true`)
+- Antigravity → `.agents/rules/agentpipe-guards.md` (`trigger: always_on`)
+- Codex → a marked section merged into a shared `AGENTS.md` (preserves user content; stripped cleanly on remove)
+- OpenClaw / Hermes → `AGENTPIPE-GUARDS.md` advisory doc (no rules system)
+
+These are **advisory, not hook-enforced** — that's the honest completeness gap,
+surfaced by `init` warnings and `list`.
 
 **P3 (todo): capability parity.** Skill bodies call Claude-specific tools — `Task`
 (subagents in ap-build auto-mode, ap-voices, ap-challenge) and `AskUserQuestion`.

@@ -37,7 +37,7 @@ export async function listCommand(path) {
 
   for (const agent of Object.keys(byAgent)) {
     const meta = AGENTS[agent];
-    const hookNote = meta && meta.hooks !== 'native' ? chalk.gray(' (skills only — no native hooks)') : '';
+    const hookNote = meta && meta.hooks !== 'native' ? chalk.gray(' (guards as advisory rules)') : '';
     console.log(chalk.bold(`${meta?.label || agent}`) + hookNote);
     for (const [file, entry] of byAgent[agent].sort((a, b) => a[0].localeCompare(b[0]))) {
       totalFiles++;

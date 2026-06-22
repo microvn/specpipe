@@ -708,6 +708,42 @@ assert_absent "neutral manifest removed"   "$PROJECT_DIR/.agentpipe"
 
 teardown
 
+# ── Phase 2: guardrails per agent ────────────────────────────────────────────
+section "guards — owned rules files per agent"
+setup
+
+cli init "$PROJECT_DIR" --agents cursor,antigravity,openclaw
+assert_exists "cursor guards .mdc"        "$PROJECT_DIR/.cursor/rules/agentpipe-guards.mdc"
+assert_exists "antigravity guards rule"   "$PROJECT_DIR/.agents/rules/agentpipe-guards.md"
+assert_exists "openclaw advisory doc"     "$PROJECT_DIR/AGENTPIPE-GUARDS.md"
+CR=$(cat "$PROJECT_DIR/.cursor/rules/agentpipe-guards.mdc")
+assert_contains "cursor guards alwaysApply" "alwaysApply: true" "$CR"
+assert_contains "guards body present"       "Never touch secrets" "$CR"
+
+teardown
+
+# ── guards: Codex merges into shared AGENTS.md, preserving user content ───────
+section "guards — Codex AGENTS.md merge + clean strip on remove"
+setup
+
+printf '# My Project\n\nUser instructions.\n' > "$PROJECT_DIR/AGENTS.md"
+cli init "$PROJECT_DIR" --agents codex
+AM=$(cat "$PROJECT_DIR/AGENTS.md")
+assert_contains "AGENTS.md keeps user content" "User instructions." "$AM"
+assert_contains "AGENTS.md gains guards section" "agentpipe guardrails" "$AM"
+
+# Idempotent: re-init --force must not duplicate the section
+cli init "$PROJECT_DIR" --agents codex --force
+COUNT=$(grep -c "agentpipe:guards:begin" "$PROJECT_DIR/AGENTS.md" || true)
+assert_contains "no duplicate guards section" "1" "$COUNT"
+
+cli remove "$PROJECT_DIR"
+AM2=$(cat "$PROJECT_DIR/AGENTS.md")
+assert_contains "remove keeps user content" "User instructions." "$AM2"
+assert_not_contains "remove strips guards section" "agentpipe guardrails" "$AM2"
+
+teardown
+
 # ══════════════════════════════════════════════════════════════════════════════
 # Summary
 # ══════════════════════════════════════════════════════════════════════════════
