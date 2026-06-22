@@ -282,7 +282,7 @@ const RULES = {
   cursor: {
     mode: 'file',
     path: '.cursor/rules/agentpipe-guards.mdc',
-    frontmatter: 'description: agentpipe guardrails — always-on engineering constraints\nglobs:\nalwaysApply: true',
+    frontmatter: 'description: agentpipe operating rules — spec-first cycle, guardrails, testing, conventions\nglobs:\nalwaysApply: true',
   },
   // Antigravity rules are plain markdown (no documented trigger/glob frontmatter);
   // official Google DevRel uses the singular `.agent/rules/` path.
@@ -308,7 +308,7 @@ export function emitRules(agentId, body) {
   const r = RULES[agentId];
   if (!r) return null;
   if (r.mode === 'file') return { mode: 'file', path: r.path, content: `---\n${r.frontmatter}\n---\n${body}` };
-  if (r.mode === 'doc') return { mode: 'doc', path: r.path, content: `# agentpipe guardrails\n\n${body}` };
+  if (r.mode === 'doc') return { mode: 'doc', path: r.path, content: `# agentpipe — operating rules\n\n${body}` };
   // agents-md: a marked section merged into a shared AGENTS.md
-  return { mode: 'agents-md', path: r.path, content: `${GUARDS_BEGIN}\n## agentpipe guardrails\n\n${body}${GUARDS_END}\n` };
+  return { mode: 'agents-md', path: r.path, content: `${GUARDS_BEGIN}\n## agentpipe — operating rules\n\n${body}${GUARDS_END}\n` };
 }

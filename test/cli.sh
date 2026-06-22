@@ -730,7 +730,7 @@ printf '# My Project\n\nUser instructions.\n' > "$PROJECT_DIR/AGENTS.md"
 cli init "$PROJECT_DIR" --agents codex
 AM=$(cat "$PROJECT_DIR/AGENTS.md")
 assert_contains "AGENTS.md keeps user content" "User instructions." "$AM"
-assert_contains "AGENTS.md gains guards section" "agentpipe guardrails" "$AM"
+assert_contains "AGENTS.md gains guards section" "operating rules" "$AM"
 
 # Idempotent: re-init --force must not duplicate the section
 cli init "$PROJECT_DIR" --agents codex --force
@@ -740,7 +740,7 @@ assert_contains "no duplicate guards section" "1" "$COUNT"
 cli remove "$PROJECT_DIR"
 AM2=$(cat "$PROJECT_DIR/AGENTS.md")
 assert_contains "remove keeps user content" "User instructions." "$AM2"
-assert_not_contains "remove strips guards section" "agentpipe guardrails" "$AM2"
+assert_not_contains "remove strips guards section" "operating rules" "$AM2"
 
 teardown
 
