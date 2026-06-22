@@ -2,6 +2,8 @@
   <img src="docs/cover.svg" alt="Agentpipe — spec-first multi-agent dev toolkit" width="100%">
 </p>
 
+<h1 align="center">Agentpipe</h1>
+
 <p align="center">
   A lightweight, spec-first development toolkit for agentic AI coding agents.
 </p>
