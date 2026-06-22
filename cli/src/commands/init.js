@@ -1,4 +1,4 @@
-import { resolve, join, dirname } from 'node:path';
+import { resolve, dirname } from 'node:path';
 import { existsSync } from 'node:fs';
 import { execSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
