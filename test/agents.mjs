@@ -119,6 +119,22 @@ console.log('\n── registry invariants ──');
   eq('every agent has required fields', allHaveFields, true);
 }
 
+console.log('\n── capability adaptation (Phase 3) ──');
+{
+  // SKILL fixture declares AskUserQuestion + Agent in allowed-tools.
+  const cu = emitSkillFile('cursor', REL, SKILL).content;
+  has('non-claude gets adaptation section', cu, 'Running outside Claude Code');
+  has('AskUserQuestion note injected', cu, 'Asking the user');
+  has('Subagent note injected', cu, 'Subagents:');
+  has('note names the agent', cu, 'On Cursor:');
+  not('claude body has no adaptation section', emitSkillFile('claude', REL, SKILL).content, 'Running outside Claude Code');
+
+  // A skill with no Claude-specific tools gets no adaptation section.
+  const plain = `---\ndescription: |\n  Plain skill.\nallowed-tools: Read, Grep\n---\n# body\ntext`;
+  not('plain skill: no adaptation section', emitSkillFile('cursor', REL, plain).content, 'Running outside Claude Code');
+  has('plain skill body preserved', emitSkillFile('cursor', REL, plain).content, 'text');
+}
+
 console.log('\n── emitRules (guardrails) ──');
 {
   const BODY = '- rule one\n- rule two\n';

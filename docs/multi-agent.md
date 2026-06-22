@@ -55,16 +55,24 @@ one canonical source (`kit/rules/agentpipe-guards.md`):
 These are **advisory, not hook-enforced** — that's the honest completeness gap,
 surfaced by `init` warnings and `list`.
 
-**P3 (todo): capability parity.** Skill bodies call Claude-specific tools — `Task`
-(subagents in ap-build auto-mode, ap-voices, ap-challenge) and `AskUserQuestion`.
-Other agents lack these. Add per-agent fallbacks or body variants so a ported skill
-degrades gracefully instead of silently assuming Claude's tool surface.
+**P3 (done): capability parity.** The skill body is kept verbatim. When a skill
+declares Claude-specific tools in its `allowed-tools` frontmatter, the emitter
+appends a "Running outside Claude Code" section to the non-Claude variant telling
+the agent how to degrade:
+- `AskUserQuestion` → ask the same choices in plain text and wait
+- `Agent`/`Task` (subagents) → perform delegated steps sequentially in-session
+- `mcp__graphatlas` → fall back to `grep`/file search
+
+Skills with no Claude-specific tools get no added section.
+
+**Lifecycle:** `upgrade`/`remove`/`diff`/`list` are agent-aware via the reconcile
+model (`computeDesired`). The manifest lives at the neutral `.agentpipe/manifest.json`
+(legacy `.claude/` read as a fallback) and records `{ agent, templateRel }` per file.
 
 **Other open items**
-- The agentpipe manifest still lives at `.claude/.devkit-manifest.json` even for
-  non-Claude installs. A neutral location (`.agentpipe/`) is future work — it touches
-  `upgrade`/`remove`/`list`, which are not yet per-agent aware.
-- `upgrade`, `remove`, `diff`, `list` operate on the Claude layout only; making them
-  per-agent is the next slice after this foundation.
 - Codex Agent Skills project path (`.codex/skills/`) is a reasonable default but not
   yet verified against a real Codex install.
+- Global install (`init --global`) is still Claude-only; multi-agent global is future work.
+- The skill *bodies* still reference "Claude Code" where they describe Claude
+  capabilities — intentional. The adaptation section explains the gap rather than
+  rewriting prose that's genuinely about Claude.

@@ -198,7 +198,40 @@ export function emitSkillFile(agentId, canonicalRel, content) {
   const parsed = parseSkill(content);
   if (!parsed.hasFrontmatter) return { path, content };
 
-  return { path, content: compose(agent.emitFrontmatter(parsed, skill), parsed.body) };
+  const body = adaptBody(agentId, parsed.body, toolsOf(parsed));
+  return { path, content: compose(agent.emitFrontmatter(parsed, skill), body) };
+}
+
+/** Tools a canonical skill declares (from its `allowed-tools` frontmatter). */
+function toolsOf(parsed) {
+  const block = getKeyBlock(parsed, 'allowed-tools');
+  if (!block) return [];
+  return block.replace(/^allowed-tools:\s*/, '').split(',').map((s) => s.trim()).filter(Boolean);
+}
+
+/**
+ * Keep the body verbatim, but append a capability-adaptation section when the
+ * skill declares Claude-specific tools the target agent may not have. This is
+ * how a skill "degrades gracefully" instead of silently assuming Claude's
+ * tool surface (Phase 3). Claude itself gets the body unchanged.
+ */
+function adaptBody(agentId, body, tools) {
+  if (agentId === 'claude') return body;
+
+  const has = (name) => tools.some((t) => t === name || t.startsWith(name));
+  const notes = [];
+  if (has('AskUserQuestion')) {
+    notes.push('- **Asking the user:** written for Claude\'s `AskUserQuestion` tool. Present the same choices in plain text and wait for the answer before proceeding.');
+  }
+  if (has('Agent') || has('Task')) {
+    notes.push('- **Subagents:** this skill may dispatch subagents (Claude\'s `Task`/`Agent`). If your runtime can\'t spawn subagents, perform each delegated step yourself, sequentially, in this same session.');
+  }
+  if (has('mcp__graphatlas')) {
+    notes.push('- **GraphAtlas MCP:** optional code-graph tool. If unavailable, fall back to `grep` and file search.');
+  }
+  if (!notes.length) return body;
+
+  return `${body.replace(/\s*$/, '')}\n\n---\n\n## Running outside Claude Code\n\nThis skill was authored for Claude Code. On ${AGENTS[agentId].label}:\n\n${notes.join('\n')}\n`;
 }
 
 /**

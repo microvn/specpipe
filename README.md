@@ -1,9 +1,10 @@
 # agentpipe
 
-A lightweight, spec-first development toolkit for [Claude Code](https://claude.ai/code). It enforces the cycle **spec (with acceptance scenarios) → code + tests → build pass** through custom commands, automatic hooks, and a universal test runner.
+A lightweight, spec-first development toolkit for agentic AI coding agents. It enforces the cycle **spec (with acceptance scenarios) → code + tests → build pass** through skills, always-on guardrails, and a universal test runner.
 
+**Agents:** [Claude Code](https://claude.ai/code) (full hook enforcement) plus Codex, Cursor, Antigravity, OpenClaw, and Hermes (skills + advisory guard rules). Install for one or all: `agentpipe init --agents <list>|all`. See [docs/multi-agent.md](docs/multi-agent.md).
 **Works with:** Swift, TypeScript/JavaScript, Python, Rust, Go, Java/Kotlin, C#, Ruby.
-**Dependencies:** None (requires only Claude Code CLI, Node.js, Git, and Bash).
+**Dependencies:** None (requires only a supported agent CLI, Node.js, Git, and Bash).
 **Optional:** [GraphAtlas](https://github.com/microvn/graphatlas) MCP server for graph-based code intelligence — six skills use it automatically when present and fall back to `grep` when it isn't. See [§3 Setup](#3-setup).
 
 ---
@@ -1245,7 +1246,7 @@ A: Only for external services you can't run locally (third-party APIs, email ser
 A: This usually means the spec is ambiguous. Clarify the spec first, then re-run `/ap-build`. Good specs produce good tests.
 
 **Q: Can I use this with other AI coding tools?**
-A: The commands and hooks are Claude Code-specific. The specs and workflow work with any tool or manual workflow.
+A: Yes. `agentpipe init --agents <list>|all` installs the skills for Codex, Cursor, Antigravity, OpenClaw, and Hermes, each in its native format. Only Claude Code gets hook-*enforced* guards; the other agents get the same guardrails as always-on advisory rules. The specs and workflow are tool-agnostic. See [docs/multi-agent.md](docs/multi-agent.md).
 
 **Q: When should I use `/ap-challenge`?**
 A: After `/ap-plan`, for complex features involving authentication, payments, data pipelines, or multi-service integration. It spawns parallel hostile reviewers that find security holes, failure modes, and false assumptions BEFORE you write code. Skip it for simple CRUD or small features — the overhead isn't worth it.
