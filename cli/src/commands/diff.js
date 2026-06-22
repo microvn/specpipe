@@ -3,9 +3,9 @@ import { readFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import chalk from 'chalk';
 import { log } from '../lib/logger.js';
-import { readManifest } from '../lib/manifest.js';
-import { hashFile } from '../lib/hasher.js';
-import { getAllFiles, getTemplateDir } from '../lib/installer.js';
+import { readManifest, getAgents } from '../lib/manifest.js';
+import { hashContent } from '../lib/hasher.js';
+import { computeDesired } from '../lib/reconcile.js';
 
 export async function diffCommand(path) {
   const targetDir = resolve(path);
@@ -16,12 +16,10 @@ export async function diffCommand(path) {
     process.exit(1);
   }
 
-  const templateDir = getTemplateDir();
-  const allFiles = getAllFiles();
+  const desired = await computeDesired(getAgents(manifest));
   let hasDiffs = false;
 
-  for (const file of allFiles) {
-    const templatePath = resolve(templateDir, file);
+  for (const [file, d] of desired) {
     const installedPath = resolve(targetDir, file);
 
     if (!existsSync(installedPath)) {
@@ -31,16 +29,14 @@ export async function diffCommand(path) {
       continue;
     }
 
-    const kitHash = await hashFile(templatePath);
-    const installedHash = await hashFile(installedPath);
-
-    if (kitHash === installedHash) continue;
+    const installedContent = await readFile(installedPath, 'utf-8');
+    if (hashContent(installedContent) === d.kitHash) continue;
 
     hasDiffs = true;
 
     // Check if kit changed or user changed
     const entry = manifest.files[file];
-    const kitChanged = entry && kitHash !== entry.kitHash;
+    const kitChanged = entry && d.kitHash !== entry.kitHash;
     const userChanged = entry && entry.customized;
 
     let label = '';
@@ -52,10 +48,8 @@ export async function diffCommand(path) {
     console.log(chalk.bold(`\n${file}`) + chalk.gray(` (${label})`));
     console.log('─'.repeat(60));
 
-    // Simple line-by-line diff
-    const kitContent = await readFile(templatePath, 'utf-8');
-    const installedContent = await readFile(installedPath, 'utf-8');
-    const kitLines = kitContent.split('\n');
+    // Simple line-by-line diff (desired kit content vs installed)
+    const kitLines = d.content.split('\n');
     const installedLines = installedContent.split('\n');
 
     // Show a simplified diff: lines only in kit (green +), only in installed (red -)
@@ -76,9 +70,9 @@ export async function diffCommand(path) {
     }
   }
 
-  // Check for files in manifest not in current kit
+  // Check for files in manifest no longer desired (removed from kit / agent)
   for (const file of Object.keys(manifest.files)) {
-    if (!allFiles.includes(file)) {
+    if (!desired.has(file)) {
       console.log(chalk.yellow(`\n${file} (removed from kit)`));
       hasDiffs = true;
     }

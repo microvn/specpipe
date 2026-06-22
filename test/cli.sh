@@ -89,7 +89,7 @@ cli_exit() { HOME="$TEST_HOME" node "$CLI" "$@" >/dev/null 2>/dev/null && echo 0
 # Patch manifest: set kitHash to fake value for one file → simulates a kit update
 # This makes upgrade think the kit file changed vs what was originally installed.
 fake_kit_hash() {
-  local manifest="$1/.claude/.devkit-manifest.json" key="$2"
+  local manifest="$1/.agentpipe/manifest.json" key="$2"
   node --input-type=module <<EOF 2>/dev/null
 import { readFileSync, writeFileSync } from 'node:fs';
 const p = '${manifest}';
@@ -143,9 +143,9 @@ assert_exists "placeholder: docs/specs/.gitkeep"      "$PROJECT_DIR/docs/specs/.
 assert_exists "placeholder: docs/test-plans/.gitkeep" "$PROJECT_DIR/docs/test-plans/.gitkeep"
 
 # Manifest
-assert_exists "manifest: created" "$PROJECT_DIR/.claude/.devkit-manifest.json"
-assert_json_valid "manifest: valid JSON" "$PROJECT_DIR/.claude/.devkit-manifest.json"
-MANIFEST=$(cat "$PROJECT_DIR/.claude/.devkit-manifest.json")
+assert_exists "manifest: created" "$PROJECT_DIR/.agentpipe/manifest.json"
+assert_json_valid "manifest: valid JSON" "$PROJECT_DIR/.agentpipe/manifest.json"
+MANIFEST=$(cat "$PROJECT_DIR/.agentpipe/manifest.json")
 assert_contains "manifest: has version key" '"version"' "$MANIFEST"
 assert_contains "manifest: has files key"   '"files"'   "$MANIFEST"
 assert_contains "manifest: tracks a hook"   'path-guard.sh' "$MANIFEST"
@@ -180,7 +180,7 @@ cli init "$PROJECT_DIR" --dry-run
 
 assert_absent "no skills with --dry-run"   "$PROJECT_DIR/.claude/skills/ap-plan/SKILL.md"
 assert_absent "no hooks with --dry-run"    "$PROJECT_DIR/.claude/hooks/path-guard.sh"
-assert_absent "no manifest with --dry-run" "$PROJECT_DIR/.claude/.devkit-manifest.json"
+assert_absent "no manifest with --dry-run" "$PROJECT_DIR/.agentpipe/manifest.json"
 
 teardown
 
@@ -272,13 +272,13 @@ cli init "$PROJECT_DIR"
 # Mangle manifest version to something old so upgrade sees a diff
 node --input-type=module <<'EOF' 2>/dev/null || true
 import { readFileSync, writeFileSync } from 'node:fs';
-const p = process.env.PROJ + '/.claude/.devkit-manifest.json';
+const p = process.env.PROJ + '/.agentpipe/manifest.json';
 const m = JSON.parse(readFileSync(p, 'utf-8'));
 m.version = '0.0.1';
 writeFileSync(p, JSON.stringify(m, null, 2) + '\n');
 EOF
 cli upgrade "$PROJECT_DIR"
-MANIFEST=$(cat "$PROJECT_DIR/.claude/.devkit-manifest.json")
+MANIFEST=$(cat "$PROJECT_DIR/.agentpipe/manifest.json")
 assert_not_contains "manifest version updated after upgrade" '"version": "0.0.1"' "$MANIFEST"
 
 teardown
@@ -294,7 +294,7 @@ cli remove "$PROJECT_DIR"
 
 assert_absent "hooks removed"     "$PROJECT_DIR/.claude/hooks/path-guard.sh"
 assert_absent "skills removed"    "$PROJECT_DIR/.claude/skills/ap-plan/SKILL.md"
-assert_absent "manifest removed"  "$PROJECT_DIR/.claude/.devkit-manifest.json"
+assert_absent "manifest removed"  "$PROJECT_DIR/.agentpipe/manifest.json"
 
 # Preserved items
 assert_exists "CLAUDE.md preserved"   "$PROJECT_DIR/.claude/CLAUDE.md"
@@ -657,6 +657,54 @@ setup
 
 CODE=$(cli_exit init "$PROJECT_DIR" --agents bogus)
 [[ "$CODE" != "0" ]] && pass "unknown agent rejected (exit $CODE)" || fail "unknown agent should fail"
+
+teardown
+
+# ── multi-agent lifecycle: upgrade is idempotent, then re-applies kit changes ──
+section "multi-agent upgrade — idempotent then re-emits on kit change"
+setup
+
+cli init "$PROJECT_DIR" --agents cursor,antigravity
+assert_exists "multi-agent manifest at neutral location" "$PROJECT_DIR/.agentpipe/manifest.json"
+MA=$(cat "$PROJECT_DIR/.agentpipe/manifest.json")
+assert_contains "manifest records agents" '"agents"' "$MA"
+assert_contains "entry carries templateRel" 'templateRel' "$MA"
+
+OUT=$(cli_out upgrade "$PROJECT_DIR")
+assert_contains "upgrade idempotent (0 updated)" "Updated 0" "$OUT"
+
+# Simulate a genuine kit change (not a user edit): roll the emitted file + its
+# manifest kitHash back to old content in lockstep, so it's NOT seen as customized.
+node --input-type=module <<EOF 2>/dev/null
+import { readFileSync, writeFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
+const f = '$PROJECT_DIR/.cursor/rules/ap-plan.mdc';
+const mp = '$PROJECT_DIR/.agentpipe/manifest.json';
+const old = '--- OLD EMITTED CONTENT ---\n';
+writeFileSync(f, old);
+const h = createHash('sha256').update(old).digest('hex');
+const m = JSON.parse(readFileSync(mp, 'utf-8'));
+m.files['.cursor/rules/ap-plan.mdc'].kitHash = h;
+m.files['.cursor/rules/ap-plan.mdc'].installedHash = h;
+writeFileSync(mp, JSON.stringify(m, null, 2) + '\n');
+EOF
+OUT=$(cli_out upgrade "$PROJECT_DIR")
+assert_contains "upgrade re-emits changed cursor rule" "Updated 1" "$OUT"
+NEW=$(cat "$PROJECT_DIR/.cursor/rules/ap-plan.mdc")
+assert_contains "re-emitted content is the real rule" "alwaysApply: false" "$NEW"
+
+teardown
+
+# ── multi-agent remove: cleans every agent's dirs + neutral manifest ─────────
+section "multi-agent remove — clears all agent layouts"
+setup
+
+cli init "$PROJECT_DIR" --agents cursor,antigravity,openclaw
+cli remove "$PROJECT_DIR"
+assert_absent "cursor rules removed"      "$PROJECT_DIR/.cursor"
+assert_absent "antigravity skills removed" "$PROJECT_DIR/.agents"
+assert_absent "openclaw skills removed"    "$PROJECT_DIR/skills"
+assert_absent "neutral manifest removed"   "$PROJECT_DIR/.agentpipe"
 
 teardown
 

@@ -1,9 +1,9 @@
-import { resolve, join } from 'node:path';
+import { resolve, join, dirname } from 'node:path';
 import { unlink, rmdir, rm } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { log } from '../lib/logger.js';
-import { readManifest } from '../lib/manifest.js';
+import { readManifest, MANIFEST_FILE, LEGACY_MANIFEST_FILE } from '../lib/manifest.js';
 import { removeGlobalHooksFromSettings } from '../lib/installer.js';
 
 const PRESERVE = [
@@ -80,74 +80,41 @@ export async function removeCommand(path, opts = {}) {
   log.info('Removing agentpipe files...');
   log.blank();
 
-  // Remove tracked files (except preserved)
+  const removedDirs = new Set();
+
+  // Remove tracked files (except preserved), across every agent's layout.
   for (const file of Object.keys(manifest.files)) {
+    if (PRESERVE.includes(file) || PRESERVE_DIRS.some((dir) => file.startsWith(dir))) {
+      log.keep(file);
+      continue;
+    }
     const fullPath = join(targetDir, file);
-
-    // Check if preserved
-    if (PRESERVE.includes(file)) {
-      log.keep(file);
-      continue;
-    }
-
-    // Check if in preserved directory
-    if (PRESERVE_DIRS.some((dir) => file.startsWith(dir))) {
-      log.keep(file);
-      continue;
-    }
-
     if (existsSync(fullPath)) {
       await unlink(fullPath);
       log.del(file);
+      // Track ancestor dirs (within the project) for empty-dir cleanup.
+      let d = dirname(file);
+      while (d && d !== '.' && d !== '/') { removedDirs.add(d); d = dirname(d); }
     }
   }
 
-  // Remove manifest itself
-  const manifestPath = join(targetDir, '.claude/.devkit-manifest.json');
-  if (existsSync(manifestPath)) {
-    await unlink(manifestPath);
-    log.del('.claude/.devkit-manifest.json');
-  }
-
-  // Clean up empty directories
-  const dirsToClean = [
-    '.claude/hooks',
-    'scripts', // legacy: older installs placed build-test.sh here
-  ];
-
-  for (const dir of dirsToClean) {
-    const fullPath = join(targetDir, dir);
-    try {
-      await rmdir(fullPath);
-    } catch {
-      // Not empty or doesn't exist
+  // Remove the manifest (new + legacy locations).
+  for (const rel of [MANIFEST_FILE, LEGACY_MANIFEST_FILE]) {
+    const p = join(targetDir, rel);
+    if (existsSync(p)) {
+      await unlink(p);
+      log.del(rel);
+      let d = dirname(rel);
+      while (d && d !== '.' && d !== '/') { removedDirs.add(d); d = dirname(d); }
     }
   }
 
-  // Remove only skill dirs that were tracked in the manifest
-  // (preserves any custom skills the user added outside of devkit)
-  const trackedSkillDirs = new Set();
-  for (const file of Object.keys(manifest.files)) {
-    const match = file.match(/^\.claude\/skills\/([^/]+)\//);
-    if (match) trackedSkillDirs.add(match[1]);
-  }
+  // Legacy: older installs placed build-test.sh under scripts/.
+  removedDirs.add('scripts');
 
-  for (const skillName of trackedSkillDirs) {
-    const skillDir = join(targetDir, '.claude', 'skills', skillName);
-    if (existsSync(skillDir)) {
-      await rm(skillDir, { recursive: true, force: true });
-      log.del(`.claude/skills/${skillName}/`);
-    }
-  }
-
-  // Remove skills dir itself only if now empty
-  const skillsDir = join(targetDir, '.claude/skills');
-  if (existsSync(skillsDir)) {
-    try {
-      await rmdir(skillsDir);
-    } catch {
-      // Not empty — user has custom skills, leave it
-    }
+  // Remove now-empty directories, deepest first (preserves dirs with user content).
+  for (const dir of [...removedDirs].sort((a, b) => b.split('/').length - a.split('/').length)) {
+    try { await rmdir(join(targetDir, dir)); } catch { /* not empty or missing */ }
   }
 
   log.blank();

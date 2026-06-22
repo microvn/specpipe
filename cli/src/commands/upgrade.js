@@ -6,8 +6,10 @@ import { fileURLToPath } from 'node:url';
 import { homedir } from 'node:os';
 import { log } from '../lib/logger.js';
 import { hashFile } from '../lib/hasher.js';
-import { readManifest, writeManifest, setFileEntry, refreshCustomizationStatus } from '../lib/manifest.js';
-import { getAllFiles, getTemplateDir, setPermissions, COMPONENTS, installSkillGlobal, getGlobalSkillsDir, installHookGlobal, getGlobalHooksDir, mergeGlobalSettings } from '../lib/installer.js';
+import { readManifest, writeManifest, setFileEntry, refreshCustomizationStatus, getAgents } from '../lib/manifest.js';
+import { getTemplateDir, setPermissions, COMPONENTS, installSkillGlobal, getGlobalSkillsDir, installHookGlobal, getGlobalHooksDir, mergeGlobalSettings } from '../lib/installer.js';
+import { computeDesired } from '../lib/reconcile.js';
+import { unlink } from 'node:fs/promises';
 
 const GLOBAL_MANIFEST = join(homedir(), '.claude', '.devkit-manifest.json');
 
@@ -110,76 +112,70 @@ export async function upgradeCommand(path, opts) {
     log.blank();
   }
 
-  const templateDir = getTemplateDir();
-  const allFiles = getAllFiles();
+  // Desired installed state for every agent this project targets.
+  const agents = getAgents(manifest);
+  const desired = await computeDesired(agents);
 
   let updated = 0;
   let skippedCustomized = 0;
   let added = 0;
   let unchanged = 0;
 
-  for (const file of allFiles) {
-    const templatePath = resolve(templateDir, file);
-    const installedPath = resolve(targetDir, file);
-    const currentKitHash = await hashFile(templatePath);
-    const entry = manifest.files[file];
+  for (const [relPath, d] of desired) {
+    const installedPath = resolve(targetDir, relPath);
+    const entry = manifest.files[relPath];
 
     if (!entry) {
-      // New file in kit — install it
+      // New file (new kit file, or an agent added since install) — install it.
       if (!opts.dryRun) {
         await mkdir(dirname(installedPath), { recursive: true });
-        await fsCopyFile(templatePath, installedPath);
-        setFileEntry(manifest, file, currentKitHash, currentKitHash);
+        await writeFile(installedPath, d.content);
+        setFileEntry(manifest, relPath, d.kitHash, d.kitHash, { agent: d.agent, templateRel: d.templateRel });
       }
-      log.copy(`${file} (new)`);
+      log.copy(`${relPath} (new)`);
       added++;
       continue;
     }
 
-    const kitChanged = currentKitHash !== entry.kitHash;
-
-    if (!kitChanged) {
-      log.same(file);
+    if (d.kitHash === entry.kitHash) {
+      log.same(relPath);
       unchanged++;
       continue;
     }
 
-    // Kit has changed
     if (entry.customized && !opts.force) {
-      log.skip(`${file} (customized — use --force to overwrite)`);
+      log.skip(`${relPath} (customized — use --force to overwrite)`);
       skippedCustomized++;
       continue;
     }
 
-    // Kit changed, user hasn't customized (or --force) → update
+    // Kit changed, user hasn't customized (or --force) → update.
     if (!opts.dryRun) {
       await mkdir(dirname(installedPath), { recursive: true });
-      await fsCopyFile(templatePath, installedPath);
-      setFileEntry(manifest, file, currentKitHash, currentKitHash);
+      await writeFile(installedPath, d.content);
+      setFileEntry(manifest, relPath, d.kitHash, d.kitHash, { agent: d.agent, templateRel: d.templateRel });
     }
-    log.copy(file);
+    log.copy(relPath);
     updated++;
   }
 
-  // Remove files in manifest that no longer exist in kit
+  // Remove files in manifest that are no longer desired (dropped kit file or agent).
   let removed = 0;
-  for (const file of Object.keys(manifest.files)) {
-    if (!allFiles.includes(file)) {
-      const filePath = resolve(targetDir, file);
-      if (!opts.dryRun) {
-        try {
-          const { unlink } = await import('node:fs/promises');
-          await unlink(filePath);
-          delete manifest.files[file];
-          removed++;
-          log.del(file);
-        } catch {
-          log.warn(`${file} — no longer in kit (could not delete)`);
-        }
-      } else {
-        log.del(`${file} (would remove)`);
+  for (const relPath of Object.keys(manifest.files)) {
+    if (desired.has(relPath)) continue;
+    const filePath = resolve(targetDir, relPath);
+    if (!opts.dryRun) {
+      try {
+        await unlink(filePath);
+        delete manifest.files[relPath];
         removed++;
+        log.del(relPath);
+      } catch {
+        log.warn(`${relPath} — no longer in kit (could not delete)`);
       }
+    } else {
+      log.del(`${relPath} (would remove)`);
+      removed++;
     }
   }
 

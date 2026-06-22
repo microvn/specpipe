@@ -200,3 +200,15 @@ export function emitSkillFile(agentId, canonicalRel, content) {
 
   return { path, content: compose(agent.emitFrontmatter(parsed, skill), parsed.body) };
 }
+
+/**
+ * Emit ANY canonical template file for an agent.
+ * Skill files are transformed (see emitSkillFile); everything else (hooks,
+ * config, docs) is copied verbatim at its original relative path. This gives
+ * lifecycle commands a single way to reproduce a file's desired content.
+ * @returns {{ path: string, content: string }}
+ */
+export function emitFile(agentId, templateRel, content) {
+  const skill = emitSkillFile(agentId, templateRel, content);
+  return skill || { path: templateRel, content };
+}

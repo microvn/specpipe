@@ -18,6 +18,8 @@ import {
   installAgentSkills,
 } from '../lib/installer.js';
 import { resolveAgents, AGENTS } from '../lib/agents.js';
+import { computeDesired } from '../lib/reconcile.js';
+import { hashContent } from '../lib/hasher.js';
 import { readFile, writeFile } from 'node:fs/promises';
 
 const GLOBAL_MANIFEST = join(homedir(), '.claude', '.devkit-manifest.json');
@@ -392,7 +394,6 @@ async function initMultiAgent(targetDir, opts, warnings = 0) {
 
   const manifest = createManifest(pkg.version, null, Object.keys(COMPONENTS));
   manifest.agents = agents;
-  manifest.agentFiles = {};
 
   // Claude base: hooks + config + docs (only Claude has a native hook system).
   if (claudeSelected) {
@@ -400,10 +401,6 @@ async function initMultiAgent(targetDir, opts, warnings = 0) {
     console.log('  Claude base (hooks, config, docs):');
     for (const file of [...COMPONENTS.hooks, ...COMPONENTS.config, ...COMPONENTS.docs]) {
       await installFile(file, targetDir, { force: opts.force });
-      const kitHash = await hashFile(resolve(getTemplateDir(), file));
-      let installedHash = kitHash;
-      try { installedHash = await hashFile(resolve(targetDir, file)); } catch { /* skipped */ }
-      setFileEntry(manifest, file, kitHash, installedHash);
     }
     for (const dir of PLACEHOLDER_DIRS) await ensurePlaceholderDir(dir, targetDir);
     await setPermissions(targetDir);
@@ -414,9 +411,7 @@ async function initMultiAgent(targetDir, opts, warnings = 0) {
   for (const agent of agents) {
     log.blank();
     console.log(`  ${AGENTS[agent].label} skills:`);
-    const r = await installAgentSkills(agent, targetDir, { force: opts.force });
-    manifest.agentFiles[agent] = r.paths;
-    results.push(r);
+    results.push(await installAgentSkills(agent, targetDir, { force: opts.force }));
   }
 
   // Project detection only fills Claude's CLAUDE.md template.
@@ -428,6 +423,15 @@ async function initMultiAgent(targetDir, opts, warnings = 0) {
     } else {
       warnings++;
     }
+  }
+
+  // Record every installed file (all agents) keyed by on-disk path, with the
+  // hash of what's actually on disk so customization/skip is detected later.
+  const desired = await computeDesired(agents);
+  for (const [relPath, d] of desired) {
+    let installedHash = d.kitHash;
+    try { installedHash = hashContent(await readFile(resolve(targetDir, relPath), 'utf-8')); } catch { /* skipped/missing */ }
+    setFileEntry(manifest, relPath, d.kitHash, installedHash, { agent: d.agent, templateRel: d.templateRel });
   }
 
   await writeManifest(targetDir, manifest);
