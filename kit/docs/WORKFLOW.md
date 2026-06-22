@@ -194,7 +194,7 @@ Is this a brand new feature (no existing spec or code)?
 
 ## 3. Prompt Templates
 
-Copy-paste these when working with Claude Code.
+Copy-paste these when working with your agent.
 
 ### Template A — Implement + Test Together
 
