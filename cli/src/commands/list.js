@@ -8,14 +8,14 @@ export async function listCommand(path) {
   const manifest = await readManifest(targetDir);
 
   if (!manifest) {
-    log.fail('No manifest found. Run `claude-devkit init` first.');
+    log.fail('No manifest found. Run `agentpipe init` first.');
     process.exit(1);
   }
 
   // Refresh hashes to get accurate customization status
   await refreshCustomizationStatus(targetDir, manifest);
 
-  log.info(`claude-devkit v${manifest.version} — installed ${manifest.installedAt.split('T')[0]}`);
+  log.info(`agentpipe v${manifest.version} — installed ${manifest.installedAt.split('T')[0]}`);
   if (manifest.projectType) {
     log.info(`Project: ${manifest.projectType.lang} (${manifest.projectType.framework})`);
   }

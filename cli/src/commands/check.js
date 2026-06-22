@@ -13,7 +13,7 @@ export async function checkCommand(path) {
   const manifest = await readManifest(targetDir);
 
   if (!manifest) {
-    log.fail('No manifest found. Run `claude-devkit init` first.');
+    log.fail('No manifest found. Run `agentpipe init` first.');
     process.exit(1);
   }
 
@@ -28,6 +28,6 @@ export async function checkCommand(path) {
     log.pass('Up to date.');
   } else {
     log.warn(`Update available: ${installed} → ${latest}`);
-    console.log('Run: npx claude-devkit upgrade');
+    console.log('Run: npx agentpipe upgrade');
   }
 }

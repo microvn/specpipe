@@ -12,7 +12,7 @@ export async function diffCommand(path) {
   const manifest = await readManifest(targetDir);
 
   if (!manifest) {
-    log.fail('No manifest found. Run `claude-devkit init` first.');
+    log.fail('No manifest found. Run `agentpipe init` first.');
     process.exit(1);
   }
 

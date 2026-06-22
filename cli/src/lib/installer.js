@@ -21,29 +21,29 @@ export const COMPONENTS = {
     '.claude/hooks/sensitive-guard.sh',
   ],
   skills: [
-    '.claude/skills/mf-explore/SKILL.md',
-    '.claude/skills/mf-scaffold/SKILL.md',
-    '.claude/skills/mf-scaffold/references/ARCHITECTURE.md.tmpl',
-    '.claude/skills/mf-scaffold/references/DESIGN.md.tmpl',
-    '.claude/skills/mf-scaffold/references/adr/NNNN-template.md',
-    '.claude/skills/mf-scaffold/references/stack-profiles/react.md',
-    '.claude/skills/mf-plan/SKILL.md',
-    '.claude/skills/mf-build/SKILL.md',
-    '.claude/skills/mf-challenge/SKILL.md',
-    '.claude/skills/mf-investigate/SKILL.md',
-    '.claude/skills/mf-fix/SKILL.md',
-    '.claude/skills/mf-review/SKILL.md',
-    '.claude/skills/mf-commit/SKILL.md',
-    '.claude/skills/mf-voices/SKILL.md',
-    '.claude/skills/mf-spec-render/SKILL.md',
-    '.claude/skills/mf-spec-render/template.html',
-    '.claude/skills/mf-spec-render/components.md',
-    '.claude/skills/mf-spec-render/examples/user-auth.md',
-    '.claude/skills/mf-spec-render/examples/user-auth.html',
-    '.claude/skills/mf-md-render/SKILL.md',
-    '.claude/skills/mf-md-render/template.html',
-    '.claude/skills/mf-md-render/components.md',
-    '.claude/skills/mf-humanize/SKILL.md',
+    '.claude/skills/ap-explore/SKILL.md',
+    '.claude/skills/ap-scaffold/SKILL.md',
+    '.claude/skills/ap-scaffold/references/ARCHITECTURE.md.tmpl',
+    '.claude/skills/ap-scaffold/references/DESIGN.md.tmpl',
+    '.claude/skills/ap-scaffold/references/adr/NNNN-template.md',
+    '.claude/skills/ap-scaffold/references/stack-profiles/react.md',
+    '.claude/skills/ap-plan/SKILL.md',
+    '.claude/skills/ap-build/SKILL.md',
+    '.claude/skills/ap-challenge/SKILL.md',
+    '.claude/skills/ap-investigate/SKILL.md',
+    '.claude/skills/ap-fix/SKILL.md',
+    '.claude/skills/ap-review/SKILL.md',
+    '.claude/skills/ap-commit/SKILL.md',
+    '.claude/skills/ap-voices/SKILL.md',
+    '.claude/skills/ap-spec-render/SKILL.md',
+    '.claude/skills/ap-spec-render/template.html',
+    '.claude/skills/ap-spec-render/components.md',
+    '.claude/skills/ap-spec-render/examples/user-auth.md',
+    '.claude/skills/ap-spec-render/examples/user-auth.html',
+    '.claude/skills/ap-md-render/SKILL.md',
+    '.claude/skills/ap-md-render/template.html',
+    '.claude/skills/ap-md-render/components.md',
+    '.claude/skills/ap-humanize/SKILL.md',
   ],
   config: [
     '.claude/settings.json',
@@ -350,8 +350,8 @@ export async function removeGlobalHooksFromSettings() {
 
 /**
  * Copy a skill to the global ~/.claude/skills/ directory.
- * Strips the '.claude/skills/' prefix so mf-plan/SKILL.md lands at
- * ~/.claude/skills/mf-plan/SKILL.md.
+ * Strips the '.claude/skills/' prefix so ap-plan/SKILL.md lands at
+ * ~/.claude/skills/ap-plan/SKILL.md.
  * @param {object} [opts.globalFiles] - files section from global manifest, used to detect true customization
  * @returns {{ result: 'copied'|'skipped'|'identical', kitHash: string }}
  */

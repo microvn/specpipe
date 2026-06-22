@@ -13,25 +13,25 @@ Every change follows this cycle: **SPEC (with acceptance scenarios) → CODE + T
 
 | Trigger | Commands | Details |
 |---------|----------|---------|
-| New project (no codebase yet) | `/mf-explore` (greenfield) → `/mf-scaffold` → `/mf-plan` → `/mf-build` | Scaffolds a runnable skeleton + ARCHITECTURE/ADRs before the first spec; `/mf-build` Foundation Gate blocks the TDD loop until a runnable harness exists |
-| Feature unclear / complex | `/mf-explore` → `/mf-plan` | Clarify requirements before writing spec |
-| New feature | `/mf-plan` → `/mf-challenge` (optional) → code in chunks → `/mf-build` each chunk | Start with spec or description |
-| Update feature | `/mf-plan <spec-path> "changes"` → code → `/mf-build` | Do NOT manually edit spec before /mf-plan |
-| Bug (complex/outage) | `/mf-investigate "description"` → `/mf-fix <investigation-file>` | OPTIONAL: diagnose root cause + blast radius before fixing |
-| Bug fix | `/mf-fix "description"` | Test-first: write failing test → fix → green |
-| Remove feature | `/mf-plan <spec-path> "remove stories"` → delete code + tests → build pass | /mf-plan handles snapshot before removal |
-| Pre-merge check | `/mf-review` | Diff-based quality gate |
-| Commit changes | `/mf-commit` | Secret scan + conventional commit |
-| Render spec HTML | `/mf-spec-render <feature>` | Generates scannable `<feature>.html` (sidebar TOC, story cards). Run after `/mf-plan` if you want the HTML view, or to refresh a stale one |
-| Render any markdown HTML | `/mf-md-render <file.md>` | Generic counterpart to `/mf-spec-render` for non-spec markdown (investigation, explore, RFC, retro, README). Callouts, step cards, Mermaid, dark/light theme |
-| Multi-LLM review | `/mf-voices [target]` | Send material to 2–3 LLMs, synthesize consensus + disagreements |
-| Rephrase to human voice | `/mf-humanize [text]` | Turn plan/notes/AI output into natural, send-ready text. Infers format + audience + tone, strips AI tone. Not part of the dev cycle |
+| New project (no codebase yet) | `/ap-explore` (greenfield) → `/ap-scaffold` → `/ap-plan` → `/ap-build` | Scaffolds a runnable skeleton + ARCHITECTURE/ADRs before the first spec; `/ap-build` Foundation Gate blocks the TDD loop until a runnable harness exists |
+| Feature unclear / complex | `/ap-explore` → `/ap-plan` | Clarify requirements before writing spec |
+| New feature | `/ap-plan` → `/ap-challenge` (optional) → code in chunks → `/ap-build` each chunk | Start with spec or description |
+| Update feature | `/ap-plan <spec-path> "changes"` → code → `/ap-build` | Do NOT manually edit spec before /ap-plan |
+| Bug (complex/outage) | `/ap-investigate "description"` → `/ap-fix <investigation-file>` | OPTIONAL: diagnose root cause + blast radius before fixing |
+| Bug fix | `/ap-fix "description"` | Test-first: write failing test → fix → green |
+| Remove feature | `/ap-plan <spec-path> "remove stories"` → delete code + tests → build pass | /ap-plan handles snapshot before removal |
+| Pre-merge check | `/ap-review` | Diff-based quality gate |
+| Commit changes | `/ap-commit` | Secret scan + conventional commit |
+| Render spec HTML | `/ap-spec-render <feature>` | Generates scannable `<feature>.html` (sidebar TOC, story cards). Run after `/ap-plan` if you want the HTML view, or to refresh a stale one |
+| Render any markdown HTML | `/ap-md-render <file.md>` | Generic counterpart to `/ap-spec-render` for non-spec markdown (investigation, explore, RFC, retro, README). Callouts, step cards, Mermaid, dark/light theme |
+| Multi-LLM review | `/ap-voices [target]` | Send material to 2–3 LLMs, synthesize consensus + disagreements |
+| Rephrase to human voice | `/ap-humanize [text]` | Turn plan/notes/AI output into natural, send-ready text. Infers format + audience + tone, strips AI tone. Not part of the dev cycle |
 
 For detailed workflow steps, templates, and decision trees, see `docs/WORKFLOW.md`.
 
 ## Testing
 
-- **Run tests:** use the project's native test command (e.g. `npx vitest run`, `swift test`, `python3 -m pytest`, `cargo test`, `go test ./...`). `/mf-build` and `/mf-fix` auto-detect it from project markers.
+- **Run tests:** use the project's native test command (e.g. `npx vitest run`, `swift test`, `python3 -m pytest`, `cargo test`, `go test ./...`). `/ap-build` and `/ap-fix` auto-detect it from project markers.
 - **Compile/typecheck BEFORE running tests.** Catch syntax errors early.
 - **Max 3 fix loops** for test failures. If tests still fail after 3 attempts, stop and report.
 - **NEVER fix production code** to make a test pass — ask the user first.

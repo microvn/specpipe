@@ -77,7 +77,7 @@ export async function upgradeGlobal({ force = false } = {}) {
     log.info(`Found per-project skills in ${projectsWithSkills.length} project(s):`);
     for (const p of projectsWithSkills) log.info(`  ${p}`);
     log.info('Per-project skills take precedence over global. Remove them to use global instead.');
-    log.info('Run `claude-devkit remove <path>` in each project to remove per-project install.');
+    log.info('Run `agentpipe remove <path>` in each project to remove per-project install.');
   }
 }
 
@@ -95,14 +95,14 @@ export async function upgradeCommand(path, opts) {
   const manifest = await readManifest(targetDir);
 
   if (!manifest) {
-    log.fail('No manifest found. Run `claude-devkit init` first, or `claude-devkit init --adopt` to adopt existing files.');
+    log.fail('No manifest found. Run `agentpipe init` first, or `agentpipe init --adopt` to adopt existing files.');
     process.exit(1);
   }
 
   // Refresh customization status by re-hashing installed files
   await refreshCustomizationStatus(targetDir, manifest);
 
-  log.info(`claude-devkit upgrade: ${manifest.version} → ${pkg.version}`);
+  log.info(`agentpipe upgrade: ${manifest.version} → ${pkg.version}`);
   log.blank();
 
   if (opts.dryRun) {

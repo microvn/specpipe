@@ -10,8 +10,8 @@ export function cli(argv) {
   const program = new Command();
 
   program
-    .name('claude-devkit')
-    .description('CLI toolkit for spec-first development with Claude Code')
+    .name('agentpipe')
+    .description('CLI toolkit for spec-first development with agentic AI coding agents')
     .version(pkg.version);
 
   program

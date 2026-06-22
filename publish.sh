@@ -64,7 +64,7 @@ cd "$CLI_DIR"
 npm publish
 
 echo ""
-echo "published claude-devkit-cli@$NEW_VERSION"
+echo "published agentpipe@$NEW_VERSION"
 
 # Update global skills on the publishing machine using local CLI (no global install required)
 echo "updating global skills..."

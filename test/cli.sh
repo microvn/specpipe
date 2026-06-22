@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# test/cli.sh — Integration tests for claude-devkit CLI
+# test/cli.sh — Integration tests for agentpipe CLI
 #
 # Covers: init, upgrade, remove — per-project AND global.
 # Real ~/.claude/ is NEVER touched — each section uses an isolated $TEST_HOME.
@@ -108,22 +108,22 @@ setup
 cli init "$PROJECT_DIR"
 
 # Skills
-assert_exists "skills: mf-explore/SKILL.md"    "$PROJECT_DIR/.claude/skills/mf-explore/SKILL.md"
-assert_exists "skills: mf-plan/SKILL.md"       "$PROJECT_DIR/.claude/skills/mf-plan/SKILL.md"
-assert_exists "skills: mf-build/SKILL.md"      "$PROJECT_DIR/.claude/skills/mf-build/SKILL.md"
-assert_exists "skills: mf-challenge/SKILL.md"  "$PROJECT_DIR/.claude/skills/mf-challenge/SKILL.md"
-assert_exists "skills: mf-investigate/SKILL.md" "$PROJECT_DIR/.claude/skills/mf-investigate/SKILL.md"
-assert_exists "skills: mf-fix/SKILL.md"        "$PROJECT_DIR/.claude/skills/mf-fix/SKILL.md"
-assert_exists "skills: mf-review/SKILL.md"     "$PROJECT_DIR/.claude/skills/mf-review/SKILL.md"
-assert_exists "skills: mf-commit/SKILL.md"     "$PROJECT_DIR/.claude/skills/mf-commit/SKILL.md"
-assert_exists "skills: mf-voices/SKILL.md"     "$PROJECT_DIR/.claude/skills/mf-voices/SKILL.md"
-assert_exists "skills: mf-spec-render/SKILL.md"       "$PROJECT_DIR/.claude/skills/mf-spec-render/SKILL.md"
-assert_exists "skills: mf-spec-render/template.html"  "$PROJECT_DIR/.claude/skills/mf-spec-render/template.html"
-assert_exists "skills: mf-spec-render/components.md"  "$PROJECT_DIR/.claude/skills/mf-spec-render/components.md"
-assert_exists "skills: mf-md-render/SKILL.md"         "$PROJECT_DIR/.claude/skills/mf-md-render/SKILL.md"
-assert_exists "skills: mf-md-render/template.html"    "$PROJECT_DIR/.claude/skills/mf-md-render/template.html"
-assert_exists "skills: mf-md-render/components.md"     "$PROJECT_DIR/.claude/skills/mf-md-render/components.md"
-assert_exists "skills: mf-humanize/SKILL.md"          "$PROJECT_DIR/.claude/skills/mf-humanize/SKILL.md"
+assert_exists "skills: ap-explore/SKILL.md"    "$PROJECT_DIR/.claude/skills/ap-explore/SKILL.md"
+assert_exists "skills: ap-plan/SKILL.md"       "$PROJECT_DIR/.claude/skills/ap-plan/SKILL.md"
+assert_exists "skills: ap-build/SKILL.md"      "$PROJECT_DIR/.claude/skills/ap-build/SKILL.md"
+assert_exists "skills: ap-challenge/SKILL.md"  "$PROJECT_DIR/.claude/skills/ap-challenge/SKILL.md"
+assert_exists "skills: ap-investigate/SKILL.md" "$PROJECT_DIR/.claude/skills/ap-investigate/SKILL.md"
+assert_exists "skills: ap-fix/SKILL.md"        "$PROJECT_DIR/.claude/skills/ap-fix/SKILL.md"
+assert_exists "skills: ap-review/SKILL.md"     "$PROJECT_DIR/.claude/skills/ap-review/SKILL.md"
+assert_exists "skills: ap-commit/SKILL.md"     "$PROJECT_DIR/.claude/skills/ap-commit/SKILL.md"
+assert_exists "skills: ap-voices/SKILL.md"     "$PROJECT_DIR/.claude/skills/ap-voices/SKILL.md"
+assert_exists "skills: ap-spec-render/SKILL.md"       "$PROJECT_DIR/.claude/skills/ap-spec-render/SKILL.md"
+assert_exists "skills: ap-spec-render/template.html"  "$PROJECT_DIR/.claude/skills/ap-spec-render/template.html"
+assert_exists "skills: ap-spec-render/components.md"  "$PROJECT_DIR/.claude/skills/ap-spec-render/components.md"
+assert_exists "skills: ap-md-render/SKILL.md"         "$PROJECT_DIR/.claude/skills/ap-md-render/SKILL.md"
+assert_exists "skills: ap-md-render/template.html"    "$PROJECT_DIR/.claude/skills/ap-md-render/template.html"
+assert_exists "skills: ap-md-render/components.md"     "$PROJECT_DIR/.claude/skills/ap-md-render/components.md"
+assert_exists "skills: ap-humanize/SKILL.md"          "$PROJECT_DIR/.claude/skills/ap-humanize/SKILL.md"
 
 # Hooks
 assert_exists "hooks: path-guard.sh"      "$PROJECT_DIR/.claude/hooks/path-guard.sh"
@@ -166,7 +166,7 @@ setup
 
 cli init "$PROJECT_DIR" --only skills
 
-assert_exists "skills present with --only skills"  "$PROJECT_DIR/.claude/skills/mf-plan/SKILL.md"
+assert_exists "skills present with --only skills"  "$PROJECT_DIR/.claude/skills/ap-plan/SKILL.md"
 assert_absent "hooks absent with --only skills"    "$PROJECT_DIR/.claude/hooks/path-guard.sh"
 assert_absent "docs absent with --only skills"     "$PROJECT_DIR/docs/WORKFLOW.md"
 
@@ -178,7 +178,7 @@ setup
 
 cli init "$PROJECT_DIR" --dry-run
 
-assert_absent "no skills with --dry-run"   "$PROJECT_DIR/.claude/skills/mf-plan/SKILL.md"
+assert_absent "no skills with --dry-run"   "$PROJECT_DIR/.claude/skills/ap-plan/SKILL.md"
 assert_absent "no hooks with --dry-run"    "$PROJECT_DIR/.claude/hooks/path-guard.sh"
 assert_absent "no manifest with --dry-run" "$PROJECT_DIR/.claude/.devkit-manifest.json"
 
@@ -212,13 +212,13 @@ section "init — skill files have YAML frontmatter"
 setup
 
 cli init "$PROJECT_DIR"
-for skill in mf-explore mf-plan mf-build mf-challenge mf-investigate mf-fix mf-review mf-commit mf-voices mf-humanize; do
+for skill in ap-explore ap-plan ap-build ap-challenge ap-investigate ap-fix ap-review ap-commit ap-voices ap-humanize; do
   CONTENT=$(head -1 "$PROJECT_DIR/.claude/skills/$skill/SKILL.md")
   assert_contains "$skill/SKILL.md starts with ---" "---" "$CONTENT"
 done
-PLAN_FM=$(awk '/^---$/{c++; if(c==2) exit} {print}' "$PROJECT_DIR/.claude/skills/mf-plan/SKILL.md")
-assert_contains "mf-plan: has description frontmatter" "description:" "$PLAN_FM"
-assert_contains "mf-plan: has allowed-tools frontmatter" "allowed-tools:" "$PLAN_FM"
+PLAN_FM=$(awk '/^---$/{c++; if(c==2) exit} {print}' "$PROJECT_DIR/.claude/skills/ap-plan/SKILL.md")
+assert_contains "ap-plan: has description frontmatter" "description:" "$PLAN_FM"
+assert_contains "ap-plan: has allowed-tools frontmatter" "allowed-tools:" "$PLAN_FM"
 
 teardown
 
@@ -293,7 +293,7 @@ cli init "$PROJECT_DIR"
 cli remove "$PROJECT_DIR"
 
 assert_absent "hooks removed"     "$PROJECT_DIR/.claude/hooks/path-guard.sh"
-assert_absent "skills removed"    "$PROJECT_DIR/.claude/skills/mf-plan/SKILL.md"
+assert_absent "skills removed"    "$PROJECT_DIR/.claude/skills/ap-plan/SKILL.md"
 assert_absent "manifest removed"  "$PROJECT_DIR/.claude/.devkit-manifest.json"
 
 # Preserved items
@@ -314,7 +314,7 @@ echo "# custom" > "$PROJECT_DIR/.claude/skills/my-custom-skill/SKILL.md"
 
 cli remove "$PROJECT_DIR"
 
-assert_absent "devkit skill removed"   "$PROJECT_DIR/.claude/skills/mf-plan/SKILL.md"
+assert_absent "devkit skill removed"   "$PROJECT_DIR/.claude/skills/ap-plan/SKILL.md"
 assert_exists "custom skill preserved" "$PROJECT_DIR/.claude/skills/my-custom-skill/SKILL.md"
 
 teardown
@@ -337,16 +337,16 @@ setup
 cli init --global
 
 # Core SKILL.md skills
-assert_exists "global skills: mf-explore"   "$TEST_HOME/.claude/skills/mf-explore/SKILL.md"
-assert_exists "global skills: mf-plan"      "$TEST_HOME/.claude/skills/mf-plan/SKILL.md"
-assert_exists "global skills: mf-build"     "$TEST_HOME/.claude/skills/mf-build/SKILL.md"
-assert_exists "global skills: mf-challenge" "$TEST_HOME/.claude/skills/mf-challenge/SKILL.md"
-assert_exists "global skills: mf-investigate" "$TEST_HOME/.claude/skills/mf-investigate/SKILL.md"
-assert_exists "global skills: mf-fix"       "$TEST_HOME/.claude/skills/mf-fix/SKILL.md"
-assert_exists "global skills: mf-review"    "$TEST_HOME/.claude/skills/mf-review/SKILL.md"
-assert_exists "global skills: mf-commit"    "$TEST_HOME/.claude/skills/mf-commit/SKILL.md"
-assert_exists "global skills: mf-voices"    "$TEST_HOME/.claude/skills/mf-voices/SKILL.md"
-assert_exists "global skills: mf-humanize"  "$TEST_HOME/.claude/skills/mf-humanize/SKILL.md"
+assert_exists "global skills: ap-explore"   "$TEST_HOME/.claude/skills/ap-explore/SKILL.md"
+assert_exists "global skills: ap-plan"      "$TEST_HOME/.claude/skills/ap-plan/SKILL.md"
+assert_exists "global skills: ap-build"     "$TEST_HOME/.claude/skills/ap-build/SKILL.md"
+assert_exists "global skills: ap-challenge" "$TEST_HOME/.claude/skills/ap-challenge/SKILL.md"
+assert_exists "global skills: ap-investigate" "$TEST_HOME/.claude/skills/ap-investigate/SKILL.md"
+assert_exists "global skills: ap-fix"       "$TEST_HOME/.claude/skills/ap-fix/SKILL.md"
+assert_exists "global skills: ap-review"    "$TEST_HOME/.claude/skills/ap-review/SKILL.md"
+assert_exists "global skills: ap-commit"    "$TEST_HOME/.claude/skills/ap-commit/SKILL.md"
+assert_exists "global skills: ap-voices"    "$TEST_HOME/.claude/skills/ap-voices/SKILL.md"
+assert_exists "global skills: ap-humanize"  "$TEST_HOME/.claude/skills/ap-humanize/SKILL.md"
 
 # All 6 hooks
 assert_exists "global hooks: path-guard.sh"      "$TEST_HOME/.claude/hooks/path-guard.sh"
@@ -436,7 +436,7 @@ setup
 
 cli init --global
 
-for skill in mf-explore mf-plan mf-build mf-challenge mf-investigate mf-fix mf-review mf-commit mf-voices mf-humanize; do
+for skill in ap-explore ap-plan ap-build ap-challenge ap-investigate ap-fix ap-review ap-commit ap-voices ap-humanize; do
   FIRST=$(head -1 "$TEST_HOME/.claude/skills/$skill/SKILL.md")
   assert_contains "global $skill starts with ---" "---" "$FIRST"
 done
@@ -486,10 +486,10 @@ section "upgrade --global (customized skill — skip)"
 setup
 
 cli init --global
-printf '\n# CUSTOM\n' >> "$TEST_HOME/.claude/skills/mf-plan/SKILL.md"
+printf '\n# CUSTOM\n' >> "$TEST_HOME/.claude/skills/ap-plan/SKILL.md"
 OUT_UGSSK=$(cli_out upgrade --global)
 assert_contains "global upgrade: skips customized skill" "customized" "$OUT_UGSSK"
-CONTENT=$(cat "$TEST_HOME/.claude/skills/mf-plan/SKILL.md")
+CONTENT=$(cat "$TEST_HOME/.claude/skills/ap-plan/SKILL.md")
 assert_contains "global upgrade: custom skill content preserved" "CUSTOM" "$CONTENT"
 
 teardown
@@ -565,7 +565,7 @@ cli remove --global
 
 # Per-project files must still be there
 assert_exists "per-project hooks untouched after global remove" "$PROJECT_DIR/.claude/hooks/path-guard.sh"
-assert_exists "per-project skills untouched after global remove" "$PROJECT_DIR/.claude/skills/mf-plan/SKILL.md"
+assert_exists "per-project skills untouched after global remove" "$PROJECT_DIR/.claude/skills/ap-plan/SKILL.md"
 
 teardown
 
@@ -580,7 +580,7 @@ cli init --global
 # Per-project init should auto-upgrade global
 OUT_AUTO=$(cli_out init "$PROJECT_DIR")
 assert_contains "auto-upgrade: global skills mentioned" "global" "$OUT_AUTO"
-assert_exists   "auto-upgrade: global skills still present" "$TEST_HOME/.claude/skills/mf-plan/SKILL.md"
+assert_exists   "auto-upgrade: global skills still present" "$TEST_HOME/.claude/skills/ap-plan/SKILL.md"
 
 teardown
 

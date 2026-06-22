@@ -15,7 +15,7 @@ const PRESERVE_DIRS = [
 ];
 
 export async function removeGlobal() {
-  log.info('Removing global claude-devkit install...');
+  log.info('Removing global agentpipe install...');
   log.blank();
 
   // Remove ~/.claude/skills/
@@ -60,7 +60,7 @@ export async function removeGlobal() {
 
   log.blank();
   log.pass('Global install removed. Per-project installs are unaffected.');
-  log.info('Run `claude-devkit init` in each project to restore per-project hooks.');
+  log.info('Run `agentpipe init` in each project to restore per-project hooks.');
 }
 
 export async function removeCommand(path, opts = {}) {
@@ -77,7 +77,7 @@ export async function removeCommand(path, opts = {}) {
     process.exit(1);
   }
 
-  log.info('Removing claude-devkit files...');
+  log.info('Removing agentpipe files...');
   log.blank();
 
   // Remove tracked files (except preserved)
