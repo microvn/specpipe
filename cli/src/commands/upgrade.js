@@ -1,11 +1,10 @@
 import { resolve, dirname, join } from 'node:path';
 import { existsSync } from 'node:fs';
-import { copyFile as fsCopyFile, mkdir, readFile, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { homedir } from 'node:os';
 import { log } from '../lib/logger.js';
-import { hashFile } from '../lib/hasher.js';
 import { readManifest, writeManifest, setFileEntry, refreshCustomizationStatus, getAgents } from '../lib/manifest.js';
 import { getTemplateDir, setPermissions, COMPONENTS, installSkillGlobal, getGlobalSkillsDir, installHookGlobal, getGlobalHooksDir, mergeGlobalSettings } from '../lib/installer.js';
 import { computeDesired } from '../lib/reconcile.js';

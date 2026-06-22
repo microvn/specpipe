@@ -12,7 +12,7 @@
 
 set -euo pipefail
 
-SKILL="$(cd "$(dirname "$0")/.." && pwd)/kit/.claude/skills/ap-build/SKILL.md"
+SKILL="$(cd "$(dirname "$0")/.." && pwd)/kit/skills/ap-build/SKILL.md"
 PASSED=0
 FAILED=0
 

@@ -1,7 +1,7 @@
 {
   "name": "agentpipe",
-  "version": "1.13.1",
-  "description": "CLI toolkit for spec-first development with agentic AI coding agents — hooks, commands, guards, and test runners",
+  "version": "1.0.0",
+  "description": "Spec-first development toolkit for agentic AI coding agents — installs skills + guardrails for Claude Code, Codex, Cursor, Antigravity, and more.",
   "bin": {
     "agentpipe": "./bin/devkit.js",
     "ap": "./bin/devkit.js"
@@ -18,20 +18,44 @@
     "chalk": "^5.4.1",
     "commander": "^13.1.0"
   },
+  "devDependencies": {
+    "@eslint/js": "^9.17.0",
+    "eslint": "^9.17.0",
+    "globals": "^15.14.0",
+    "prettier": "^3.4.2"
+  },
   "keywords": [
-    "claude",
+    "ai",
+    "ai-agents",
+    "coding-agent",
     "claude-code",
-    "devkit",
+    "codex",
+    "cursor",
+    "antigravity",
     "spec-first",
-    "testing",
-    "hooks",
-    "guards"
+    "tdd",
+    "skills",
+    "guardrails",
+    "developer-tools"
   ],
   "scripts": {
+    "test": "node ../test/agents.mjs && bash ../test/cli.sh && bash ../test/hooks.sh && bash ../test/coverage-gate.sh",
+    "lint": "eslint src bin",
+    "format": "prettier --write \"src/**/*.js\" \"bin/**/*.js\"",
     "prepublishOnly": "rm -rf templates && cp -r ../kit templates && cp ../README.md README.md",
     "postpublish": "rm -rf templates README.md",
     "dev": "node bin/devkit.js"
   },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/microvn/agentpipe.git",
+    "directory": "cli"
+  },
+  "homepage": "https://github.com/microvn/agentpipe#readme",
+  "bugs": {
+    "url": "https://github.com/microvn/agentpipe/issues"
+  },
+  "author": "Microvn <microvn.gm@gmail.com>",
   "license": "MIT",
   "type": "module"
 }

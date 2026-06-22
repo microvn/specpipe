@@ -1,0 +1,49 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    name: test (node ${{ matrix.node }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        node: [18, 20, 22]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+      - name: Install CLI deps
+        working-directory: cli
+        run: npm install
+      - name: Configure git (tests init repos)
+        run: |
+          git config --global user.email ci@example.com
+          git config --global user.name CI
+      - name: Run test suites
+        run: |
+          node test/agents.mjs
+          bash test/cli.sh
+          bash test/hooks.sh
+          bash test/coverage-gate.sh
+
+  lint:
+    name: lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Install CLI deps
+        working-directory: cli
+        run: npm install
+      - name: ESLint
+        working-directory: cli
+        run: npm run lint
