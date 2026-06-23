@@ -5,8 +5,10 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { log } from '../lib/logger.js';
 import { detectProject } from '../lib/detector.js';
-import { writeManifest, createManifest, setFileEntry } from '../lib/manifest.js';
-import { hashFile } from '../lib/hasher.js';
+import { writeManifest, createManifest, setFileEntry, readManifest, mergeAgents } from '../lib/manifest.js';
+import { hashFile, hashContent } from '../lib/hasher.js';
+import { readFile } from 'node:fs/promises';
+import { computeDesired } from '../lib/reconcile.js';
 import {
   getAllFiles, getFilesForComponents, installFile,
   ensurePlaceholderDir, setPermissions, fillTemplate,
@@ -15,6 +17,7 @@ import {
 } from '../lib/installer.js';
 import { AGENTS, parseSkillPath } from '../lib/agents.js';
 import { initMultiAgent } from './init-agents.js';
+import { adoptExisting } from './init-adopt.js';
 import { readGlobalManifest, writeGlobalManifest, initGlobal } from './init-global.js';
 
 
@@ -134,6 +137,18 @@ export async function initCommand(path, opts) {
       installedHash = await hashFile(resolve(targetDir, outPath));
     } catch { /* file might not exist if skipped */ }
     setFileEntry(manifest, outPath, kitHash, installedHash, { agent: 'claude', templateRel: file });
+  }
+
+  // Accumulate: keep agents installed by an earlier run so a plain `init` doesn't
+  // orphan files from a prior `init --agents …`. Record their on-disk files too.
+  const prior = await readManifest(targetDir);
+  manifest.agents = mergeAgents(prior?.agents, ['claude']);
+  for (const [relPath, d] of await computeDesired(manifest.agents.filter((a) => a !== 'claude'))) {
+    if (manifest.files[relPath]) continue;
+    try {
+      const installedHash = hashContent(await readFile(resolve(targetDir, relPath), 'utf-8'));
+      setFileEntry(manifest, relPath, d.kitHash, installedHash, { agent: d.agent, templateRel: d.templateRel });
+    } catch { /* prior agent's file not on disk — don't record a phantom */ }
   }
 
   // Placeholder directories
@@ -281,51 +296,6 @@ async function trackProjectPath(projectPath) {
   const projects = new Set(meta.projects || []);
   projects.add(projectPath);
   await writeGlobalManifest({ ...meta, projects: [...projects] });
-}
-
-/**
- * Adopt existing kit files (migration from setup.sh).
- * Scans for existing files and generates a manifest without overwriting.
- */
-async function adoptExisting(targetDir) {
-  log.info('Adopting existing kit files...');
-  log.blank();
-
-  const allFiles = getAllFiles();
-  const manifest = createManifest(pkg.version, null, Object.keys(COMPONENTS));
-  let adopted = 0;
-
-  for (const file of allFiles) {
-    // Skills live at the Claude output path (.claude/skills/) on disk; map from canonical skills/.
-    const sk = parseSkillPath(file);
-    const outRel = sk ? AGENTS.claude.skillTarget(sk.skill, sk.inner) : file;
-    const installedPath = resolve(targetDir, outRel);
-    const templatePath = resolve(getTemplateDir(), file);
-
-    if (!existsSync(installedPath)) continue;
-
-    const installedHash = await hashFile(installedPath);
-    let kitHash;
-    try {
-      kitHash = await hashFile(templatePath);
-    } catch {
-      kitHash = installedHash; // Template doesn't exist, treat as matching
-    }
-    setFileEntry(manifest, outRel, kitHash, installedHash, { agent: 'claude', templateRel: file });
-    log.adopt(outRel);
-    adopted++;
-  }
-
-  // Detect project
-  const projectInfo = detectProject(targetDir);
-  if (projectInfo) {
-    manifest.projectType = { lang: projectInfo.lang, framework: projectInfo.framework };
-    log.info(`Detected: ${projectInfo.lang} (${projectInfo.framework})`);
-  }
-
-  await writeManifest(targetDir, manifest);
-  log.blank();
-  log.pass(`Manifest created for ${adopted} existing files. Future upgrades will work.`);
 }
 
 function commandExists(cmd) {

@@ -102,13 +102,16 @@ export const AGENTS = {
     capabilities: 'full',
     emitFrontmatter: fmClaude,
   },
+  // Antigravity + Codex share the vendor-neutral `.agents/skills/` standard, so they emit
+  // to the same path with identical frontmatter — computeDesired's Map dedups them (one
+  // emission serves the family). Intentional; `list` then shows that file under one agent.
   antigravity: {
     label: 'Antigravity',
-    // Verified path convention via GitHub code search: .agents/skills/ (plural) dominant
+    // Verified: official Google Codelab — .agents/skills/<name>/SKILL.md
     skillTarget: (name, inner) => `.agents/skills/${name}/${inner}`,
     globalRoot: '.agents/skills',
     skillFile: 'SKILL.md',
-    hooks: 'rules', // .agent(s)/rules — translated in a later phase
+    hooks: 'rules', // guards emitted to .agent/rules/ (plain markdown)
     capabilities: 'router-no-hooks',
     emitFrontmatter: fmNameDesc,
   },

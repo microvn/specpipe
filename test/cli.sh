@@ -744,6 +744,45 @@ assert_not_contains "remove strips guards section" "operating rules" "$AM2"
 
 teardown
 
+# ── M-1: re-init accumulates agents (no orphaning) ───────────────────────────
+section "init --agents accumulates across runs"
+setup
+
+cli init "$PROJECT_DIR" --agents codex
+cli init "$PROJECT_DIR" --agents cursor
+assert_exists "first agent (codex) still installed" "$PROJECT_DIR/.agents/skills/ap-plan/SKILL.md"
+assert_exists "second agent (cursor) installed"     "$PROJECT_DIR/.cursor/rules/ap-plan.mdc"
+MA=$(cat "$PROJECT_DIR/.agentpipe/manifest.json")
+assert_contains "manifest tracks codex still" 'codex' "$MA"
+assert_contains "manifest tracks cursor"      'cursor' "$MA"
+# remove now cleans BOTH agents (codex would be orphaned without accumulation)
+cli remove "$PROJECT_DIR"
+assert_absent "remove cleans codex (.agents)" "$PROJECT_DIR/.agents"
+assert_absent "remove cleans cursor"          "$PROJECT_DIR/.cursor"
+
+teardown
+
+# ── M-2: upgrade refreshes the Codex AGENTS.md guards section ────────────────
+section "upgrade re-merges AGENTS.md guards (Codex)"
+setup
+
+cli init "$PROJECT_DIR" --agents codex
+# Simulate a stale guards section: gut its body but keep the markers.
+node --input-type=module <<EOF 2>/dev/null
+import { readFileSync, writeFileSync } from 'node:fs';
+const p = '$PROJECT_DIR/AGENTS.md';
+let s = readFileSync(p, 'utf-8');
+s = s.replace(/<!-- agentpipe:guards:begin -->[\s\S]*?<!-- agentpipe:guards:end -->/,
+  '<!-- agentpipe:guards:begin -->\nSTALE\n<!-- agentpipe:guards:end -->');
+writeFileSync(p, s);
+EOF
+cli upgrade "$PROJECT_DIR"
+AM=$(cat "$PROJECT_DIR/AGENTS.md")
+assert_contains "upgrade restored guards body" "Never touch secrets" "$AM"
+assert_not_contains "stale marker content gone" "STALE" "$AM"
+
+teardown
+
 # ══════════════════════════════════════════════════════════════════════════════
 # Summary
 # ══════════════════════════════════════════════════════════════════════════════

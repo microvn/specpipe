@@ -34,6 +34,16 @@ export function getAgents(manifest) {
   return manifest?.agents?.length ? manifest.agents : ['claude'];
 }
 
+/** Union of already-installed agents (from manifest) with newly requested ones, order-stable. */
+export function mergeAgents(existing, requested) {
+  const seen = new Set();
+  const out = [];
+  for (const a of [...(existing || []), ...requested]) {
+    if (!seen.has(a)) { seen.add(a); out.push(a); }
+  }
+  return out;
+}
+
 /**
  * Create a new empty manifest.
  */

@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { log } from '../lib/logger.js';
 import { detectProject } from '../lib/detector.js';
-import { createManifest, writeManifest, setFileEntry } from '../lib/manifest.js';
+import { createManifest, writeManifest, setFileEntry, readManifest, mergeAgents } from '../lib/manifest.js';
 import { hashContent } from '../lib/hasher.js';
 import {
   COMPONENTS, PLACEHOLDER_DIRS, installFile, ensurePlaceholderDir,
@@ -22,13 +22,17 @@ const pkg = JSON.parse(readFileSync(resolve(__dirname, '../../package.json'), 'u
  * (hooks, config, docs) since it's the only agent with a native hook system.
  */
 export async function initMultiAgent(targetDir, opts, warnings = 0) {
-  let agents;
+  let requested;
   try {
-    agents = resolveAgents(opts.agents);
+    requested = resolveAgents(opts.agents);
   } catch (e) {
     log.fail(e.message);
     process.exit(1);
   }
+  // Accumulate: keep agents already installed (per the existing manifest) and add the
+  // requested ones, so `init --agents X` then `--agents Y` ends up with both, not just Y.
+  const existing = await readManifest(targetDir);
+  const agents = mergeAgents(existing?.agents, requested);
   const claudeSelected = agents.includes('claude');
   const labels = agents.map((a) => AGENTS[a].label).join(', ');
 

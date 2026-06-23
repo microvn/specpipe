@@ -6,7 +6,8 @@ import { fileURLToPath } from 'node:url';
 import { homedir } from 'node:os';
 import { log } from '../lib/logger.js';
 import { readManifest, writeManifest, setFileEntry, refreshCustomizationStatus, getAgents } from '../lib/manifest.js';
-import { setPermissions, COMPONENTS, installSkillGlobal, getGlobalSkillsDir, installHookGlobal, getGlobalHooksDir, mergeGlobalSettings } from '../lib/installer.js';
+import { setPermissions, COMPONENTS, installSkillGlobal, getGlobalSkillsDir, installHookGlobal, getGlobalHooksDir, mergeGlobalSettings, installAgentRules } from '../lib/installer.js';
+import { agentRulesMode } from '../lib/agents.js';
 import { computeDesired } from '../lib/reconcile.js';
 import { unlink } from 'node:fs/promises';
 
@@ -175,6 +176,15 @@ export async function upgradeCommand(path, opts) {
     } else {
       log.del(`${relPath} (would remove)`);
       removed++;
+    }
+  }
+
+  // Refresh guardrails that aren't owned files: Codex's shared AGENTS.md section is
+  // merged (not reconciled via computeDesired), so re-merge it here to pick up kit
+  // changes. Owned rule files were already handled by the reconcile loop above.
+  if (!opts.dryRun) {
+    for (const agent of agents) {
+      if (agentRulesMode(agent) === 'agents-md') await installAgentRules(agent, targetDir, { force: opts.force });
     }
   }
 

@@ -9,7 +9,8 @@ export const GUARDS_TEMPLATE_REL = 'rules/agentpipe-guards.md';
 /**
  * Template files a given agent receives. Claude gets the full kit
  * (hooks + config + docs + skills); every other agent gets skills only —
- * hooks/guards are Claude-specific (translated in a later phase).
+ * their guardrails are emitted separately from kit/rules (see emitRules), since
+ * hooks are Claude-specific.
  */
 export function templateFilesForAgent(agentId) {
   return agentId === 'claude' ? getAllFiles() : COMPONENTS.skills;
