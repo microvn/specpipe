@@ -4,6 +4,7 @@
 import {
   parseSkill, parseSkillPath, emitSkillFile, resolveAgents,
   emitRules, agentRulesMode, GUARDS_BEGIN, GUARDS_END,
+  emitHooks, agentHasHooks,
   AGENTS, AGENT_IDS, DEFAULT_AGENT,
 } from '../cli/src/lib/agents.js';
 
@@ -181,6 +182,28 @@ console.log('\n── emitRules (guardrails) ──');
   eq('codex mode is agents-md', cx.mode, 'agents-md');
   has('codex section has begin marker', cx.content, GUARDS_BEGIN);
   has('codex section has end marker', cx.content, GUARDS_END);
+}
+
+console.log('\n── emitHooks (enforced) ──');
+{
+  eq('claude has no enforced-hooks emitter (uses .claude/hooks)', emitHooks('claude'), null);
+  eq('antigravity: no enforced hooks', agentHasHooks('antigravity'), false);
+  eq('hermes: no enforced hooks', agentHasHooks('hermes'), false);
+
+  const cx = emitHooks('codex');
+  eq('codex hooks config path', cx.configPath, '.codex/hooks.json');
+  eq('codex ships shell-guard', cx.scripts.some((s) => s.dst === '.codex/hooks/agentpipe-shell-guard.sh'), true);
+  has('codex config wires the shell guard', cx.configContent, 'agentpipe-shell-guard.sh');
+  has('codex PreToolUse matcher', cx.configContent, 'PreToolUse');
+  const okJson = (d, s) => { try { JSON.parse(s); ok(d); } catch { no(d, 'invalid JSON'); } };
+  okJson('codex config is valid JSON', cx.configContent);
+
+  const cu = emitHooks('cursor');
+  eq('cursor hooks config path', cu.configPath, '.cursor/hooks.json');
+  eq('cursor ships 2 guards', cu.scripts.length, 2);
+  has('cursor config uses failClosed', cu.configContent, 'failClosed');
+  has('cursor beforeReadFile guard', cu.configContent, 'beforeReadFile');
+  okJson('cursor config is valid JSON', cu.configContent);
 }
 
 console.log(`\n══════════════════════════════════`);

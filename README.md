@@ -241,17 +241,18 @@ npx agentpipe init --agents all .               # every supported agent
 
 The skills are authored once and emitted into each agent's native format on install.
 The markdown body is identical across agents; only the file location, name, and
-frontmatter change. Only Claude Code has a native hook system — every other agent
-gets the same guardrails as **always-on advisory rules** instead of enforced hooks.
+frontmatter change. Guardrails are **enforced via blocking hooks** for Claude, Codex,
+and Cursor (they can deny a tool call); Antigravity, OpenClaw, and Hermes get the same
+guard intent as **always-on advisory rules**.
 
 | Agent | Install location | Guardrails |
 |-------|------------------|-----------|
 | **Claude Code** | `.claude/skills/ap-*/SKILL.md` + `.claude/hooks/` | Hook-enforced |
-| **Antigravity** | `.agents/skills/ap-*/SKILL.md` | `.agents/rules/` (advisory) |
+| **Codex CLI** | `.agents/skills/ap-*/SKILL.md` | **enforced** `.codex/hooks.json` + `AGENTS.md` |
+| **Cursor** | `.cursor/skills/ap-*/SKILL.md` | **enforced** `.cursor/hooks.json` + `.cursor/rules/` |
+| **Antigravity** | `.agents/skills/ap-*/SKILL.md` | `.agent/rules/` (advisory) |
 | **OpenClaw** | `skills/ap-*/SKILL.md` | `AGENTPIPE-GUARDS.md` (advisory) |
 | **Hermes** | `optional-skills/agentpipe/ap-*/SKILL.md` | `AGENTPIPE-GUARDS.md` (advisory) |
-| **Codex CLI** | `.codex/skills/ap-*/SKILL.md` | `AGENTS.md` section (advisory) |
-| **Cursor** | `.cursor/skills/ap-*/SKILL.md` | `.cursor/rules/` (advisory) |
 
 Skills that use Claude-only tools (`AskUserQuestion`, subagents) get a "Running outside
 Claude Code" note appended for the other agents, so they degrade gracefully. The specs
@@ -1294,7 +1295,7 @@ A: Only for external services you can't run locally (third-party APIs, email ser
 A: This usually means the spec is ambiguous. Clarify the spec first, then re-run `/ap-build`. Good specs produce good tests.
 
 **Q: Can I use this with other AI coding tools?**
-A: Yes. `agentpipe init --agents <list>|all` installs the skills for Codex, Cursor, Antigravity, OpenClaw, and Hermes, each in its native format. Only Claude Code gets hook-*enforced* guards; the other agents get the same guardrails as always-on advisory rules. The specs and workflow are tool-agnostic. See [docs/multi-agent.md](docs/multi-agent.md).
+A: Yes. `agentpipe init --agents <list>|all` installs the skills for Codex, Cursor, Antigravity, OpenClaw, and Hermes, each in its native format. Guards are hook-*enforced* for Claude, Codex, and Cursor (`.codex/hooks.json` / `.cursor/hooks.json` can block tool calls); Antigravity, OpenClaw, and Hermes get them as always-on advisory rules. The specs and workflow are tool-agnostic. See [docs/multi-agent.md](docs/multi-agent.md).
 
 **Q: When should I use `/ap-challenge`?**
 A: After `/ap-plan`, for complex features involving authentication, payments, data pipelines, or multi-service integration. It spawns parallel hostile reviewers that find security holes, failure modes, and false assumptions BEFORE you write code. Skip it for simple CRUD or small features — the overhead isn't worth it.

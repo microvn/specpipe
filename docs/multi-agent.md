@@ -21,25 +21,30 @@ OpenClaw — also have blocking hooks; emitting native hook configs for them is 
 
 ## Verified format matrix (2026-06-22)
 
-| Agent | Skill path | File | Frontmatter emitted | Guards today | Blocking hooks exist? |
-|---|---|---|---|---|---|
-| Claude Code | `.claude/skills/<n>/` | `SKILL.md` | canonical, verbatim | hooks (enforced) | ✓ `.claude/hooks` |
-| Codex CLI | `.agents/skills/<n>/` | `SKILL.md` | `name` + `description` | AGENTS.md section | ✓ `.codex/hooks.json` (deny/exit-2) |
-| Cursor | `.cursor/skills/<n>/` | `SKILL.md` | `name` + `description` | `.cursor/rules/*.mdc` | ✓ `.cursor/hooks.json` (fail-open by default) |
-| Antigravity | `.agents/skills/<n>/` | `SKILL.md` | `name` + `description` | `.agent/rules/*.md` | ✗ rules only |
-| OpenClaw | `skills/<n>/` | `SKILL.md` | `name` + `description` + `metadata.openclaw` | `AGENTPIPE-GUARDS.md` | ✓ plugin hooks (`api.on` block) |
-| Hermes-Agent | `optional-skills/agentpipe/<n>/` | `SKILL.md` | `name`+`description`+`version`+`metadata.hermes.tags` | `AGENTPIPE-GUARDS.md` | ~ `command:*` only |
+| Agent | Skill path | File | Frontmatter emitted | Guards installed |
+|---|---|---|---|---|
+| Claude Code | `.claude/skills/<n>/` | `SKILL.md` | canonical, verbatim | **enforced** hooks (`.claude/hooks` + settings.json) |
+| Codex CLI | `.agents/skills/<n>/` | `SKILL.md` | `name` + `description` | **enforced** `.codex/hooks.json` (PreToolUse, exit-2) + advisory `AGENTS.md` |
+| Cursor | `.cursor/skills/<n>/` | `SKILL.md` | `name` + `description` | **enforced** `.cursor/hooks.json` (`failClosed`) + advisory `.cursor/rules/*.mdc` |
+| Antigravity | `.agents/skills/<n>/` | `SKILL.md` | `name` + `description` | advisory `.agent/rules/*.md` |
+| OpenClaw | `skills/<n>/` | `SKILL.md` | `name` + `description` + `metadata.openclaw` | advisory `AGENTPIPE-GUARDS.md` (plugin hooks can block — planned) |
+| Hermes-Agent | `optional-skills/agentpipe/<n>/` | `SKILL.md` | `name`+`description`+`version`+`metadata.hermes.tags` | advisory `AGENTPIPE-GUARDS.md` |
 
 `allowed-tools` (Claude-specific) is stripped for every non-Claude agent.
 Cursor uses its **native skills** (`.cursor/skills/`), not always-on `.mdc` rules — it also
 reads `.claude/skills/` and `.agents/skills/` for interop. Reference files land under
 `.cursor/skills/<n>/`.
 
-**Enforcement (researched 2026-06):** Claude is NOT the only agent with blocking hooks —
-Codex, Cursor, and OpenClaw also have hook systems that can deny a tool call. We currently
-emit guards as **advisory rules** for all non-Claude agents; emitting native blocking-hook
-configs for Codex/Cursor/OpenClaw is planned (see Phases). Antigravity (rules only) and
-Hermes (only `command:*` can deny) stay advisory.
+**Enforcement.** Claude is not the only agent that can BLOCK a tool call.
+**Codex and Cursor now get enforced hooks** — agentpipe installs shared guard scripts
+(`agentpipe-shell-guard.sh` blocks wasteful-dir exploration + secret access in shell
+commands; `agentpipe-read-guard.sh` blocks secret-file reads) wired via `.codex/hooks.json`
+(PreToolUse → exit-2) and `.cursor/hooks.json` (`beforeShellExecution`/`beforeReadFile`,
+`failClosed: true`). They ALSO get the advisory operating-rules for everything the hooks
+don't cover. The hook payloads + exit-2 block primitive are verified against each tool's
+docs; the scripts are unit-tested on both payload shapes. OpenClaw's plugin-hook
+enforcement (a TypeScript plugin, different mechanism) is still planned; Antigravity and
+Hermes stay advisory (no usable blocking-hook surface).
 
 ### Sources
 - Claude Code skills/memory: https://code.claude.com/docs/en/skills , https://code.claude.com/docs/en/memory

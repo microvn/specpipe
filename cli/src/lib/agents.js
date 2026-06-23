@@ -272,42 +272,9 @@ export function emitFile(agentId, templateRel, content) {
   return skill || { path: templateRel, content };
 }
 
-// ── Guardrails (Phase 2) ────────────────────────────────────────────────────
-// Claude enforces guards via native hooks. Every other agent gets the same
-// intent as an always-on RULE — advisory, not enforced. OpenClaw/Hermes have no
-// rules system, so they get a plain advisory doc.
-
-const RULES = {
-  cursor: {
-    mode: 'file',
-    path: '.cursor/rules/agentpipe-guards.mdc',
-    frontmatter: 'description: agentpipe operating rules — spec-first cycle, guardrails, testing, conventions\nglobs:\nalwaysApply: true',
-  },
-  // Antigravity rules are plain markdown (no documented trigger/glob frontmatter);
-  // official Google DevRel uses the singular `.agent/rules/` path.
-  antigravity: { mode: 'doc', path: '.agent/rules/agentpipe-guards.md' },
-  codex: { mode: 'agents-md', path: 'AGENTS.md' },
-  openclaw: { mode: 'doc', path: 'AGENTPIPE-GUARDS.md' },
-  hermes: { mode: 'doc', path: 'AGENTPIPE-GUARDS.md' },
-};
-
-export const GUARDS_BEGIN = '<!-- agentpipe:guards:begin -->';
-export const GUARDS_END = '<!-- agentpipe:guards:end -->';
-
-/** How an agent carries guardrails: 'file' | 'doc' | 'agents-md' | null (native hooks). */
-export function agentRulesMode(agentId) {
-  return RULES[agentId]?.mode || null;
-}
-
-/**
- * Emit the guardrails artifact for an agent from the canonical guards body.
- * @returns {{ mode, path, content } | null} null for Claude (native hooks).
- */
-export function emitRules(agentId, body) {
-  const r = RULES[agentId];
-  if (!r) return null;
-  if (r.mode === 'file') return { mode: 'file', path: r.path, content: `---\n${r.frontmatter}\n---\n${body}` };
-  if (r.mode === 'doc') return { mode: 'doc', path: r.path, content: `# agentpipe — operating rules\n\n${body}` };
-  // agents-md: a marked section merged into a shared AGENTS.md
-  return { mode: 'agents-md', path: r.path, content: `${GUARDS_BEGIN}\n## agentpipe — operating rules\n\n${body}${GUARDS_END}\n` };
-}
+// Guardrails (advisory rules) + enforced (blocking) hooks live in agent-guards.js;
+// re-exported here so callers keep importing them from agents.js.
+export {
+  GUARDS_BEGIN, GUARDS_END, HOOKS_SRC_DIR,
+  agentRulesMode, emitRules, agentHasHooks, emitHooks,
+} from './agent-guards.js';

@@ -783,6 +783,32 @@ assert_not_contains "stale marker content gone" "STALE" "$AM"
 
 teardown
 
+# ── Enforced hooks (Codex/Cursor) — install, block, remove ───────────────────
+section "enforced hooks install + actually block + remove"
+setup
+
+cli init "$PROJECT_DIR" --agents codex,cursor
+assert_exists  "codex hooks.json"        "$PROJECT_DIR/.codex/hooks.json"
+assert_json_valid "codex hooks.json valid" "$PROJECT_DIR/.codex/hooks.json"
+assert_executable "codex shell-guard +x"  "$PROJECT_DIR/.codex/hooks/agentpipe-shell-guard.sh"
+assert_exists  "cursor hooks.json"       "$PROJECT_DIR/.cursor/hooks.json"
+assert_json_valid "cursor hooks.json valid" "$PROJECT_DIR/.cursor/hooks.json"
+assert_executable "cursor read-guard +x" "$PROJECT_DIR/.cursor/hooks/agentpipe-read-guard.sh"
+
+# The installed guard actually blocks (exit 2) — real enforcement, not advisory.
+C=$(printf '{"tool_input":{"command":"ls node_modules"}}' | bash "$PROJECT_DIR/.codex/hooks/agentpipe-shell-guard.sh" >/dev/null 2>&1; echo $?)
+[[ "$C" == "2" ]] && pass "shell-guard blocks node_modules (exit 2)" || fail "shell-guard should block (got $C)"
+C=$(printf '{"command":"ls src"}' | bash "$PROJECT_DIR/.cursor/hooks/agentpipe-shell-guard.sh" >/dev/null 2>&1; echo $?)
+[[ "$C" == "0" ]] && pass "shell-guard allows safe command (exit 0)" || fail "shell-guard should allow (got $C)"
+C=$(printf '{"file_path":"app/.env"}' | bash "$PROJECT_DIR/.cursor/hooks/agentpipe-read-guard.sh" >/dev/null 2>&1; echo $?)
+[[ "$C" == "2" ]] && pass "read-guard blocks .env (exit 2)" || fail "read-guard should block (got $C)"
+
+cli remove "$PROJECT_DIR"
+assert_absent "codex hooks removed"  "$PROJECT_DIR/.codex/hooks"
+assert_absent "cursor hooks removed" "$PROJECT_DIR/.cursor/hooks"
+
+teardown
+
 # ══════════════════════════════════════════════════════════════════════════════
 # Summary
 # ══════════════════════════════════════════════════════════════════════════════

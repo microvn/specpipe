@@ -6,8 +6,8 @@ import { fileURLToPath } from 'node:url';
 import { homedir } from 'node:os';
 import { log } from '../lib/logger.js';
 import { readManifest, writeManifest, setFileEntry, refreshCustomizationStatus, getAgents } from '../lib/manifest.js';
-import { setPermissions, COMPONENTS, installSkillGlobal, getGlobalSkillsDir, installHookGlobal, getGlobalHooksDir, mergeGlobalSettings, installAgentRules } from '../lib/installer.js';
-import { agentRulesMode } from '../lib/agents.js';
+import { setPermissions, COMPONENTS, installSkillGlobal, getGlobalSkillsDir, installHookGlobal, getGlobalHooksDir, mergeGlobalSettings, installAgentRules, installAgentHooks } from '../lib/installer.js';
+import { agentRulesMode, agentHasHooks } from '../lib/agents.js';
 import { computeDesired } from '../lib/reconcile.js';
 import { unlink } from 'node:fs/promises';
 
@@ -185,6 +185,7 @@ export async function upgradeCommand(path, opts) {
   if (!opts.dryRun) {
     for (const agent of agents) {
       if (agentRulesMode(agent) === 'agents-md') await installAgentRules(agent, targetDir, { force: opts.force });
+      if (agentHasHooks(agent)) await installAgentHooks(agent, targetDir, { force: opts.force });
     }
   }
 

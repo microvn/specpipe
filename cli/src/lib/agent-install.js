@@ -1,9 +1,9 @@
 import { existsSync } from 'node:fs';
-import { mkdir, readFile, writeFile, unlink } from 'node:fs/promises';
+import { mkdir, readFile, writeFile, unlink, chmod, rmdir } from 'node:fs/promises';
 import { join, dirname } from 'node:path';
 import { log } from './logger.js';
 import { getTemplateDir, COMPONENTS } from './installer.js';
-import { emitSkillFile, emitRules, AGENTS, GUARDS_BEGIN, GUARDS_END } from './agents.js';
+import { emitSkillFile, emitRules, emitHooks, AGENTS, GUARDS_BEGIN, GUARDS_END } from './agents.js';
 
 /**
  * Emit one canonical skill file for a target agent and write it to targetDir.
@@ -113,4 +113,49 @@ export async function installAgentRules(agentId, targetDir, { force = false } = 
   await writeFile(dst, r.content);
   log.copy(r.path);
   return { mode: r.mode, path: r.path };
+}
+
+/**
+ * Install an agent's ENFORCED (blocking) hooks: the guard scripts + the agent's
+ * hook config file. Codex/Cursor only (verified payloads). Returns null otherwise.
+ * The hook config is agentpipe-owned; if a different one already exists, we skip
+ * unless --force (don't clobber a user's hooks).
+ */
+export async function installAgentHooks(agentId, targetDir, { force = false } = {}) {
+  const h = emitHooks(agentId);
+  if (!h) return null;
+
+  for (const { src, dst } of h.scripts) {
+    const content = await readFile(join(getTemplateDir(), src), 'utf-8');
+    const dstAbs = join(targetDir, dst);
+    await mkdir(dirname(dstAbs), { recursive: true });
+    await writeFile(dstAbs, content);
+    await chmod(dstAbs, 0o755);
+    log.copy(dst);
+  }
+
+  const cfgAbs = join(targetDir, h.configPath);
+  if (existsSync(cfgAbs) && !force) {
+    try {
+      if ((await readFile(cfgAbs, 'utf-8')) === h.configContent) {
+        log.same(`${h.configPath} (identical)`);
+        return { configPath: h.configPath };
+      }
+    } catch { /* unreadable */ }
+    log.warn(`${h.configPath} (exists — use --force to install agentpipe enforced hooks)`);
+    return { configPath: h.configPath };
+  }
+  await mkdir(dirname(cfgAbs), { recursive: true });
+  await writeFile(cfgAbs, h.configContent);
+  log.copy(h.configPath);
+  return { configPath: h.configPath };
+}
+
+/** Remove an agent's enforced-hook scripts + config (+ empty hooks dir). */
+export async function removeAgentHooks(agentId, targetDir) {
+  const h = emitHooks(agentId);
+  if (!h) return;
+  for (const { dst } of h.scripts) { try { await unlink(join(targetDir, dst)); } catch { /* */ } }
+  try { await unlink(join(targetDir, h.configPath)); } catch { /* */ }
+  try { await rmdir(join(targetDir, h.hooksDir)); } catch { /* not empty / missing */ }
 }

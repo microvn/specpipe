@@ -8,7 +8,7 @@ import { createManifest, writeManifest, setFileEntry, readManifest, mergeAgents 
 import { hashContent } from '../lib/hasher.js';
 import {
   COMPONENTS, PLACEHOLDER_DIRS, installFile, ensurePlaceholderDir,
-  setPermissions, fillTemplate, installAgentSkills, installAgentRules,
+  setPermissions, fillTemplate, installAgentSkills, installAgentRules, installAgentHooks,
 } from '../lib/installer.js';
 import { resolveAgents, AGENTS } from '../lib/agents.js';
 import { computeDesired } from '../lib/reconcile.js';
@@ -67,6 +67,7 @@ export async function initMultiAgent(targetDir, opts, warnings = 0) {
     results.push(await installAgentSkills(agent, targetDir, { force: opts.force }));
     const rules = await installAgentRules(agent, targetDir, { force: opts.force });
     if (rules?.mode === 'agents-md') manifest.agentsMdGuards = true;
+    await installAgentHooks(agent, targetDir, { force: opts.force }); // enforced hooks (Codex/Cursor)
   }
 
   // Project detection only fills Claude's CLAUDE.md template.

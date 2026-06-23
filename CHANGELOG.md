@@ -16,6 +16,10 @@ All notable changes to this project are documented here. The format is based on
   moved to the neutral `.agentpipe/manifest.json` (legacy `.claude/` read as a fallback).
 - Capability adaptation: non-Claude skill variants rewrite `AskUserQuestion` into an
   explicit plain-text-question instruction and carry a subagent caveat.
+- Enforced (blocking) guard hooks for Codex (`.codex/hooks.json`, PreToolUse exit-2) and
+  Cursor (`.cursor/hooks.json`, `failClosed`): shared `agentpipe-shell-guard.sh` /
+  `agentpipe-read-guard.sh` block wasteful-dir exploration and secret access. These agents
+  now ENFORCE guards (not just advisory rules), like Claude's hooks.
 - OSS scaffolding: LICENSE, CONTRIBUTING, CODE_OF_CONDUCT, SECURITY, CHANGELOG, CI.
 
 ### Changed
@@ -28,9 +32,8 @@ All notable changes to this project are documented here. The format is based on
   350-line guard the kit ships.
 
 ### Planned (post-1.0)
-- Native blocking-hook enforcement for non-Claude agents that support it — Codex
-  (`.codex/hooks.json`), Cursor (`.cursor/hooks.json`), OpenClaw (plugin hooks) — so
-  guards are enforced, not just advisory. (Researched: these agents can deny tool calls.)
+- OpenClaw enforced hooks (a TypeScript plugin via `api.on` — different mechanism than
+  the Codex/Cursor JSON-config hooks already shipped).
 - Subagent conditional content for orchestration skills (currently an advisory caveat).
 - Unify the default and `--agents` install paths into one.
 

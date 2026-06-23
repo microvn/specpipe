@@ -136,6 +136,7 @@ export async function installFile(relativePath, targetDir, { force = false } = {
 export {
   installSkillForAgent, installAgentSkills, installAgentRules,
   mergeAgentsMdGuards, stripAgentsMdGuards,
+  installAgentHooks, removeAgentHooks,
 } from './agent-install.js';
 
 /**
