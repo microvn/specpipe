@@ -251,7 +251,7 @@ gets the same guardrails as **always-on advisory rules** instead of enforced hoo
 | **OpenClaw** | `skills/ap-*/SKILL.md` | `AGENTPIPE-GUARDS.md` (advisory) |
 | **Hermes** | `optional-skills/agentpipe/ap-*/SKILL.md` | `AGENTPIPE-GUARDS.md` (advisory) |
 | **Codex CLI** | `.codex/skills/ap-*/SKILL.md` | `AGENTS.md` section (advisory) |
-| **Cursor** | `.cursor/rules/ap-*.mdc` | `.cursor/rules/` (advisory) |
+| **Cursor** | `.cursor/skills/ap-*/SKILL.md` | `.cursor/rules/` (advisory) |
 
 Skills that use Claude-only tools (`AskUserQuestion`, subagents) get a "Running outside
 Claude Code" note appended for the other agents, so they degrade gracefully. The specs

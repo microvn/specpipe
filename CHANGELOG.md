@@ -21,11 +21,16 @@ All notable changes to this project are documented here. The format is based on
 ### Changed
 - Rebrand `claude-devkit-cli` → `agentpipe`; skills `mf-*` → `ap-*`.
 - Codex skills target corrected to the cross-tool `.agents/skills/` standard.
+- Cursor skills now emit to its native `.cursor/skills/<n>/SKILL.md` (was converted to
+  always-on `.cursor/rules/*.mdc`); guards stay a `.cursor/rules/*.mdc` rule.
 - Refactor: split `installer.js` (→ `agent-install.js`, `claude-global.js`) and
   `init.js` (→ `init-agents.js`, `init-global.js`); every source file is now under the
   350-line guard the kit ships.
 
 ### Planned (post-1.0)
+- Native blocking-hook enforcement for non-Claude agents that support it — Codex
+  (`.codex/hooks.json`), Cursor (`.cursor/hooks.json`), OpenClaw (plugin hooks) — so
+  guards are enforced, not just advisory. (Researched: these agents can deny tool calls.)
 - Subagent conditional content for orchestration skills (currently an advisory caveat).
 - Unify the default and `--agents` install paths into one.
 

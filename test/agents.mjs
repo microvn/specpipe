@@ -57,7 +57,7 @@ const REL = 'skills/ap-plan/SKILL.md';
   eq('openclaw path', emitSkillFile('openclaw', REL, SKILL).path, 'skills/ap-plan/SKILL.md');
   eq('hermes path', emitSkillFile('hermes', REL, SKILL).path, 'optional-skills/agentpipe/ap-plan/SKILL.md');
   eq('codex path', emitSkillFile('codex', REL, SKILL).path, '.agents/skills/ap-plan/SKILL.md');
-  eq('cursor path -> .mdc flat', emitSkillFile('cursor', REL, SKILL).path, '.cursor/rules/ap-plan.mdc');
+  eq('cursor path -> native skills', emitSkillFile('cursor', REL, SKILL).path, '.cursor/skills/ap-plan/SKILL.md');
 }
 
 console.log('\n── emitSkillFile: frontmatter transforms ──');
@@ -80,9 +80,8 @@ console.log('\n── emitSkillFile: frontmatter transforms ──');
   has('hermes adds tags block', he, 'tags: [agentpipe');
 
   const cu = emitSkillFile('cursor', REL, SKILL).content;
-  has('cursor adds alwaysApply', cu, 'alwaysApply: false');
-  has('cursor adds globs key', cu, 'globs:');
-  not('cursor has no name field', cu, 'name: ap-plan');
+  has('cursor (native skill) adds name', cu, 'name: ap-plan');
+  not('cursor drops allowed-tools', cu, 'allowed-tools');
   has('cursor keeps body', cu, 'Body content here.');
 }
 
@@ -94,7 +93,7 @@ console.log('\n── emitSkillFile: reference files copy verbatim ──');
   eq('ref path under skill dir', ag.path, '.agents/skills/ap-scaffold/references/react.md');
   eq('ref content untouched', ag.content, refContent);
   const cu = emitSkillFile('cursor', refRel, refContent);
-  eq('cursor ref under .cursor/rules/<name>/', cu.path, '.cursor/rules/ap-scaffold/references/react.md');
+  eq('cursor ref under .cursor/skills/<name>/', cu.path, '.cursor/skills/ap-scaffold/references/react.md');
 }
 
 console.log('\n── resolveAgents ──');

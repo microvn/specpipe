@@ -620,7 +620,7 @@ section "init --agents (non-claude) emits native paths, no .claude"
 setup
 
 cli init "$PROJECT_DIR" --agents cursor,antigravity
-assert_exists "cursor .mdc emitted" "$PROJECT_DIR/.cursor/rules/ap-plan.mdc"
+assert_exists "cursor native skill emitted" "$PROJECT_DIR/.cursor/skills/ap-plan/SKILL.md"
 assert_exists "antigravity SKILL.md emitted" "$PROJECT_DIR/.agents/skills/ap-plan/SKILL.md"
 # Manifest still lives at .claude/.devkit-manifest.json (neutral location is future work),
 # but no Claude *content* is installed when Claude isn't selected.
@@ -633,8 +633,8 @@ if printf '%s' "$AG" | grep -q "allowed-tools"; then
   fail "antigravity drops allowed-tools"
 else pass "antigravity drops allowed-tools"; fi
 
-CU=$(cat "$PROJECT_DIR/.cursor/rules/ap-plan.mdc")
-assert_contains "cursor .mdc has alwaysApply" "alwaysApply: false" "$CU"
+CU=$(cat "$PROJECT_DIR/.cursor/skills/ap-plan/SKILL.md")
+assert_contains "cursor native skill adds name" "name: ap-plan" "$CU"
 
 teardown
 
@@ -678,20 +678,20 @@ assert_contains "upgrade idempotent (0 updated)" "Updated 0" "$OUT"
 node --input-type=module <<EOF 2>/dev/null
 import { readFileSync, writeFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
-const f = '$PROJECT_DIR/.cursor/rules/ap-plan.mdc';
+const f = '$PROJECT_DIR/.cursor/skills/ap-plan/SKILL.md';
 const mp = '$PROJECT_DIR/.agentpipe/manifest.json';
 const old = '--- OLD EMITTED CONTENT ---\n';
 writeFileSync(f, old);
 const h = createHash('sha256').update(old).digest('hex');
 const m = JSON.parse(readFileSync(mp, 'utf-8'));
-m.files['.cursor/rules/ap-plan.mdc'].kitHash = h;
-m.files['.cursor/rules/ap-plan.mdc'].installedHash = h;
+m.files['.cursor/skills/ap-plan/SKILL.md'].kitHash = h;
+m.files['.cursor/skills/ap-plan/SKILL.md'].installedHash = h;
 writeFileSync(mp, JSON.stringify(m, null, 2) + '\n');
 EOF
 OUT=$(cli_out upgrade "$PROJECT_DIR")
 assert_contains "upgrade re-emits changed cursor rule" "Updated 1" "$OUT"
-NEW=$(cat "$PROJECT_DIR/.cursor/rules/ap-plan.mdc")
-assert_contains "re-emitted content is the real rule" "alwaysApply: false" "$NEW"
+NEW=$(cat "$PROJECT_DIR/.cursor/skills/ap-plan/SKILL.md")
+assert_contains "re-emitted content is the real skill" "name: ap-plan" "$NEW"
 
 teardown
 
@@ -751,7 +751,7 @@ setup
 cli init "$PROJECT_DIR" --agents codex
 cli init "$PROJECT_DIR" --agents cursor
 assert_exists "first agent (codex) still installed" "$PROJECT_DIR/.agents/skills/ap-plan/SKILL.md"
-assert_exists "second agent (cursor) installed"     "$PROJECT_DIR/.cursor/rules/ap-plan.mdc"
+assert_exists "second agent (cursor) installed"     "$PROJECT_DIR/.cursor/skills/ap-plan/SKILL.md"
 MA=$(cat "$PROJECT_DIR/.agentpipe/manifest.json")
 assert_contains "manifest tracks codex still" 'codex' "$MA"
 assert_contains "manifest tracks cursor"      'cursor' "$MA"

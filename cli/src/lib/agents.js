@@ -83,11 +83,6 @@ function fmHermes(parsed, name) {
   ].join('\n');
 }
 
-/** Cursor .mdc rules: description + globs + alwaysApply (no name; filename is the id). */
-function fmCursor(parsed) {
-  const desc = getKeyBlock(parsed, 'description') || 'description: ""';
-  return [desc, 'globs:', 'alwaysApply: false'].join('\n');
-}
 
 // ── Agent registry ─────────────────────────────────────────────────────────
 
@@ -149,15 +144,16 @@ export const AGENTS = {
   },
   cursor: {
     label: 'Cursor',
-    // Verified: cursor.com/docs/rules  .cursor/rules/<name>.mdc  (flat, MDC)
-    // SKILL.md -> <name>.mdc ; reference files land under .cursor/rules/<name>/
-    skillTarget: (name, inner) =>
-      inner === 'SKILL.md' ? `.cursor/rules/${name}.mdc` : `.cursor/rules/${name}/${inner}`,
-    globalRoot: '.cursor/rules',
+    // Verified: cursor.com/help/customization/skills — Cursor has NATIVE skills at
+    // .cursor/skills/<name>/SKILL.md (also reads .claude/skills & .agents/skills).
+    // Skills are on-demand (/skill, @skill) — the correct home, not always-on .mdc rules.
+    // Guards stay an always-on .cursor/rules/*.mdc (see RULES.cursor).
+    skillTarget: (name, inner) => `.cursor/skills/${name}/${inner}`,
+    globalRoot: '.cursor/skills',
     skillFile: 'SKILL.md',
-    hooks: 'rules',
-    capabilities: 'manual-no-hooks', // invoked via @name, no slash + no auto-description
-    emitFrontmatter: fmCursor,
+    hooks: 'rules', // advisory now; Cursor DOES support blocking hooks (.cursor/hooks.json) — roadmapped
+    capabilities: 'router-no-hooks',
+    emitFrontmatter: fmNameDesc,
   },
 };
 
