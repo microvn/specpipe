@@ -1,6 +1,6 @@
 {
   "name": "specpipe",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Spec-first development toolkit for agentic AI coding agents — installs skills + guardrails for Claude Code, Codex, Cursor, Antigravity, and more.",
   "bin": {
     "specpipe": "./bin/devkit.js",
@@ -51,7 +51,7 @@
     "url": "git+https://github.com/microvn/specpipe.git",
     "directory": "cli"
   },
-  "homepage": "https://github.com/microvn/specpipe#readme",
+  "homepage": "https://specpipe.vercel.app",
   "bugs": {
     "url": "https://github.com/microvn/specpipe/issues"
   },

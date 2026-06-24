@@ -4,7 +4,12 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [1.0.1]
+
+### Changed
+- Package `homepage` now points to the landing site, [specpipe.vercel.app](https://specpipe.vercel.app).
+
+## [1.0.0]
 
 ### Added
 - Multi-agent install: `specpipe init --agents <list>|all` emits the skill set for
