@@ -2,7 +2,7 @@
 
 ## Scope
 
-agentpipe is a local CLI that writes skill/config files into your project and runs
+specpipe is a local CLI that writes skill/config files into your project and runs
 shell/Node hooks **on your own machine** under your agent. It has no network service.
 The security surface is: the installed hook scripts, the files written on `init`/`upgrade`,
 and the npm package supply chain.
@@ -14,14 +14,14 @@ Please **do not open a public issue** for a security vulnerability.
 Email **microvn.gm@gmail.com** with:
 - a description of the issue and its impact,
 - steps to reproduce (or a proof of concept),
-- affected version (`agentpipe --version`) and OS.
+- affected version (`specpipe --version`) and OS.
 
 You'll get an acknowledgement within a few days. Once a fix ships, we'll credit you in
 the release notes unless you prefer to stay anonymous.
 
 ## Supported versions
 
-The latest published `agentpipe` release receives security fixes. Older versions do not.
+The latest published `specpipe` release receives security fixes. Older versions do not.
 
 ## Hardening notes
 

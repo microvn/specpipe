@@ -1,6 +1,6 @@
 # Multi-Agent Support
 
-agentpipe authors each skill once in an **agent-neutral source**
+specpipe authors each skill once in an **agent-neutral source**
 (`kit/skills/<skill>/SKILL.md`) and emits per-agent variants on install — Claude is
 just one target (its emitter keeps the frontmatter verbatim), not the privileged source.
 The markdown **body is identical** across agents; only the install path, file name,
@@ -9,13 +9,13 @@ and frontmatter change. See `cli/src/lib/agents.js` for the registry and emitter
 ## Install
 
 ```bash
-agentpipe init                              # Claude only (default, backward compatible)
-agentpipe init --agents cursor,antigravity  # specific agents
-agentpipe init --agents all                 # every supported agent
+specpipe init                              # Claude only (default, backward compatible)
+specpipe init --agents cursor,antigravity  # specific agents
+specpipe init --agents all                 # every supported agent
 ```
 
 When Claude is among the targets it also gets the full base (hook scripts, settings.json,
-CLAUDE.md). Today agentpipe enforces guards via hooks for Claude only; every other agent
+CLAUDE.md). Today specpipe enforces guards via hooks for Claude only; every other agent
 gets the same guard intent as always-on advisory rules. (Several of them — Codex, Cursor,
 OpenClaw — also have blocking hooks; emitting native hook configs for them is planned.)
 
@@ -27,8 +27,8 @@ OpenClaw — also have blocking hooks; emitting native hook configs for them is 
 | Codex CLI | `.agents/skills/<n>/` | `SKILL.md` | `name` + `description` | **enforced** `.codex/hooks.json` (PreToolUse, exit-2) + advisory `AGENTS.md` |
 | Cursor | `.cursor/skills/<n>/` | `SKILL.md` | `name` + `description` | **enforced** `.cursor/hooks.json` (`failClosed`) + advisory `.cursor/rules/*.mdc` |
 | Antigravity | `.agents/skills/<n>/` | `SKILL.md` | `name` + `description` | advisory `.agent/rules/*.md` |
-| OpenClaw | `skills/<n>/` | `SKILL.md` | `name` + `description` + `metadata.openclaw` | advisory `AGENTPIPE-GUARDS.md` (plugin hooks can block — planned) |
-| Hermes-Agent | `optional-skills/agentpipe/<n>/` | `SKILL.md` | `name`+`description`+`version`+`metadata.hermes.tags` | advisory `AGENTPIPE-GUARDS.md` |
+| OpenClaw | `skills/<n>/` | `SKILL.md` | `name` + `description` + `metadata.openclaw` | advisory `SPECPIPE-GUARDS.md` (plugin hooks can block — planned) |
+| Hermes-Agent | `optional-skills/specpipe/<n>/` | `SKILL.md` | `name`+`description`+`version`+`metadata.hermes.tags` | advisory `SPECPIPE-GUARDS.md` |
 
 `allowed-tools` (Claude-specific) is stripped for every non-Claude agent.
 Cursor uses its **native skills** (`.cursor/skills/`), not always-on `.mdc` rules — it also
@@ -36,9 +36,9 @@ reads `.claude/skills/` and `.agents/skills/` for interop. Reference files land 
 `.cursor/skills/<n>/`.
 
 **Enforcement.** Claude is not the only agent that can BLOCK a tool call.
-**Codex and Cursor now get enforced hooks** — agentpipe installs shared guard scripts
-(`agentpipe-shell-guard.sh` blocks wasteful-dir exploration + secret access in shell
-commands; `agentpipe-read-guard.sh` blocks secret-file reads) wired via `.codex/hooks.json`
+**Codex and Cursor now get enforced hooks** — specpipe installs shared guard scripts
+(`specpipe-shell-guard.sh` blocks wasteful-dir exploration + secret access in shell
+commands; `specpipe-read-guard.sh` blocks secret-file reads) wired via `.codex/hooks.json`
 (PreToolUse → exit-2) and `.cursor/hooks.json` (`beforeShellExecution`/`beforeReadFile`,
 `failClosed: true`). They ALSO get the advisory operating-rules for everything the hooks
 don't cover. The hook payloads + exit-2 block primitive are verified against each tool's
@@ -61,11 +61,11 @@ manifest fields. Backward compatible — no `--agents` behaves exactly as before
 
 **P2 (done): hooks/guards per agent.** Claude keeps its native hook enforcement.
 Every other agent gets the same guard *intent* as an always-on rule, emitted from
-one canonical source (`kit/rules/agentpipe-guards.md`):
-- Cursor → `.cursor/rules/agentpipe-guards.mdc` (`alwaysApply: true`)
-- Antigravity → `.agent/rules/agentpipe-guards.md` (plain markdown — no documented trigger/glob frontmatter)
+one canonical source (`kit/rules/specpipe-guards.md`):
+- Cursor → `.cursor/rules/specpipe-guards.mdc` (`alwaysApply: true`)
+- Antigravity → `.agent/rules/specpipe-guards.md` (plain markdown — no documented trigger/glob frontmatter)
 - Codex → a marked section merged into a shared `AGENTS.md` (preserves user content; stripped cleanly on remove)
-- OpenClaw / Hermes → `AGENTPIPE-GUARDS.md` advisory doc (no rules system)
+- OpenClaw / Hermes → `SPECPIPE-GUARDS.md` advisory doc (no rules system)
 
 These are **advisory, not hook-enforced** — that's the honest completeness gap,
 surfaced by `init` warnings and `list`.
@@ -81,7 +81,7 @@ the agent how to degrade:
 Skills with no Claude-specific tools get no added section.
 
 **Lifecycle:** `upgrade`/`remove`/`diff`/`list` are agent-aware via the reconcile
-model (`computeDesired`). The manifest lives at the neutral `.agentpipe/manifest.json`
+model (`computeDesired`). The manifest lives at the neutral `.specpipe/manifest.json`
 (legacy `.claude/` read as a fallback) and records `{ agent, templateRel }` per file.
 
 **Other open items**

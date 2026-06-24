@@ -16,7 +16,7 @@ const PRESERVE_DIRS = [
 ];
 
 export async function removeGlobal() {
-  log.info('Removing global agentpipe install...');
+  log.info('Removing global specpipe install...');
   log.blank();
 
   // Remove ~/.claude/skills/
@@ -61,7 +61,7 @@ export async function removeGlobal() {
 
   log.blank();
   log.pass('Global install removed. Per-project installs are unaffected.');
-  log.info('Run `agentpipe init` in each project to restore per-project hooks.');
+  log.info('Run `specpipe init` in each project to restore per-project hooks.');
 }
 
 export async function removeCommand(path, opts = {}) {
@@ -78,7 +78,7 @@ export async function removeCommand(path, opts = {}) {
     process.exit(1);
   }
 
-  log.info('Removing agentpipe files...');
+  log.info('Removing specpipe files...');
   log.blank();
 
   const removedDirs = new Set();
@@ -112,7 +112,7 @@ export async function removeCommand(path, opts = {}) {
 
   // Codex guards live as a section in a shared AGENTS.md — strip just that section.
   if (manifest.agentsMdGuards) {
-    if (await stripAgentsMdGuards(targetDir)) log.del('AGENTS.md (agentpipe guards section)');
+    if (await stripAgentsMdGuards(targetDir)) log.del('AGENTS.md (specpipe guards section)');
   }
 
   // Enforced hooks (Codex/Cursor) live outside the tracked file set — clean per agent.

@@ -48,8 +48,8 @@ function compose(frontmatter, body) {
  * Split a canonical skill relative path into its skill name + inner path.
  * Canonical skills live in the agent-neutral `kit/skills/` (relative: `skills/`);
  * each agent's emitter maps them to its own output location.
- *   'skills/ap-plan/SKILL.md'            -> { skill: 'ap-plan', inner: 'SKILL.md' }
- *   'skills/ap-scaffold/references/x.md' -> { skill: 'ap-scaffold', inner: 'references/x.md' }
+ *   'skills/sp-plan/SKILL.md'            -> { skill: 'sp-plan', inner: 'SKILL.md' }
+ *   'skills/sp-scaffold/references/x.md' -> { skill: 'sp-scaffold', inner: 'references/x.md' }
  */
 export function parseSkillPath(rel) {
   const m = rel.replace(/\\/g, '/').match(/^skills\/([^/]+)\/(.+)$/);
@@ -79,7 +79,7 @@ function fmHermes(parsed, name) {
     'version: 1.0.0',
     'metadata:',
     '  hermes:',
-    '    tags: [agentpipe, spec-first, tdd]',
+    '    tags: [specpipe, spec-first, tdd]',
   ].join('\n');
 }
 
@@ -123,8 +123,8 @@ export const AGENTS = {
   hermes: {
     label: 'Hermes-Agent',
     // Verified: github.com/NousResearch/hermes-agent  optional-skills/<cat>/<name>/SKILL.md
-    skillTarget: (name, inner) => `optional-skills/agentpipe/${name}/${inner}`,
-    globalRoot: 'optional-skills/agentpipe',
+    skillTarget: (name, inner) => `optional-skills/specpipe/${name}/${inner}`,
+    globalRoot: 'optional-skills/specpipe',
     skillFile: 'SKILL.md',
     hooks: 'none',
     capabilities: 'router-no-hooks',
@@ -178,7 +178,7 @@ export function resolveAgents(spec) {
 /**
  * Emit one canonical skill file for a target agent.
  * @param {string} agentId
- * @param {string} canonicalRel - e.g. '.claude/skills/ap-plan/SKILL.md'
+ * @param {string} canonicalRel - e.g. '.claude/skills/sp-plan/SKILL.md'
  * @param {string} content - the canonical file content
  * @returns {{ path: string, content: string } | null} target rel path + content, or null if not a skill file
  */

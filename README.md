@@ -1,8 +1,8 @@
 <p align="center">
-  <img src="docs/cover.svg" alt="Agentpipe — spec-first multi-agent dev toolkit" width="100%">
+  <img src="docs/cover.svg" alt="Specpipe — spec-first multi-agent dev toolkit" width="100%">
 </p>
 
-<h1 align="center">Agentpipe</h1>
+<h1 align="center">Specpipe</h1>
 
 <p align="center">
   A lightweight, spec-first development toolkit for agentic AI coding agents.
@@ -10,7 +10,7 @@
 
 It enforces the cycle **spec (with acceptance scenarios) → code + tests → build pass** through skills, always-on guardrails, and a universal test runner.
 
-**Agents:** [Claude Code](https://claude.ai/code) (full hook enforcement) plus Codex, Cursor, Antigravity, OpenClaw, and Hermes (skills + advisory guard rules). Install for one or all: `agentpipe init --agents <list>|all`. See [docs/multi-agent.md](docs/multi-agent.md).
+**Agents:** [Claude Code](https://claude.ai/code) (full hook enforcement) plus Codex, Cursor, Antigravity, OpenClaw, and Hermes (skills + advisory guard rules). Install for one or all: `specpipe init --agents <list>|all`. See [docs/multi-agent.md](docs/multi-agent.md).
 **Works with:** Swift, TypeScript/JavaScript, Python, Rust, Go, Java/Kotlin, C#, Ruby.
 **Dependencies:** None (requires only a supported agent CLI, Node.js, Git, and Bash).
 **Optional:** [GraphAtlas](https://github.com/microvn/graphatlas) MCP server for graph-based code intelligence — six skills use it automatically when present and fall back to `grep` when it isn't. See [§3 Setup](#3-setup).
@@ -65,10 +65,10 @@ Every code change — feature, fix, or removal — follows this cycle. The spec 
 **Time needed: 5 minutes.** Below is a realistic transcript — user input, what each skill actually asks, what it actually outputs. Nothing embellished.
 
 ```bash
-npx agentpipe init .              # install for Claude Code (default)
+npx specpipe init .              # install for Claude Code (default)
 # or target other agents:
-npx agentpipe init . --agents cursor,codex
-npx agentpipe init . --agents all
+npx specpipe init . --agents cursor,codex
+npx specpipe init . --agents all
 
 claude                            # open your agent (claude, codex, cursor, …)
 ```
@@ -76,12 +76,12 @@ claude                            # open your agent (claude, codex, cursor, …)
 > The transcript below is on Claude Code. The same skills install for Codex, Cursor,
 > Antigravity, OpenClaw, and Hermes — see [§ Supported agents](#supported-agents).
 
-### Step 1 — Spec the feature (`/ap-plan`)
+### Step 1 — Spec the feature (`/sp-plan`)
 
 ```text
-You: /ap-plan "add tag filter to the todo list screen"
+You: /sp-plan "add tag filter to the todo list screen"
 
-Claude → running /ap-plan
+Claude → running /sp-plan
   Phase 0: Codebase scan — found docs/specs/todo-list/todo-list.md (exists)
   Phase 1: Scope Challenge — TodoList already supports text search; tag
            filter can reuse the same query pipeline. Flagging: reuse vs rebuild.
@@ -107,18 +107,18 @@ Claude: Drafting spec…
   Not in Scope: saving favorite tag combinations (deferred).
 ```
 
-> **Complex spec?** Run `/ap-challenge docs/specs/<feature>/<feature>.md` before coding.
+> **Complex spec?** Run `/sp-challenge docs/specs/<feature>/<feature>.md` before coding.
 > It spawns parallel hostile reviewers (Security Adversary, Failure Mode Analyst,
 > Assumption Destroyer, Scope & YAGNI Critic) that quote the spec and propose surgical
 > edits — e.g. "AS-014 doesn't define tag case-sensitivity → add constraint or AS".
 > Skip for simple CRUD like this tag filter.
 
-### Step 2 — Implement + build (`/ap-build`)
+### Step 2 — Implement + build (`/sp-build`)
 
 ```text
-You: (edit TodoListView.swift, TagFilterChip.swift) — now /ap-build
+You: (edit TodoListView.swift, TagFilterChip.swift) — now /sp-build
 
-Claude → running /ap-build
+Claude → running /sp-build
   Phase 1.5: Coverage Map
     [+] TodoListView.swift
         └── applyTagFilter(selected:)
@@ -131,12 +131,12 @@ Claude → running /ap-build
   ✓ 14 tests passed (3 new, 0 regressions)
 ```
 
-### Step 3 — Bug found? (`/ap-fix`)
+### Step 3 — Bug found? (`/sp-fix`)
 
 ```text
-You: /ap-fix "selecting two tags shows OR results, should be AND"
+You: /sp-fix "selecting two tags shows OR results, should be AND"
 
-Claude → running /ap-fix
+Claude → running /sp-fix
   Phase 0: Bug Path Diagram
     applyTagFilter(selected: ["work","urgent"])
       └── [BUG] predicate uses .contains(anyOf:) — should be .contains(allOf:)
@@ -150,10 +150,10 @@ Claude → running /ap-fix
     Prevention: add AS for multi-tag AND to spec (auto-signaled)
 ```
 
-### Step 4 — Review + commit (`/ap-review` → `/ap-commit`)
+### Step 4 — Review + commit (`/sp-review` → `/sp-commit`)
 
 ```text
-You: /ap-review
+You: /sp-review
 
 Claude → Smart Focus: UI state + query predicate
   Failure Mode Grid: all paths have tests ✓ error states covered ✓
@@ -161,7 +161,7 @@ Claude → Smart Focus: UI state + query predicate
     navigation. Not in current spec — logged under "Not in Scope".
   Verdict: APPROVE
 
-You: /ap-commit
+You: /sp-commit
 
 Claude → secret scan: clean. debug-code scan: clean.
   Staging 4 files. Conventional message:
@@ -169,9 +169,9 @@ Claude → secret scan: clean. debug-code scan: clean.
   ✓ commit a1b2c3d (not pushed — run `git push` when ready)
 ```
 
-> **Complex bug?** Insert `/ap-investigate "<bug>"` before `/ap-fix`. It's read-only,
+> **Complex bug?** Insert `/sp-investigate "<bug>"` before `/sp-fix`. It's read-only,
 > writes `docs/investigate/<slug>-<date>.md` with hypotheses + blast radius, then
-> `/ap-fix` auto-picks it up. Skip for trivial bugs.
+> `/sp-fix` auto-picks it up. Skip for trivial bugs.
 
 That's the 5 minutes. The CLI auto-detected your project (Swift + XCTest here) — no config touched.
 
@@ -195,23 +195,23 @@ That's the 5 minutes. The CLI auto-detected your project (Swift + XCTest here) �
 **Option A: One-command install** (recommended)
 
 ```bash
-npx agentpipe init .
+npx specpipe init .
 ```
 
 **Option B: Global install**
 
 ```bash
-npm install -g agentpipe
+npm install -g specpipe
 
 # Then, in any project:
 cd my-project
-agentpipe init .
+specpipe init .
 ```
 
 **Option C: Global skills install** (available in all projects without running `init` again)
 
 ```bash
-agentpipe init --global
+specpipe init --global
 # or after per-project init, answer "yes" to the global prompt
 ```
 
@@ -220,21 +220,21 @@ Skills installed globally at `~/.claude/skills/` are available in every project.
 **Option D: Force re-install** (overwrites existing files)
 
 ```bash
-npx agentpipe init --force .
+npx specpipe init --force .
 ```
 
 **Option D: Selective install** (only specific components)
 
 ```bash
-npx agentpipe init --only hooks,skills .
+npx specpipe init --only hooks,skills .
 ```
 
 **Option E: Multi-agent install** (one agent, several, or all)
 
 ```bash
-npx agentpipe init --agents cursor .            # one
-npx agentpipe init --agents claude,codex .      # several
-npx agentpipe init --agents all .               # every supported agent
+npx specpipe init --agents cursor .            # one
+npx specpipe init --agents claude,codex .      # several
+npx specpipe init --agents all .               # every supported agent
 ```
 
 ### Supported agents
@@ -247,12 +247,12 @@ guard intent as **always-on advisory rules**.
 
 | Agent | Install location | Guardrails |
 |-------|------------------|-----------|
-| **Claude Code** | `.claude/skills/ap-*/SKILL.md` + `.claude/hooks/` | Hook-enforced |
-| **Codex CLI** | `.agents/skills/ap-*/SKILL.md` | **enforced** `.codex/hooks.json` + `AGENTS.md` |
-| **Cursor** | `.cursor/skills/ap-*/SKILL.md` | **enforced** `.cursor/hooks.json` + `.cursor/rules/` |
-| **Antigravity** | `.agents/skills/ap-*/SKILL.md` | `.agent/rules/` (advisory) |
-| **OpenClaw** | `skills/ap-*/SKILL.md` | `AGENTPIPE-GUARDS.md` (advisory) |
-| **Hermes** | `optional-skills/agentpipe/ap-*/SKILL.md` | `AGENTPIPE-GUARDS.md` (advisory) |
+| **Claude Code** | `.claude/skills/sp-*/SKILL.md` + `.claude/hooks/` | Hook-enforced |
+| **Codex CLI** | `.agents/skills/sp-*/SKILL.md` | **enforced** `.codex/hooks.json` + `AGENTS.md` |
+| **Cursor** | `.cursor/skills/sp-*/SKILL.md` | **enforced** `.cursor/hooks.json` + `.cursor/rules/` |
+| **Antigravity** | `.agents/skills/sp-*/SKILL.md` | `.agent/rules/` (advisory) |
+| **OpenClaw** | `skills/sp-*/SKILL.md` | `SPECPIPE-GUARDS.md` (advisory) |
+| **Hermes** | `optional-skills/specpipe/sp-*/SKILL.md` | `SPECPIPE-GUARDS.md` (advisory) |
 
 Skills that use Claude-only tools (`AskUserQuestion`, subagents) get a "Running outside
 Claude Code" note appended for the other agents, so they degrade gracefully. The specs
@@ -265,7 +265,7 @@ agents install the same skills into their own locations — see [Supported agent
 
 ```
 your-project/
-├── .agentpipe/
+├── .specpipe/
 │   └── manifest.json          ← install manifest (tracks files per agent; used by upgrade/remove)
 ├── .claude/
 │   ├── CLAUDE.md              ← Project rules hub
@@ -278,8 +278,8 @@ your-project/
 │   │   ├── sensitive-guard.sh ← Blocks access to secrets
 │   │   └── self-review.sh     ← Quality checklist on stop
 │   └── skills/
-│       ├── ap-explore/SKILL.md      ← /ap-explore skill
-│       ├── ap-scaffold/             ← /ap-scaffold skill (greenfield bootstrap)
+│       ├── sp-explore/SKILL.md      ← /sp-explore skill
+│       ├── sp-scaffold/             ← /sp-scaffold skill (greenfield bootstrap)
 │       │   ├── SKILL.md
 │       │   └── references/          ← ARCHITECTURE/DESIGN templates, ADR template,
 │       │       │                       stack-profiles/ seeds (copy to ~/.claude or
@@ -288,35 +288,35 @@ your-project/
 │       │       ├── DESIGN.md.tmpl
 │       │       ├── adr/NNNN-template.md
 │       │       └── stack-profiles/react.md
-│       ├── ap-plan/SKILL.md         ← /ap-plan skill
-│       ├── ap-challenge/SKILL.md    ← /ap-challenge skill
-│       ├── ap-build/SKILL.md        ← /ap-build skill
-│       ├── ap-investigate/SKILL.md  ← /ap-investigate skill (optional, read-only)
-│       ├── ap-fix/SKILL.md          ← /ap-fix skill
-│       ├── ap-review/SKILL.md       ← /ap-review skill
-│       ├── ap-commit/SKILL.md       ← /ap-commit skill
-│       ├── ap-spec-render/          ← /ap-spec-render skill (spec HTML view, user-invoked)
+│       ├── sp-plan/SKILL.md         ← /sp-plan skill
+│       ├── sp-challenge/SKILL.md    ← /sp-challenge skill
+│       ├── sp-build/SKILL.md        ← /sp-build skill
+│       ├── sp-investigate/SKILL.md  ← /sp-investigate skill (optional, read-only)
+│       ├── sp-fix/SKILL.md          ← /sp-fix skill
+│       ├── sp-review/SKILL.md       ← /sp-review skill
+│       ├── sp-commit/SKILL.md       ← /sp-commit skill
+│       ├── sp-spec-render/          ← /sp-spec-render skill (spec HTML view, user-invoked)
 │       │   ├── SKILL.md
 │       │   ├── template.html
 │       │   ├── components.md
 │       │   └── examples/
-│       ├── ap-md-render/            ← /ap-md-render skill (generic markdown HTML view)
+│       ├── sp-md-render/            ← /sp-md-render skill (generic markdown HTML view)
 │       │   ├── SKILL.md
 │       │   ├── template.html
 │       │   └── components.md
-│       ├── ap-voices/SKILL.md       ← /ap-voices skill (multi-LLM review)
-│       └── ap-humanize/SKILL.md     ← /ap-humanize skill (rephrase to human voice)
+│       ├── sp-voices/SKILL.md       ← /sp-voices skill (multi-LLM review)
+│       └── sp-humanize/SKILL.md     ← /sp-humanize skill (rephrase to human voice)
 └── docs/
     ├── specs/                 ← Your specs (folder-per-feature)
     │   └── <feature>/
     │       ├── <feature>.md   ← Spec with acceptance scenarios
-    │       └── snapshots/     ← Version history (managed by /ap-plan)
+    │       └── snapshots/     ← Version history (managed by /sp-plan)
     └── WORKFLOW.md            ← Process reference
 ```
 
 ### Optional: GraphAtlas Code Intelligence
 
-The `ap-*` skills work out of the box with `grep`. But when [GraphAtlas](https://github.com/microvn/graphatlas) (GA) is connected as an MCP server, six skills — `/ap-explore`, `/ap-plan`, `/ap-build`, `/ap-fix`, `/ap-review`, `/ap-investigate` — prefer it over `grep` for code discovery, call-graph tracing, and blast-radius analysis.
+The `sp-*` skills work out of the box with `grep`. But when [GraphAtlas](https://github.com/microvn/graphatlas) (GA) is connected as an MCP server, six skills — `/sp-explore`, `/sp-plan`, `/sp-build`, `/sp-fix`, `/sp-review`, `/sp-investigate` — prefer it over `grep` for code discovery, call-graph tracing, and blast-radius analysis.
 
 **Why it helps:** `grep` can't tell a call site from a string literal, doesn't see polymorphic dispatch, and won't follow re-exports. An agent that edits one function but misses its callers, test files, and overrides in other modules ships a bug. GA indexes the repo once into a local graph with typed `CALL` / `IMPORT` / `OVERRIDE` edges, then answers structural questions deterministically in milliseconds with a small token footprint. It runs 100% locally — no LLM, no embeddings, no telemetry.
 
@@ -337,26 +337,26 @@ Look for the **Project Info** section. Ensure language, test framework, and dire
 ### Upgrade
 
 ```bash
-npx agentpipe upgrade
+npx specpipe upgrade
 ```
 
 Smart upgrade — updates kit files but preserves any you've customized. Use `--force` to overwrite everything.
 
 ```bash
 # Check if update is available
-npx agentpipe check
+npx specpipe check
 
 # See what changed
-npx agentpipe diff
+npx specpipe diff
 
 # View installed files and status
-npx agentpipe list
+npx specpipe list
 ```
 
 ### Uninstall
 
 ```bash
-npx agentpipe remove
+npx specpipe remove
 ```
 
 This removes hooks, skills, and settings. It preserves `CLAUDE.md` (which you may have customized) and `docs/` (which contains your specs).
@@ -370,16 +370,16 @@ This removes hooks, skills, and settings. It preserves `CLAUDE.md` (which you ma
 > When: Brand-new project — no codebase yet (empty repo, no package manager / `src/`).
 
 ```
-1. /ap-explore "what you're building"
+1. /sp-explore "what you're building"
    → Detects greenfield, also decides app-type + stack (researched, current),
      emits a Bootstrap Brief in docs/explore/<feature>.md.
 
-2. /ap-scaffold
+2. /sp-scaffold
    → Generator-first runnable skeleton (core/ + one pattern-demonstrating module +
      tests), smoke-gated (install→build→start GREEN), + ARCHITECTURE.md / ADRs.
      Hands off only when it RUNS.
 
-3. /ap-plan → /ap-build   → normal New Feature flow, now on a runnable base.
+3. /sp-plan → /sp-build   → normal New Feature flow, now on a runnable base.
 ```
 
 ### Explore Before Planning
@@ -387,19 +387,19 @@ This removes hooks, skills, and settings. It preserves `CLAUDE.md` (which you ma
 > When: Requirements are unclear, you're debating between approaches, or it's a brownfield feature with existing code to understand first.
 
 ```
-1. /ap-explore "feature description"
+1. /sp-explore "feature description"
    → Asks questions as a Client Technical Lead — one topic at a time.
    → Clarifies: why, behavior, boundaries, business rules, edge cases, permissions, UI.
    → Output: docs/explore/<feature>.md
 
-2. /ap-plan "feature description"
+2. /sp-plan "feature description"
    → Auto-detects docs/explore/<feature>.md, skips redundant discovery.
    → Continue with the normal New Feature flow.
 ```
 
 **Example:**
 ```
-/ap-explore "cancel order request"
+/sp-explore "cancel order request"
 ```
 
 ### New Feature
@@ -407,21 +407,21 @@ This removes hooks, skills, and settings. It preserves `CLAUDE.md` (which you ma
 > When: Building something new — no existing code or spec.
 
 ```
-1. /ap-plan "description of the feature"
+1. /sp-plan "description of the feature"
    → Generates spec with acceptance scenarios at docs/specs/<feature>/<feature>.md.
 
 2. Implement code in chunks.
-   After each chunk: /ap-build
+   After each chunk: /sp-build
    Repeat until green.
 
-3. /ap-review (before merge)
+3. /sp-review (before merge)
 
-4. /ap-commit
+4. /sp-commit
 ```
 
 **Example:**
 ```
-/ap-plan "User authentication with email/password login, password reset via email, and session management with 24h expiry"
+/sp-plan "User authentication with email/password login, password reset via email, and session management with 24h expiry"
 ```
 
 ### Update Existing Feature
@@ -429,15 +429,15 @@ This removes hooks, skills, and settings. It preserves `CLAUDE.md` (which you ma
 > When: Changing behavior of something that already exists.
 
 ```
-1. /ap-plan docs/specs/<feature>/<feature>.md "description of changes"
+1. /sp-plan docs/specs/<feature>/<feature>.md "description of changes"
    → Mode C handles everything: snapshot → classification → change report → apply.
-   Do NOT manually edit the spec before running /ap-plan.
+   Do NOT manually edit the spec before running /sp-plan.
 
 2. Implement the code change.
-   /ap-build
+   /sp-build
    Fix until green.
 
-3. /ap-review → /ap-commit
+3. /sp-review → /sp-commit
 ```
 
 ### Bug Fix
@@ -445,21 +445,21 @@ This removes hooks, skills, and settings. It preserves `CLAUDE.md` (which you ma
 > When: Something is broken.
 
 ```
-0. (OPTIONAL) /ap-investigate "description of the bug"
+0. (OPTIONAL) /sp-investigate "description of the bug"
    → Use for complex bugs, outages, data corruption, or when the cause is unclear.
    → Read-only: hypothesis + blast radius + evidence, no code changes.
-   → Writes docs/investigate/<slug>-<date>.md for /ap-fix to consume.
-   → Skip for trivial/obvious bugs — go straight to /ap-fix.
+   → Writes docs/investigate/<slug>-<date>.md for /sp-fix to consume.
+   → Skip for trivial/obvious bugs — go straight to /sp-fix.
 
-1. /ap-fix "description of the bug"  (or /ap-fix docs/investigate/<slug>-<date>.md)
+1. /sp-fix "description of the bug"  (or /sp-fix docs/investigate/<slug>-<date>.md)
    → Writes failing test → fixes code → runs full suite.
 
-2. /ap-commit
+2. /sp-commit
 ```
 
 **Example:**
 ```
-/ap-fix "Search returns no results when query contains apostrophes like O'Brien"
+/sp-fix "Search returns no results when query contains apostrophes like O'Brien"
 ```
 
 ### Remove Feature
@@ -467,7 +467,7 @@ This removes hooks, skills, and settings. It preserves `CLAUDE.md` (which you ma
 > When: Deleting code, removing deprecated functionality.
 
 ```
-1. /ap-plan docs/specs/<feature>/<feature>.md "remove stories S-XXX"
+1. /sp-plan docs/specs/<feature>/<feature>.md "remove stories S-XXX"
    → Mode C creates a snapshot (removing stories = Major), then marks as removed.
 
 2. Delete production code + related tests.
@@ -475,22 +475,22 @@ This removes hooks, skills, and settings. It preserves `CLAUDE.md` (which you ma
 3. Run the full test suite (your project's native test command).
    Fix cascading breaks.
 
-4. /ap-commit
+4. /sp-commit
 ```
 
 ---
 
 ## 5. Commands Reference
 
-### /ap-explore — Feature Discovery as Client Technical Lead
+### /sp-explore — Feature Discovery as Client Technical Lead
 
 **Usage:**
 ```
-/ap-explore "cancel order request"
-/ap-explore "user notification preferences"
+/sp-explore "cancel order request"
+/sp-explore "user notification preferences"
 ```
 
-**When to use:** Requirements are unclear, you're debating between approaches, or you want to clarify a feature deeply before committing to a spec. Runs before `/ap-plan`.
+**When to use:** Requirements are unclear, you're debating between approaches, or you want to clarify a feature deeply before committing to a spec. Runs before `/sp-plan`.
 
 **How it works:**
 
@@ -505,44 +505,44 @@ This removes hooks, skills, and settings. It preserves `CLAUDE.md` (which you ma
 9. **Phase 6: Scenario confirmation** — Presents concrete happy path + unhappy paths with fake data. Confirms with user before proceeding.
 10. **Phase 7: Handoff summary** — Compiles everything into a structured doc, confirms with user, writes to `docs/explore/<feature>.md`.
 
-**Output:** `docs/explore/<feature>.md` — auto-detected by `/ap-plan`, which skips redundant discovery and maps explore findings directly to spec sections.
+**Output:** `docs/explore/<feature>.md` — auto-detected by `/sp-plan`, which skips redundant discovery and maps explore findings directly to spec sections.
 
 **Token cost:** 10–20k
 
 ---
 
-### /ap-scaffold — Greenfield Project Bootstrap
+### /sp-scaffold — Greenfield Project Bootstrap
 
 **Usage:**
 ```
-/ap-scaffold                                # bootstrap from the Bootstrap Brief in docs/explore/
-/ap-scaffold "Next.js + Nest pnpm monorepo" # standalone: gather app-type/stack itself
+/sp-scaffold                                # bootstrap from the Bootstrap Brief in docs/explore/
+/sp-scaffold "Next.js + Nest pnpm monorepo" # standalone: gather app-type/stack itself
 ```
 
-**When to use:** A brand-new project with no runnable codebase yet. Runs between `/ap-explore` (greenfield branch) and `/ap-plan`: `ap-explore → ap-scaffold → ap-plan → ap-build`. Skip if a runnable project already exists — go straight to `/ap-plan`. `/ap-build`'s Foundation Gate refuses to start the TDD loop until this has produced a runnable harness.
+**When to use:** A brand-new project with no runnable codebase yet. Runs between `/sp-explore` (greenfield branch) and `/sp-plan`: `sp-explore → sp-scaffold → sp-plan → sp-build`. Skip if a runnable project already exists — go straight to `/sp-plan`. `/sp-build`'s Foundation Gate refuses to start the TDD loop until this has produced a runnable harness.
 
 **How it works:**
 
 1. **Precondition** — confirms greenfield; resumes a partial repo without clobbering user files.
 2. **App-type + stack** — taken from the Bootstrap Brief (or asked); never silently defaulted; **current versions researched**, not recalled from training memory. Optional layered stack profiles (`./.claude/` > `~/.claude/` > kit seed) supply opinionated defaults; the Brief always wins.
 3. **Skeleton (generator-first)** — official `create-*` CLIs give real pinned deps (defends against hallucinated/typosquatted packages); monorepos orchestrated root-first; imposes `core/` + `modules/` + co-located tests; seeds ONE module that **demonstrates the architecture pattern** (the template every feature copies).
-4. **Smoke gate (non-negotiable)** — `install → build → start/smoke` must be GREEN, with ≥1 real passing test (this resolves `TEST_CMD` for `/ap-build`). Not green → BLOCKED; never a half-scaffold.
+4. **Smoke gate (non-negotiable)** — `install → build → start/smoke` must be GREEN, with ≥1 real passing test (this resolves `TEST_CMD` for `/sp-build`). Not green → BLOCKED; never a half-scaffold.
 5. **Docs** — fills `ARCHITECTURE.md` (codemap + invariants), one ADR per major stack choice, optional `DESIGN.md`.
 6. **Hygiene & handoff** — secret scan, `.gitignore`, `.env.example`; reports the resolved `TEST_CMD`.
 
-**Output:** a runnable walking skeleton + canonical docs. Thin by design — features come later via `/ap-plan` → `/ap-build`.
+**Output:** a runnable walking skeleton + canonical docs. Thin by design — features come later via `/sp-plan` → `/sp-build`.
 
 **Token cost:** 15–40k + real install/build time (heavier than other skills — it runs generators and builds).
 
 ---
 
-### /ap-plan — Generate Spec with Acceptance Scenarios
+### /sp-plan — Generate Spec with Acceptance Scenarios
 
 **Usage:**
 ```
-/ap-plan "user authentication with OAuth2"                          # Mode A: new spec from description
-/ap-plan docs/specs/auth/auth.md                                    # Mode B: add scenarios to existing spec
-/ap-plan docs/specs/auth/auth.md "add password reset flow"          # Mode C: update existing spec
+/sp-plan "user authentication with OAuth2"                          # Mode A: new spec from description
+/sp-plan docs/specs/auth/auth.md                                    # Mode B: add scenarios to existing spec
+/sp-plan docs/specs/auth/auth.md "add password reset flow"          # Mode C: update existing spec
 ```
 
 **Modes:**
@@ -575,28 +575,28 @@ This removes hooks, skills, and settings. It preserves `CLAUDE.md` (which you ma
 ```
 docs/specs/<feature>/
   <feature>.md              # single source of truth — always read this file
-  snapshots/                # version history (managed by ap-plan, not developers)
+  snapshots/                # version history (managed by sp-plan, not developers)
     YYYY-MM-DD.md
     YYYY-MM-DD-<REF>.md
 ```
 
 **Output:**
 - Spec with acceptance scenarios: `docs/specs/<feature>/<feature>.md`
-- (Optional) Scannable HTML view: `docs/specs/<feature>/<feature>.html` — generated by running `/ap-spec-render <feature>` after `/ap-plan`. `/ap-plan` suggests the command at the end of Phase 4 and Mode C but does not invoke it. Source `.md` remains canonical; HTML is regenerable.
+- (Optional) Scannable HTML view: `docs/specs/<feature>/<feature>.html` — generated by running `/sp-spec-render <feature>` after `/sp-plan`. `/sp-plan` suggests the command at the end of Phase 4 and Mode C but does not invoke it. Source `.md` remains canonical; HTML is regenerable.
 
-### /ap-spec-render — Render Spec as HTML View
+### /sp-spec-render — Render Spec as HTML View
 
 **Usage:**
 ```
-/ap-spec-render <feature>                              # render by feature slug
-/ap-spec-render docs/specs/auth/auth.md                # render specific spec
-/ap-spec-render docs/specs/billing/                    # render spec dir
-/ap-spec-render --all                                  # bulk re-render all specs
-/ap-spec-render                                        # list + prompt
+/sp-spec-render <feature>                              # render by feature slug
+/sp-spec-render docs/specs/auth/auth.md                # render specific spec
+/sp-spec-render docs/specs/billing/                    # render spec dir
+/sp-spec-render --all                                  # bulk re-render all specs
+/sp-spec-render                                        # list + prompt
 ```
 
-**When to use:** Decoupled from `/ap-plan` — you invoke it explicitly when you want the HTML view. `/ap-plan` writes the spec markdown and ends; it suggests `/ap-spec-render` at the end of Phase 4 and Mode C but never calls it automatically. Run it:
-- After `/ap-plan` to generate the initial HTML view (sidebar TOC, story cards, collapsible AS)
+**When to use:** Decoupled from `/sp-plan` — you invoke it explicitly when you want the HTML view. `/sp-plan` writes the spec markdown and ends; it suggests `/sp-spec-render` at the end of Phase 4 and Mode C but never calls it automatically. Run it:
+- After `/sp-plan` to generate the initial HTML view (sidebar TOC, story cards, collapsible AS)
 - After a Mode C update to refresh a now-stale `.html`
 - After fixing a typo directly in `<feature>.md` (no spec semantics changed, but HTML is stale)
 - For specs written before this skill existed
@@ -624,24 +624,24 @@ docs/specs/<feature>/
 - Self-contained: zero external dependencies, no CDN, opens offline
 
 **Source remains truth:**
-- `.md` is canonical. Edit `.md` via `/ap-plan`; regenerate `.html` via this skill.
-- Never hand-edit the `.html`. Re-rendering is idempotent — run `/ap-spec-render` any time you want the HTML to catch up with the `.md`.
+- `.md` is canonical. Edit `.md` via `/sp-plan`; regenerate `.html` via this skill.
+- Never hand-edit the `.html`. Re-rendering is idempotent — run `/sp-spec-render` any time you want the HTML to catch up with the `.md`.
 
 **Token cost:** 3–8k (template + components cached; output ≈ source markdown × 1.2 — no CSS/JS in output token stream).
 
-### /ap-md-render — Render Any Markdown as HTML View
+### /sp-md-render — Render Any Markdown as HTML View
 
-Generic counterpart to `/ap-spec-render`. Same template/component architecture, but for arbitrary long-form markdown with no fixed schema — investigation reports, explore docs, RFCs, retros, design notes, READMEs.
+Generic counterpart to `/sp-spec-render`. Same template/component architecture, but for arbitrary long-form markdown with no fixed schema — investigation reports, explore docs, RFCs, retros, design notes, READMEs.
 
 **Usage:**
 ```
-/ap-md-render docs/investigate/payment-bug-2026-05-16.md   # render next to source
-/ap-md-render <file.md> --out report.html                  # custom output path
-/ap-md-render docs/notes/                                   # list + prompt
-/ap-md-render                                                # prompt for path
+/sp-md-render docs/investigate/payment-bug-2026-05-16.md   # render next to source
+/sp-md-render <file.md> --out report.html                  # custom output path
+/sp-md-render docs/notes/                                   # list + prompt
+/sp-md-render                                                # prompt for path
 ```
 
-**When to use:** Any non-spec markdown you want as a scannable, shareable single HTML file. It refuses spec files (heading `### S-NNN:`) and points you to `/ap-spec-render` instead.
+**When to use:** Any non-spec markdown you want as a scannable, shareable single HTML file. It refuses spec files (heading `### S-NNN:`) and points you to `/sp-spec-render` instead.
 
 **How it works:** Reads source + `template.html` + `components.md`, then uses an *analyzer pattern* (not fixed parsing) — each markdown chunk is mapped to the best component: numbered actions → step cards, GFM admonitions → callouts, ` ```mermaid ` → diagrams, pros/cons → compare cards, long appendices → collapsible. Builds the buffer in-memory, writes once.
 
@@ -649,12 +649,12 @@ Generic counterpart to `/ap-spec-render`. Same template/component architecture, 
 
 **Token cost:** 3–8k (template + components cached; output ≈ source markdown × 1.2 — no CSS/JS in output token stream).
 
-### /ap-challenge — Adversarial Plan Review
+### /sp-challenge — Adversarial Plan Review
 
 **Usage:**
 ```
-/ap-challenge docs/specs/auth/auth.md   # challenge a spec
-/ap-challenge "user authentication"     # challenge by feature name
+/sp-challenge docs/specs/auth/auth.md   # challenge a spec
+/sp-challenge "user authentication"     # challenge by feature name
 ```
 
 **How it works (7 phases):**
@@ -721,19 +721,19 @@ Generic counterpart to `/ap-spec-render`. Same template/component architecture, 
 6. Skip style/formatting — substance only
 
 **When to use:**
-- After `/ap-plan`, before coding — for complex features
+- After `/sp-plan`, before coding — for complex features
 - Features involving auth, payments, data pipelines, multi-service integration
 - NOT needed for simple CRUD, small bug fixes, or trivial features
 
 **Token cost:** 15-30k (uses parallel subagents, doesn't bloat main context)
 
-### /ap-build — TDD Delivery Loop
+### /sp-build — TDD Delivery Loop
 
 **Usage:**
 ```
-/ap-build                              # build all changes vs base branch
-/ap-build src/api/users.ts             # build specific file
-/ap-build "user authentication"        # build specific feature
+/sp-build                              # build all changes vs base branch
+/sp-build src/api/users.ts             # build specific file
+/sp-build "user authentication"        # build specific feature
 ```
 
 **How it works:**
@@ -754,15 +754,15 @@ Generic counterpart to `/ap-spec-render`. Same template/component architecture, 
 
 **What NOT to test:** Private/internal methods, framework behavior, trivial getters/setters, implementation details.
 
-### /ap-investigate — Read-Only Root Cause Investigation (Optional)
+### /sp-investigate — Read-Only Root Cause Investigation (Optional)
 
 **Usage:**
 ```
-/ap-investigate "production 500s after deploy on /api/orders"
-/ap-investigate "intermittent data corruption in nightly sync"
+/sp-investigate "production 500s after deploy on /api/orders"
+/sp-investigate "intermittent data corruption in nightly sync"
 ```
 
-**When to use:** OPTIONAL branch before `/ap-fix`. Use for complex bugs, production outages, data corruption, unclear regressions, or when the user wants a diagnosis report without any code change. Skip for trivial/obvious bugs — go straight to `/ap-fix`.
+**When to use:** OPTIONAL branch before `/sp-fix`. Use for complex bugs, production outages, data corruption, unclear regressions, or when the user wants a diagnosis report without any code change. Skip for trivial/obvious bugs — go straight to `/sp-fix`.
 
 **What it does NOT do:** Never edits source code, tests, or config. The only write it performs is the investigation report at `docs/investigate/<slug>-<date>.md`.
 
@@ -774,7 +774,7 @@ Generic counterpart to `/ap-spec-render`. Same template/component architecture, 
 4. **Phase 4: Form Hypothesis** — Specific, testable, falsifiable. Location + mechanism + causal chain + disproof condition + confidence (HIGH/MEDIUM/LOW). 3-strike rule: if 3 hypotheses all stay below MEDIUM → escalate via AskUserQuestion.
 5. **Phase 5: Map Blast Radius** — Investigation scope, bug path diagram (skipped if ISOLATED), impact scope (direct/indirect/data/user-facing), similar-risk scan (5-min timebox).
 6. **Phase 6: Recommend Next Steps** — CRITICAL/HIGH/MEDIUM actions, test strategy, fix approach (minimal / targeted refactor / architectural).
-7. **Output** — Writes structured Investigation Report to `docs/investigate/<slug>-<date>.md`. Signals `/ap-fix <file>` for handoff.
+7. **Output** — Writes structured Investigation Report to `docs/investigate/<slug>-<date>.md`. Signals `/sp-fix <file>` for handoff.
 
 **Status values:** `ROOT_CAUSE_FOUND | PROBABLE_CAUSE | INSUFFICIENT_EVIDENCE | BLOCKED`
 
@@ -784,16 +784,16 @@ Generic counterpart to `/ap-spec-render`. Same template/component architecture, 
 
 ---
 
-### /ap-fix — Test-First Bug Fix
+### /sp-fix — Test-First Bug Fix
 
 **Usage:**
 ```
-/ap-fix "description of the bug"
+/sp-fix "description of the bug"
 ```
 
 **How it works:**
 
-1. **Phase 0: Investigate** — Parses the bug report, locates relevant code, checks git history, and forms a root cause hypothesis. Then draws a **Bug Path Diagram** (same `[GAP]`/`[★★ TESTED]` format as `/ap-build`) for the buggy function — if no specific `[GAP]` path can be identified, the hypothesis isn't specific enough yet.
+1. **Phase 0: Investigate** — Parses the bug report, locates relevant code, checks git history, and forms a root cause hypothesis. Then draws a **Bug Path Diagram** (same `[GAP]`/`[★★ TESTED]` format as `/sp-build`) for the buggy function — if no specific `[GAP]` path can be identified, the hypothesis isn't specific enough yet.
 2. **Phase 1: Write Failing Test** — **Regression rule first:** if the bug exists because the diff changed existing behavior with no test covering that path, a regression test is a CRITICAL requirement. Creates a test that reproduces the bug and **MUST fail** with current code.
 3. **Phase 2: Fix** — Minimal change only. Blast radius check: if fix touches >5 files, stops and asks before editing.
 4. **Phase 3: Verify** — Bug test must pass; full suite must show no new regressions.
@@ -802,12 +802,12 @@ Generic counterpart to `/ap-spec-render`. Same template/component architecture, 
 
 **Multiple bugs:** Triages by severity, fixes one at a time, commits each separately.
 
-### /ap-review — Pre-Merge Quality Gate
+### /sp-review — Pre-Merge Quality Gate
 
 **Usage:**
 ```
-/ap-review                            # review all changes vs base branch
-/ap-review src/auth/                  # review specific directory
+/sp-review                            # review all changes vs base branch
+/sp-review src/auth/                  # review specific directory
 ```
 
 **How it works:**
@@ -826,11 +826,11 @@ Generic counterpart to `/ap-spec-render`. Same template/component architecture, 
 - Never auto-fixes code — report only
 - Checks spec-test alignment: code changed → spec/acceptance scenarios/tests also changed?
 
-### /ap-commit — Smart Git Commit
+### /sp-commit — Smart Git Commit
 
 **Usage:**
 ```
-/ap-commit
+/sp-commit
 ```
 
 **How it works:**
@@ -848,16 +848,16 @@ Generic counterpart to `/ap-spec-render`. Same template/component architecture, 
 
 **Breaking changes:** If the diff removes/renames a public function, export, or API endpoint, uses `feat!` or `fix!` type, or adds a `BREAKING CHANGE:` footer.
 
-### /ap-voices — Multi-LLM Review (Optional)
+### /sp-voices — Multi-LLM Review (Optional)
 
 **Usage:**
 ```
-/ap-voices                              # review current diff with multi-LLM panel
-/ap-voices docs/specs/auth/auth.md      # review a spec
-/ap-voices src/payment/                 # review specific files
+/sp-voices                              # review current diff with multi-LLM panel
+/sp-voices docs/specs/auth/auth.md      # review a spec
+/sp-voices src/payment/                 # review specific files
 ```
 
-**When to use:** Optional second opinion *after* `/ap-review` for high-stakes changes (auth, payment, data pipelines), when `/ap-review` returns mixed-confidence findings (most at 5–7), or any time you want cross-model verification before merge. Skip for routine refactors and small CRUD.
+**When to use:** Optional second opinion *after* `/sp-review` for high-stakes changes (auth, payment, data pipelines), when `/sp-review` returns mixed-confidence findings (most at 5–7), or any time you want cross-model verification before merge. Skip for routine refactors and small CRUD.
 
 **How it works:**
 
@@ -875,13 +875,13 @@ Generic counterpart to `/ap-spec-render`. Same template/component architecture, 
 
 ---
 
-### /ap-humanize — Rephrase to Human Voice
+### /sp-humanize — Rephrase to Human Voice
 
 **Usage:**
 ```
-/ap-humanize <paste plan/notes/draft>           # infer format + audience from context
-/ap-humanize reply jira <notes>                  # target a specific format
-/ap-humanize draft a customer email <notes>      # switch audience, hide implementation
+/sp-humanize <paste plan/notes/draft>           # infer format + audience from context
+/sp-humanize reply jira <notes>                  # target a specific format
+/sp-humanize draft a customer email <notes>      # switch audience, hide implementation
 ```
 
 **When to use:** You have a plan, bullet notes, or AI-generated draft and want it rewritten into natural, send-ready text — a PR description, release note, slack announcement, postmortem, customer reply, LinkedIn post, or plain email. Not part of the spec-first dev cycle. Skip for pure translation, summarization, or generating content from zero.
@@ -1140,7 +1140,7 @@ Skip sections that don't apply. Match depth to feature complexity.
 
 ### Snapshots (Version History)
 
-When `/ap-plan` Mode C detects a Major change (new story, removed story, priority change, flow change, behavior change for P0, or constraint change), it automatically creates a snapshot before updating:
+When `/sp-plan` Mode C detects a Major change (new story, removed story, priority change, flow change, behavior change for P0, or constraint change), it automatically creates a snapshot before updating:
 
 ```
 docs/specs/<feature>/snapshots/
@@ -1148,7 +1148,7 @@ docs/specs/<feature>/snapshots/
   2026-04-05-BILL-101.md     ← with ticket reference
 ```
 
-Snapshots are immutable, managed by ap-plan (not developers), and capped at 5 most recent.
+Snapshots are immutable, managed by sp-plan (not developers), and capped at 5 most recent.
 
 ### Naming Conventions
 | Item | Convention | Example |
@@ -1197,8 +1197,8 @@ Create new skills in `.claude/skills/<name>/SKILL.md`:
 # .claude/skills/deploy/SKILL.md
 
 Run the deployment pipeline:
-1. /ap-review
-2. /ap-commit
+1. /sp-review
+2. /sp-commit
 3. Run: bash scripts/deploy.sh $ARGUMENTS
 4. Verify deployment health: curl -f https://api.example.com/health
 ```
@@ -1211,25 +1211,25 @@ Then use: `/deploy staging`
 
 | Activity | Tokens | Frequency |
 |----------|--------|-----------|
-| `/ap-scaffold` (greenfield bootstrap) | 15–40k + install/build time | Once per new project, before the first spec |
-| `/ap-build` (incremental, 1-3 files) | 5–10k | Every code chunk |
-| `/ap-investigate` (complex bug) | 8–15k | OPTIONAL before /ap-fix — complex/outage only |
-| `/ap-fix` (single bug) | 3–5k | As needed |
-| `/ap-commit` | 2–4k | Every commit |
-| `/ap-review` (diff-based) | 10–20k | Before merge |
-| `/ap-plan` (new feature) | 20–40k | Start of feature |
-| `/ap-challenge` (adversarial review) | 15–30k | After /ap-plan, complex features |
-| `/ap-spec-render` (HTML view) | 3–8k | User-invoked after /ap-plan when HTML view wanted, or to refresh stale `.html` |
-| `/ap-md-render` (HTML view, any md) | 3–8k | User-invoked for non-spec markdown — investigation, explore, RFC, retro, README |
-| `/ap-voices` (multi-LLM review) | 10–30k + external API cost (~$0.01–0.50) | Optional — after /ap-review for high-stakes changes |
+| `/sp-scaffold` (greenfield bootstrap) | 15–40k + install/build time | Once per new project, before the first spec |
+| `/sp-build` (incremental, 1-3 files) | 5–10k | Every code chunk |
+| `/sp-investigate` (complex bug) | 8–15k | OPTIONAL before /sp-fix — complex/outage only |
+| `/sp-fix` (single bug) | 3–5k | As needed |
+| `/sp-commit` | 2–4k | Every commit |
+| `/sp-review` (diff-based) | 10–20k | Before merge |
+| `/sp-plan` (new feature) | 20–40k | Start of feature |
+| `/sp-challenge` (adversarial review) | 15–30k | After /sp-plan, complex features |
+| `/sp-spec-render` (HTML view) | 3–8k | User-invoked after /sp-plan when HTML view wanted, or to refresh stale `.html` |
+| `/sp-md-render` (HTML view, any md) | 3–8k | User-invoked for non-spec markdown — investigation, explore, RFC, retro, README |
+| `/sp-voices` (multi-LLM review) | 10–30k + external API cost (~$0.01–0.50) | Optional — after /sp-review for high-stakes changes |
 | Full audit (manual prompt) | 100k+ | Before release |
 
 ### Minimizing Token Usage
 
-- **Test incrementally.** `/ap-build` after each small chunk uses 5-10k. Waiting until everything is done then running `/ap-build` on a large diff uses 50k+.
-- **Use filters.** `/ap-build src/auth/login.ts` is cheaper than `/ap-build` on the whole project.
-- **Skip `/ap-plan` for tiny changes.** Under 5 lines with no behavior change? Just `/ap-build` and `/ap-commit`.
-- **Use `/ap-review` only before merge.** Not after every commit.
+- **Test incrementally.** `/sp-build` after each small chunk uses 5-10k. Waiting until everything is done then running `/sp-build` on a large diff uses 50k+.
+- **Use filters.** `/sp-build src/auth/login.ts` is cheaper than `/sp-build` on the whole project.
+- **Skip `/sp-plan` for tiny changes.** Under 5 lines with no behavior change? Just `/sp-build` and `/sp-commit`.
+- **Use `/sp-review` only before merge.** Not after every commit.
 
 ---
 
@@ -1247,7 +1247,7 @@ Then use: `/deploy staging`
 
 ### Tests not detected
 
-**Symptom:** `/ap-build` or `/ap-fix` can't figure out how to run the tests.
+**Symptom:** `/sp-build` or `/sp-fix` can't figure out how to run the tests.
 
 **Check:**
 1. Are you in the project root? `pwd`
@@ -1256,7 +1256,7 @@ Then use: `/deploy staging`
 
 ### Wrong base branch
 
-**Symptom:** `/ap-build` or `/ap-review` compares against wrong branch.
+**Symptom:** `/sp-build` or `/sp-review` compares against wrong branch.
 
 **Check:**
 ```bash
@@ -1286,34 +1286,34 @@ export FILE_GUARD_EXCLUDE="*.generated.swift,*.pb.go,*.min.js,*.snap"
 ## 11. FAQ
 
 **Q: Do I need specs for every tiny change?**
-A: No. Changes under 5 lines with no behavior change can skip the spec. Just `/ap-build` and `/ap-commit`. The spec-first rule is for meaningful behavior changes.
+A: No. Changes under 5 lines with no behavior change can skip the spec. Just `/sp-build` and `/sp-commit`. The spec-first rule is for meaningful behavior changes.
 
 **Q: Can I use mocks in tests?**
 A: Only for external services you can't run locally (third-party APIs, email services). Never mock your own code or database just to make tests pass faster.
 
 **Q: What if Claude writes a test that tests the wrong thing?**
-A: This usually means the spec is ambiguous. Clarify the spec first, then re-run `/ap-build`. Good specs produce good tests.
+A: This usually means the spec is ambiguous. Clarify the spec first, then re-run `/sp-build`. Good specs produce good tests.
 
 **Q: Can I use this with other AI coding tools?**
-A: Yes. `agentpipe init --agents <list>|all` installs the skills for Codex, Cursor, Antigravity, OpenClaw, and Hermes, each in its native format. Guards are hook-*enforced* for Claude, Codex, and Cursor (`.codex/hooks.json` / `.cursor/hooks.json` can block tool calls); Antigravity, OpenClaw, and Hermes get them as always-on advisory rules. The specs and workflow are tool-agnostic. See [docs/multi-agent.md](docs/multi-agent.md).
+A: Yes. `specpipe init --agents <list>|all` installs the skills for Codex, Cursor, Antigravity, OpenClaw, and Hermes, each in its native format. Guards are hook-*enforced* for Claude, Codex, and Cursor (`.codex/hooks.json` / `.cursor/hooks.json` can block tool calls); Antigravity, OpenClaw, and Hermes get them as always-on advisory rules. The specs and workflow are tool-agnostic. See [docs/multi-agent.md](docs/multi-agent.md).
 
-**Q: When should I use `/ap-challenge`?**
-A: After `/ap-plan`, for complex features involving authentication, payments, data pipelines, or multi-service integration. It spawns parallel hostile reviewers that find security holes, failure modes, and false assumptions BEFORE you write code. Skip it for simple CRUD or small features — the overhead isn't worth it.
+**Q: When should I use `/sp-challenge`?**
+A: After `/sp-plan`, for complex features involving authentication, payments, data pipelines, or multi-service integration. It spawns parallel hostile reviewers that find security holes, failure modes, and false assumptions BEFORE you write code. Skip it for simple CRUD or small features — the overhead isn't worth it.
 
 **Q: How do I do a full coverage audit?**
 A: This is intentionally not a command (it's expensive and rare). When needed, prompt Claude directly: "Audit test coverage for feature X against docs/specs/X/X.md acceptance scenarios. Identify gaps and write missing tests."
 
 **Q: What if my project uses multiple languages?**
-A: The skills auto-detect the test command from the first project marker they find. For monorepos, run `/ap-build` from each sub-project directory, or pin the test command per project in `.claude/CLAUDE.md` under **Testing**.
+A: The skills auto-detect the test command from the first project marker they find. For monorepos, run `/sp-build` from each sub-project directory, or pin the test command per project in `.claude/CLAUDE.md` under **Testing**.
 
 **Q: Can I add more skills?**
 A: Yes. Create a directory `.claude/skills/<name>/SKILL.md` and it becomes available as a slash command. See [Customization](#8-customization).
 
 **Q: How do I update the kit in existing projects?**
-A: Run `npx agentpipe upgrade`. It automatically detects which files you've customized and only updates unchanged files. Use `--force` to overwrite everything.
+A: Run `npx specpipe upgrade`. It automatically detects which files you've customized and only updates unchanged files. Use `--force` to overwrite everything.
 
 **Q: What's the HTML view next to my spec, and how do I generate it?**
-A: It's a scannable view of the spec — sidebar TOC, story cards, collapsible AS, dark/light theme. Reading a 1000-line spec markdown in an editor is painful; the HTML is what a tired human can actually skim. Generate or refresh it by running `/ap-spec-render <feature>` — `/ap-plan` does not create it automatically, it just suggests the command at the end. `.md` remains the source of truth (AI and `/ap-build` read it, git diffs work normally). `.html` is a regenerable artifact — never edit it by hand, let `/ap-spec-render` rebuild it. You can email/Slack the HTML to PMs/stakeholders who don't want to clone the repo.
+A: It's a scannable view of the spec — sidebar TOC, story cards, collapsible AS, dark/light theme. Reading a 1000-line spec markdown in an editor is painful; the HTML is what a tired human can actually skim. Generate or refresh it by running `/sp-spec-render <feature>` — `/sp-plan` does not create it automatically, it just suggests the command at the end. `.md` remains the source of truth (AI and `/sp-build` read it, git diffs work normally). `.html` is a regenerable artifact — never edit it by hand, let `/sp-spec-render` rebuild it. You can email/Slack the HTML to PMs/stakeholders who don't want to clone the repo.
 
 **Q: I installed with the old setup.sh — how do I migrate?**
-A: Run `npx agentpipe init --adopt .` to generate a manifest from your existing files without overwriting anything. Future upgrades will then work normally.
+A: Run `npx specpipe init --adopt .` to generate a manifest from your existing files without overwriting anything. Future upgrades will then work normally.

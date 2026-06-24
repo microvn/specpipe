@@ -21,7 +21,7 @@ description: |
   Use when asked to "write the spec".
 allowed-tools: Read, Write, Edit, AskUserQuestion, Agent
 ---
-# ap-plan
+# sp-plan
 
 Body content here.
 `;
@@ -44,21 +44,21 @@ console.log('\n── parseSkill ──');
 
 console.log('\n── parseSkillPath ──');
 {
-  eq('skill name', parseSkillPath('skills/ap-plan/SKILL.md').skill, 'ap-plan');
-  eq('inner SKILL.md', parseSkillPath('skills/ap-plan/SKILL.md').inner, 'SKILL.md');
-  eq('nested inner', parseSkillPath('skills/ap-scaffold/references/x.md').inner, 'references/x.md');
+  eq('skill name', parseSkillPath('skills/sp-plan/SKILL.md').skill, 'sp-plan');
+  eq('inner SKILL.md', parseSkillPath('skills/sp-plan/SKILL.md').inner, 'SKILL.md');
+  eq('nested inner', parseSkillPath('skills/sp-scaffold/references/x.md').inner, 'references/x.md');
   eq('non-skill path -> null', parseSkillPath('docs/WORKFLOW.md'), null);
 }
 
 console.log('\n── emitSkillFile: paths ──');
-const REL = 'skills/ap-plan/SKILL.md';
+const REL = 'skills/sp-plan/SKILL.md';
 {
-  eq('claude path', emitSkillFile('claude', REL, SKILL).path, '.claude/skills/ap-plan/SKILL.md');
-  eq('antigravity path', emitSkillFile('antigravity', REL, SKILL).path, '.agents/skills/ap-plan/SKILL.md');
-  eq('openclaw path', emitSkillFile('openclaw', REL, SKILL).path, 'skills/ap-plan/SKILL.md');
-  eq('hermes path', emitSkillFile('hermes', REL, SKILL).path, 'optional-skills/agentpipe/ap-plan/SKILL.md');
-  eq('codex path', emitSkillFile('codex', REL, SKILL).path, '.agents/skills/ap-plan/SKILL.md');
-  eq('cursor path -> native skills', emitSkillFile('cursor', REL, SKILL).path, '.cursor/skills/ap-plan/SKILL.md');
+  eq('claude path', emitSkillFile('claude', REL, SKILL).path, '.claude/skills/sp-plan/SKILL.md');
+  eq('antigravity path', emitSkillFile('antigravity', REL, SKILL).path, '.agents/skills/sp-plan/SKILL.md');
+  eq('openclaw path', emitSkillFile('openclaw', REL, SKILL).path, 'skills/sp-plan/SKILL.md');
+  eq('hermes path', emitSkillFile('hermes', REL, SKILL).path, 'optional-skills/specpipe/sp-plan/SKILL.md');
+  eq('codex path', emitSkillFile('codex', REL, SKILL).path, '.agents/skills/sp-plan/SKILL.md');
+  eq('cursor path -> native skills', emitSkillFile('cursor', REL, SKILL).path, '.cursor/skills/sp-plan/SKILL.md');
 }
 
 console.log('\n── emitSkillFile: frontmatter transforms ──');
@@ -68,33 +68,33 @@ console.log('\n── emitSkillFile: frontmatter transforms ──');
   has('claude keeps allowed-tools', claude, 'allowed-tools');
 
   const ag = emitSkillFile('antigravity', REL, SKILL).content;
-  has('antigravity adds name from dir', ag, 'name: ap-plan');
+  has('antigravity adds name from dir', ag, 'name: sp-plan');
   has('antigravity keeps description', ag, 'Generate spec with scenarios.');
   not('antigravity drops allowed-tools', ag, 'allowed-tools');
 
   const oc = emitSkillFile('openclaw', REL, SKILL).content;
-  has('openclaw adds name', oc, 'name: ap-plan');
+  has('openclaw adds name', oc, 'name: sp-plan');
   not('openclaw drops allowed-tools', oc, 'allowed-tools');
 
   const he = emitSkillFile('hermes', REL, SKILL).content;
   has('hermes adds version', he, 'version: 1.0.0');
-  has('hermes adds tags block', he, 'tags: [agentpipe');
+  has('hermes adds tags block', he, 'tags: [specpipe');
 
   const cu = emitSkillFile('cursor', REL, SKILL).content;
-  has('cursor (native skill) adds name', cu, 'name: ap-plan');
+  has('cursor (native skill) adds name', cu, 'name: sp-plan');
   not('cursor drops allowed-tools', cu, 'allowed-tools');
   has('cursor keeps body', cu, 'Body content here.');
 }
 
 console.log('\n── emitSkillFile: reference files copy verbatim ──');
 {
-  const refRel = 'skills/ap-scaffold/references/react.md';
+  const refRel = 'skills/sp-scaffold/references/react.md';
   const refContent = '# react profile\nstuff';
   const ag = emitSkillFile('antigravity', refRel, refContent);
-  eq('ref path under skill dir', ag.path, '.agents/skills/ap-scaffold/references/react.md');
+  eq('ref path under skill dir', ag.path, '.agents/skills/sp-scaffold/references/react.md');
   eq('ref content untouched', ag.content, refContent);
   const cu = emitSkillFile('cursor', refRel, refContent);
-  eq('cursor ref under .cursor/skills/<name>/', cu.path, '.cursor/skills/ap-scaffold/references/react.md');
+  eq('cursor ref under .cursor/skills/<name>/', cu.path, '.cursor/skills/sp-scaffold/references/react.md');
 }
 
 console.log('\n── resolveAgents ──');
@@ -165,16 +165,16 @@ console.log('\n── emitRules (guardrails) ──');
   eq('claude rules mode is null', agentRulesMode('claude'), null);
 
   const cu = emitRules('cursor', BODY);
-  eq('cursor rules path', cu.path, '.cursor/rules/agentpipe-guards.mdc');
+  eq('cursor rules path', cu.path, '.cursor/rules/specpipe-guards.mdc');
   has('cursor rules alwaysApply', cu.content, 'alwaysApply: true');
   has('cursor rules carries body', cu.content, 'rule one');
 
   const ag = emitRules('antigravity', BODY);
-  eq('antigravity rules path (singular .agent, official)', ag.path, '.agent/rules/agentpipe-guards.md');
+  eq('antigravity rules path (singular .agent, official)', ag.path, '.agent/rules/specpipe-guards.md');
   not('antigravity rules: no fabricated frontmatter', ag.content, 'trigger:');
 
   const oc = emitRules('openclaw', BODY);
-  eq('openclaw advisory doc path', oc.path, 'AGENTPIPE-GUARDS.md');
+  eq('openclaw advisory doc path', oc.path, 'SPECPIPE-GUARDS.md');
   eq('openclaw mode is doc', oc.mode, 'doc');
 
   const cx = emitRules('codex', BODY);
@@ -192,8 +192,8 @@ console.log('\n── emitHooks (enforced) ──');
 
   const cx = emitHooks('codex');
   eq('codex hooks config path', cx.configPath, '.codex/hooks.json');
-  eq('codex ships shell-guard', cx.scripts.some((s) => s.dst === '.codex/hooks/agentpipe-shell-guard.sh'), true);
-  has('codex config wires the shell guard', cx.configContent, 'agentpipe-shell-guard.sh');
+  eq('codex ships shell-guard', cx.scripts.some((s) => s.dst === '.codex/hooks/specpipe-shell-guard.sh'), true);
+  has('codex config wires the shell guard', cx.configContent, 'specpipe-shell-guard.sh');
   has('codex PreToolUse matcher', cx.configContent, 'PreToolUse');
   const okJson = (d, s) => { try { JSON.parse(s); ok(d); } catch { no(d, 'invalid JSON'); } };
   okJson('codex config is valid JSON', cx.configContent);

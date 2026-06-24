@@ -12,7 +12,7 @@ export async function diffCommand(path) {
   const manifest = await readManifest(targetDir);
 
   if (!manifest) {
-    log.fail('No manifest found. Run `agentpipe init` first.');
+    log.fail('No manifest found. Run `specpipe init` first.');
     process.exit(1);
   }
 

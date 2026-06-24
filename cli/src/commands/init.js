@@ -32,7 +32,7 @@ export async function initCommand(path, opts) {
     process.exit(1);
   }
 
-  log.info(`agentpipe v${pkg.version}`);
+  log.info(`specpipe v${pkg.version}`);
   log.info(`Target: ${targetDir}`);
   log.blank();
 
@@ -206,7 +206,7 @@ export async function initCommand(path, opts) {
   console.log('  .claude/CLAUDE.md          — Project rules (review and customize)');
   console.log('  .claude/settings.json      — Hook configuration');
   console.log('  .claude/hooks/             — 6 guards (file, path, glob, comment, sensitive, self-review)');
-  console.log('  .claude/skills/            — /ap-plan, /ap-challenge, /ap-build, /ap-fix, /ap-review, /ap-commit, /ap-voices');
+  console.log('  .claude/skills/            — /sp-plan, /sp-challenge, /sp-build, /sp-fix, /sp-review, /sp-commit, /sp-voices');
   console.log('  docs/WORKFLOW.md           — Workflow reference');
   log.blank();
   const parts = [`${copied} copied`];
@@ -217,8 +217,8 @@ export async function initCommand(path, opts) {
   console.log('Next steps:');
   console.log('  1. Review .claude/CLAUDE.md — ensure project info is correct');
   console.log('  2. Write your first spec:   docs/specs/<feature>.md');
-  console.log('  3. Generate test plan:      /ap-plan docs/specs/<feature>.md');
-  console.log('  4. Start coding + testing:  /ap-build');
+  console.log('  3. Generate test plan:      /sp-plan docs/specs/<feature>.md');
+  console.log('  4. Start coding + testing:  /sp-build');
   log.blank();
 
   if (warnings > 0) {
@@ -250,8 +250,8 @@ async function promptGlobalInstall(opts) {
   console.log('  .claude/hooks/      ← per-project hooks  (takes precedence over global)');
   console.log('');
   console.log('To revert global hooks back to per-project later:');
-  console.log('  agentpipe remove --global');
-  console.log('  then: agentpipe init  (in each project)');
+  console.log('  specpipe remove --global');
+  console.log('  then: specpipe init  (in each project)');
   console.log('');
   console.log('RECOMMENDATION: Choose A if you work across many projects.');
   console.log('');
@@ -266,7 +266,7 @@ async function promptGlobalInstall(opts) {
     await trackProjectPath(process.cwd());
   } else if (answer === 'no') {
     await writeGlobalManifest({ globalInstalled: false, updatedAt: new Date().toISOString() });
-    log.info('Skipping global install. Run `agentpipe init --global` anytime.');
+    log.info('Skipping global install. Run `specpipe init --global` anytime.');
   }
   // 'later' = don't write anything, prompt again next time
 }

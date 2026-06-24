@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# test/cli.sh — Integration tests for agentpipe CLI
+# test/cli.sh — Integration tests for specpipe CLI
 #
 # Covers: init, upgrade, remove — per-project AND global.
 # Real ~/.claude/ is NEVER touched — each section uses an isolated $TEST_HOME.
@@ -89,7 +89,7 @@ cli_exit() { HOME="$TEST_HOME" node "$CLI" "$@" >/dev/null 2>/dev/null && echo 0
 # Patch manifest: set kitHash to fake value for one file → simulates a kit update
 # This makes upgrade think the kit file changed vs what was originally installed.
 fake_kit_hash() {
-  local manifest="$1/.agentpipe/manifest.json" key="$2"
+  local manifest="$1/.specpipe/manifest.json" key="$2"
   node --input-type=module <<EOF 2>/dev/null
 import { readFileSync, writeFileSync } from 'node:fs';
 const p = '${manifest}';
@@ -108,22 +108,22 @@ setup
 cli init "$PROJECT_DIR"
 
 # Skills
-assert_exists "skills: ap-explore/SKILL.md"    "$PROJECT_DIR/.claude/skills/ap-explore/SKILL.md"
-assert_exists "skills: ap-plan/SKILL.md"       "$PROJECT_DIR/.claude/skills/ap-plan/SKILL.md"
-assert_exists "skills: ap-build/SKILL.md"      "$PROJECT_DIR/.claude/skills/ap-build/SKILL.md"
-assert_exists "skills: ap-challenge/SKILL.md"  "$PROJECT_DIR/.claude/skills/ap-challenge/SKILL.md"
-assert_exists "skills: ap-investigate/SKILL.md" "$PROJECT_DIR/.claude/skills/ap-investigate/SKILL.md"
-assert_exists "skills: ap-fix/SKILL.md"        "$PROJECT_DIR/.claude/skills/ap-fix/SKILL.md"
-assert_exists "skills: ap-review/SKILL.md"     "$PROJECT_DIR/.claude/skills/ap-review/SKILL.md"
-assert_exists "skills: ap-commit/SKILL.md"     "$PROJECT_DIR/.claude/skills/ap-commit/SKILL.md"
-assert_exists "skills: ap-voices/SKILL.md"     "$PROJECT_DIR/.claude/skills/ap-voices/SKILL.md"
-assert_exists "skills: ap-spec-render/SKILL.md"       "$PROJECT_DIR/.claude/skills/ap-spec-render/SKILL.md"
-assert_exists "skills: ap-spec-render/template.html"  "$PROJECT_DIR/.claude/skills/ap-spec-render/template.html"
-assert_exists "skills: ap-spec-render/components.md"  "$PROJECT_DIR/.claude/skills/ap-spec-render/components.md"
-assert_exists "skills: ap-md-render/SKILL.md"         "$PROJECT_DIR/.claude/skills/ap-md-render/SKILL.md"
-assert_exists "skills: ap-md-render/template.html"    "$PROJECT_DIR/.claude/skills/ap-md-render/template.html"
-assert_exists "skills: ap-md-render/components.md"     "$PROJECT_DIR/.claude/skills/ap-md-render/components.md"
-assert_exists "skills: ap-humanize/SKILL.md"          "$PROJECT_DIR/.claude/skills/ap-humanize/SKILL.md"
+assert_exists "skills: sp-explore/SKILL.md"    "$PROJECT_DIR/.claude/skills/sp-explore/SKILL.md"
+assert_exists "skills: sp-plan/SKILL.md"       "$PROJECT_DIR/.claude/skills/sp-plan/SKILL.md"
+assert_exists "skills: sp-build/SKILL.md"      "$PROJECT_DIR/.claude/skills/sp-build/SKILL.md"
+assert_exists "skills: sp-challenge/SKILL.md"  "$PROJECT_DIR/.claude/skills/sp-challenge/SKILL.md"
+assert_exists "skills: sp-investigate/SKILL.md" "$PROJECT_DIR/.claude/skills/sp-investigate/SKILL.md"
+assert_exists "skills: sp-fix/SKILL.md"        "$PROJECT_DIR/.claude/skills/sp-fix/SKILL.md"
+assert_exists "skills: sp-review/SKILL.md"     "$PROJECT_DIR/.claude/skills/sp-review/SKILL.md"
+assert_exists "skills: sp-commit/SKILL.md"     "$PROJECT_DIR/.claude/skills/sp-commit/SKILL.md"
+assert_exists "skills: sp-voices/SKILL.md"     "$PROJECT_DIR/.claude/skills/sp-voices/SKILL.md"
+assert_exists "skills: sp-spec-render/SKILL.md"       "$PROJECT_DIR/.claude/skills/sp-spec-render/SKILL.md"
+assert_exists "skills: sp-spec-render/template.html"  "$PROJECT_DIR/.claude/skills/sp-spec-render/template.html"
+assert_exists "skills: sp-spec-render/components.md"  "$PROJECT_DIR/.claude/skills/sp-spec-render/components.md"
+assert_exists "skills: sp-md-render/SKILL.md"         "$PROJECT_DIR/.claude/skills/sp-md-render/SKILL.md"
+assert_exists "skills: sp-md-render/template.html"    "$PROJECT_DIR/.claude/skills/sp-md-render/template.html"
+assert_exists "skills: sp-md-render/components.md"     "$PROJECT_DIR/.claude/skills/sp-md-render/components.md"
+assert_exists "skills: sp-humanize/SKILL.md"          "$PROJECT_DIR/.claude/skills/sp-humanize/SKILL.md"
 
 # Hooks
 assert_exists "hooks: path-guard.sh"      "$PROJECT_DIR/.claude/hooks/path-guard.sh"
@@ -143,9 +143,9 @@ assert_exists "placeholder: docs/specs/.gitkeep"      "$PROJECT_DIR/docs/specs/.
 assert_exists "placeholder: docs/test-plans/.gitkeep" "$PROJECT_DIR/docs/test-plans/.gitkeep"
 
 # Manifest
-assert_exists "manifest: created" "$PROJECT_DIR/.agentpipe/manifest.json"
-assert_json_valid "manifest: valid JSON" "$PROJECT_DIR/.agentpipe/manifest.json"
-MANIFEST=$(cat "$PROJECT_DIR/.agentpipe/manifest.json")
+assert_exists "manifest: created" "$PROJECT_DIR/.specpipe/manifest.json"
+assert_json_valid "manifest: valid JSON" "$PROJECT_DIR/.specpipe/manifest.json"
+MANIFEST=$(cat "$PROJECT_DIR/.specpipe/manifest.json")
 assert_contains "manifest: has version key" '"version"' "$MANIFEST"
 assert_contains "manifest: has files key"   '"files"'   "$MANIFEST"
 assert_contains "manifest: tracks a hook"   'path-guard.sh' "$MANIFEST"
@@ -166,7 +166,7 @@ setup
 
 cli init "$PROJECT_DIR" --only skills
 
-assert_exists "skills present with --only skills"  "$PROJECT_DIR/.claude/skills/ap-plan/SKILL.md"
+assert_exists "skills present with --only skills"  "$PROJECT_DIR/.claude/skills/sp-plan/SKILL.md"
 assert_absent "hooks absent with --only skills"    "$PROJECT_DIR/.claude/hooks/path-guard.sh"
 assert_absent "docs absent with --only skills"     "$PROJECT_DIR/docs/WORKFLOW.md"
 
@@ -178,9 +178,9 @@ setup
 
 cli init "$PROJECT_DIR" --dry-run
 
-assert_absent "no skills with --dry-run"   "$PROJECT_DIR/.claude/skills/ap-plan/SKILL.md"
+assert_absent "no skills with --dry-run"   "$PROJECT_DIR/.claude/skills/sp-plan/SKILL.md"
 assert_absent "no hooks with --dry-run"    "$PROJECT_DIR/.claude/hooks/path-guard.sh"
-assert_absent "no manifest with --dry-run" "$PROJECT_DIR/.agentpipe/manifest.json"
+assert_absent "no manifest with --dry-run" "$PROJECT_DIR/.specpipe/manifest.json"
 
 teardown
 
@@ -212,13 +212,13 @@ section "init — skill files have YAML frontmatter"
 setup
 
 cli init "$PROJECT_DIR"
-for skill in ap-explore ap-plan ap-build ap-challenge ap-investigate ap-fix ap-review ap-commit ap-voices ap-humanize; do
+for skill in sp-explore sp-plan sp-build sp-challenge sp-investigate sp-fix sp-review sp-commit sp-voices sp-humanize; do
   CONTENT=$(head -1 "$PROJECT_DIR/.claude/skills/$skill/SKILL.md")
   assert_contains "$skill/SKILL.md starts with ---" "---" "$CONTENT"
 done
-PLAN_FM=$(awk '/^---$/{c++; if(c==2) exit} {print}' "$PROJECT_DIR/.claude/skills/ap-plan/SKILL.md")
-assert_contains "ap-plan: has description frontmatter" "description:" "$PLAN_FM"
-assert_contains "ap-plan: has allowed-tools frontmatter" "allowed-tools:" "$PLAN_FM"
+PLAN_FM=$(awk '/^---$/{c++; if(c==2) exit} {print}' "$PROJECT_DIR/.claude/skills/sp-plan/SKILL.md")
+assert_contains "sp-plan: has description frontmatter" "description:" "$PLAN_FM"
+assert_contains "sp-plan: has allowed-tools frontmatter" "allowed-tools:" "$PLAN_FM"
 
 teardown
 
@@ -272,13 +272,13 @@ cli init "$PROJECT_DIR"
 # Mangle manifest version to something old so upgrade sees a diff
 node --input-type=module <<'EOF' 2>/dev/null || true
 import { readFileSync, writeFileSync } from 'node:fs';
-const p = process.env.PROJ + '/.agentpipe/manifest.json';
+const p = process.env.PROJ + '/.specpipe/manifest.json';
 const m = JSON.parse(readFileSync(p, 'utf-8'));
 m.version = '0.0.1';
 writeFileSync(p, JSON.stringify(m, null, 2) + '\n');
 EOF
 cli upgrade "$PROJECT_DIR"
-MANIFEST=$(cat "$PROJECT_DIR/.agentpipe/manifest.json")
+MANIFEST=$(cat "$PROJECT_DIR/.specpipe/manifest.json")
 assert_not_contains "manifest version updated after upgrade" '"version": "0.0.1"' "$MANIFEST"
 
 teardown
@@ -293,8 +293,8 @@ cli init "$PROJECT_DIR"
 cli remove "$PROJECT_DIR"
 
 assert_absent "hooks removed"     "$PROJECT_DIR/.claude/hooks/path-guard.sh"
-assert_absent "skills removed"    "$PROJECT_DIR/.claude/skills/ap-plan/SKILL.md"
-assert_absent "manifest removed"  "$PROJECT_DIR/.agentpipe/manifest.json"
+assert_absent "skills removed"    "$PROJECT_DIR/.claude/skills/sp-plan/SKILL.md"
+assert_absent "manifest removed"  "$PROJECT_DIR/.specpipe/manifest.json"
 
 # Preserved items
 assert_exists "CLAUDE.md preserved"   "$PROJECT_DIR/.claude/CLAUDE.md"
@@ -314,7 +314,7 @@ echo "# custom" > "$PROJECT_DIR/.claude/skills/my-custom-skill/SKILL.md"
 
 cli remove "$PROJECT_DIR"
 
-assert_absent "devkit skill removed"   "$PROJECT_DIR/.claude/skills/ap-plan/SKILL.md"
+assert_absent "devkit skill removed"   "$PROJECT_DIR/.claude/skills/sp-plan/SKILL.md"
 assert_exists "custom skill preserved" "$PROJECT_DIR/.claude/skills/my-custom-skill/SKILL.md"
 
 teardown
@@ -337,16 +337,16 @@ setup
 cli init --global
 
 # Core SKILL.md skills
-assert_exists "global skills: ap-explore"   "$TEST_HOME/.claude/skills/ap-explore/SKILL.md"
-assert_exists "global skills: ap-plan"      "$TEST_HOME/.claude/skills/ap-plan/SKILL.md"
-assert_exists "global skills: ap-build"     "$TEST_HOME/.claude/skills/ap-build/SKILL.md"
-assert_exists "global skills: ap-challenge" "$TEST_HOME/.claude/skills/ap-challenge/SKILL.md"
-assert_exists "global skills: ap-investigate" "$TEST_HOME/.claude/skills/ap-investigate/SKILL.md"
-assert_exists "global skills: ap-fix"       "$TEST_HOME/.claude/skills/ap-fix/SKILL.md"
-assert_exists "global skills: ap-review"    "$TEST_HOME/.claude/skills/ap-review/SKILL.md"
-assert_exists "global skills: ap-commit"    "$TEST_HOME/.claude/skills/ap-commit/SKILL.md"
-assert_exists "global skills: ap-voices"    "$TEST_HOME/.claude/skills/ap-voices/SKILL.md"
-assert_exists "global skills: ap-humanize"  "$TEST_HOME/.claude/skills/ap-humanize/SKILL.md"
+assert_exists "global skills: sp-explore"   "$TEST_HOME/.claude/skills/sp-explore/SKILL.md"
+assert_exists "global skills: sp-plan"      "$TEST_HOME/.claude/skills/sp-plan/SKILL.md"
+assert_exists "global skills: sp-build"     "$TEST_HOME/.claude/skills/sp-build/SKILL.md"
+assert_exists "global skills: sp-challenge" "$TEST_HOME/.claude/skills/sp-challenge/SKILL.md"
+assert_exists "global skills: sp-investigate" "$TEST_HOME/.claude/skills/sp-investigate/SKILL.md"
+assert_exists "global skills: sp-fix"       "$TEST_HOME/.claude/skills/sp-fix/SKILL.md"
+assert_exists "global skills: sp-review"    "$TEST_HOME/.claude/skills/sp-review/SKILL.md"
+assert_exists "global skills: sp-commit"    "$TEST_HOME/.claude/skills/sp-commit/SKILL.md"
+assert_exists "global skills: sp-voices"    "$TEST_HOME/.claude/skills/sp-voices/SKILL.md"
+assert_exists "global skills: sp-humanize"  "$TEST_HOME/.claude/skills/sp-humanize/SKILL.md"
 
 # All 6 hooks
 assert_exists "global hooks: path-guard.sh"      "$TEST_HOME/.claude/hooks/path-guard.sh"
@@ -436,7 +436,7 @@ setup
 
 cli init --global
 
-for skill in ap-explore ap-plan ap-build ap-challenge ap-investigate ap-fix ap-review ap-commit ap-voices ap-humanize; do
+for skill in sp-explore sp-plan sp-build sp-challenge sp-investigate sp-fix sp-review sp-commit sp-voices sp-humanize; do
   FIRST=$(head -1 "$TEST_HOME/.claude/skills/$skill/SKILL.md")
   assert_contains "global $skill starts with ---" "---" "$FIRST"
 done
@@ -486,10 +486,10 @@ section "upgrade --global (customized skill — skip)"
 setup
 
 cli init --global
-printf '\n# CUSTOM\n' >> "$TEST_HOME/.claude/skills/ap-plan/SKILL.md"
+printf '\n# CUSTOM\n' >> "$TEST_HOME/.claude/skills/sp-plan/SKILL.md"
 OUT_UGSSK=$(cli_out upgrade --global)
 assert_contains "global upgrade: skips customized skill" "customized" "$OUT_UGSSK"
-CONTENT=$(cat "$TEST_HOME/.claude/skills/ap-plan/SKILL.md")
+CONTENT=$(cat "$TEST_HOME/.claude/skills/sp-plan/SKILL.md")
 assert_contains "global upgrade: custom skill content preserved" "CUSTOM" "$CONTENT"
 
 teardown
@@ -565,7 +565,7 @@ cli remove --global
 
 # Per-project files must still be there
 assert_exists "per-project hooks untouched after global remove" "$PROJECT_DIR/.claude/hooks/path-guard.sh"
-assert_exists "per-project skills untouched after global remove" "$PROJECT_DIR/.claude/skills/ap-plan/SKILL.md"
+assert_exists "per-project skills untouched after global remove" "$PROJECT_DIR/.claude/skills/sp-plan/SKILL.md"
 
 teardown
 
@@ -580,7 +580,7 @@ cli init --global
 # Per-project init should auto-upgrade global
 OUT_AUTO=$(cli_out init "$PROJECT_DIR")
 assert_contains "auto-upgrade: global skills mentioned" "global" "$OUT_AUTO"
-assert_exists   "auto-upgrade: global skills still present" "$TEST_HOME/.claude/skills/ap-plan/SKILL.md"
+assert_exists   "auto-upgrade: global skills still present" "$TEST_HOME/.claude/skills/sp-plan/SKILL.md"
 
 teardown
 
@@ -620,21 +620,21 @@ section "init --agents (non-claude) emits native paths, no .claude"
 setup
 
 cli init "$PROJECT_DIR" --agents cursor,antigravity
-assert_exists "cursor native skill emitted" "$PROJECT_DIR/.cursor/skills/ap-plan/SKILL.md"
-assert_exists "antigravity SKILL.md emitted" "$PROJECT_DIR/.agents/skills/ap-plan/SKILL.md"
+assert_exists "cursor native skill emitted" "$PROJECT_DIR/.cursor/skills/sp-plan/SKILL.md"
+assert_exists "antigravity SKILL.md emitted" "$PROJECT_DIR/.agents/skills/sp-plan/SKILL.md"
 # Manifest still lives at .claude/.devkit-manifest.json (neutral location is future work),
 # but no Claude *content* is installed when Claude isn't selected.
 assert_absent "no claude settings.json when claude not selected" "$PROJECT_DIR/.claude/settings.json"
 assert_absent "no claude skills when claude not selected" "$PROJECT_DIR/.claude/skills"
 
-AG=$(cat "$PROJECT_DIR/.agents/skills/ap-plan/SKILL.md")
-assert_contains "antigravity adds name from dir" "name: ap-plan" "$AG"
+AG=$(cat "$PROJECT_DIR/.agents/skills/sp-plan/SKILL.md")
+assert_contains "antigravity adds name from dir" "name: sp-plan" "$AG"
 if printf '%s' "$AG" | grep -q "allowed-tools"; then
   fail "antigravity drops allowed-tools"
 else pass "antigravity drops allowed-tools"; fi
 
-CU=$(cat "$PROJECT_DIR/.cursor/skills/ap-plan/SKILL.md")
-assert_contains "cursor native skill adds name" "name: ap-plan" "$CU"
+CU=$(cat "$PROJECT_DIR/.cursor/skills/sp-plan/SKILL.md")
+assert_contains "cursor native skill adds name" "name: sp-plan" "$CU"
 
 teardown
 
@@ -644,10 +644,10 @@ setup
 
 cli init "$PROJECT_DIR" --agents all
 assert_exists "claude settings.json present" "$PROJECT_DIR/.claude/settings.json"
-assert_exists "claude skill present" "$PROJECT_DIR/.claude/skills/ap-plan/SKILL.md"
-assert_exists "openclaw skill present" "$PROJECT_DIR/skills/ap-plan/SKILL.md"
-assert_exists "hermes skill present" "$PROJECT_DIR/optional-skills/agentpipe/ap-plan/SKILL.md"
-assert_exists "codex skill present" "$PROJECT_DIR/.agents/skills/ap-plan/SKILL.md"
+assert_exists "claude skill present" "$PROJECT_DIR/.claude/skills/sp-plan/SKILL.md"
+assert_exists "openclaw skill present" "$PROJECT_DIR/skills/sp-plan/SKILL.md"
+assert_exists "hermes skill present" "$PROJECT_DIR/optional-skills/specpipe/sp-plan/SKILL.md"
+assert_exists "codex skill present" "$PROJECT_DIR/.agents/skills/sp-plan/SKILL.md"
 
 teardown
 
@@ -665,8 +665,8 @@ section "multi-agent upgrade — idempotent then re-emits on kit change"
 setup
 
 cli init "$PROJECT_DIR" --agents cursor,antigravity
-assert_exists "multi-agent manifest at neutral location" "$PROJECT_DIR/.agentpipe/manifest.json"
-MA=$(cat "$PROJECT_DIR/.agentpipe/manifest.json")
+assert_exists "multi-agent manifest at neutral location" "$PROJECT_DIR/.specpipe/manifest.json"
+MA=$(cat "$PROJECT_DIR/.specpipe/manifest.json")
 assert_contains "manifest records agents" '"agents"' "$MA"
 assert_contains "entry carries templateRel" 'templateRel' "$MA"
 
@@ -678,20 +678,20 @@ assert_contains "upgrade idempotent (0 updated)" "Updated 0" "$OUT"
 node --input-type=module <<EOF 2>/dev/null
 import { readFileSync, writeFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
-const f = '$PROJECT_DIR/.cursor/skills/ap-plan/SKILL.md';
-const mp = '$PROJECT_DIR/.agentpipe/manifest.json';
+const f = '$PROJECT_DIR/.cursor/skills/sp-plan/SKILL.md';
+const mp = '$PROJECT_DIR/.specpipe/manifest.json';
 const old = '--- OLD EMITTED CONTENT ---\n';
 writeFileSync(f, old);
 const h = createHash('sha256').update(old).digest('hex');
 const m = JSON.parse(readFileSync(mp, 'utf-8'));
-m.files['.cursor/skills/ap-plan/SKILL.md'].kitHash = h;
-m.files['.cursor/skills/ap-plan/SKILL.md'].installedHash = h;
+m.files['.cursor/skills/sp-plan/SKILL.md'].kitHash = h;
+m.files['.cursor/skills/sp-plan/SKILL.md'].installedHash = h;
 writeFileSync(mp, JSON.stringify(m, null, 2) + '\n');
 EOF
 OUT=$(cli_out upgrade "$PROJECT_DIR")
 assert_contains "upgrade re-emits changed cursor rule" "Updated 1" "$OUT"
-NEW=$(cat "$PROJECT_DIR/.cursor/skills/ap-plan/SKILL.md")
-assert_contains "re-emitted content is the real skill" "name: ap-plan" "$NEW"
+NEW=$(cat "$PROJECT_DIR/.cursor/skills/sp-plan/SKILL.md")
+assert_contains "re-emitted content is the real skill" "name: sp-plan" "$NEW"
 
 teardown
 
@@ -704,7 +704,7 @@ cli remove "$PROJECT_DIR"
 assert_absent "cursor rules removed"      "$PROJECT_DIR/.cursor"
 assert_absent "antigravity skills removed" "$PROJECT_DIR/.agents"
 assert_absent "openclaw skills removed"    "$PROJECT_DIR/skills"
-assert_absent "neutral manifest removed"   "$PROJECT_DIR/.agentpipe"
+assert_absent "neutral manifest removed"   "$PROJECT_DIR/.specpipe"
 
 teardown
 
@@ -713,10 +713,10 @@ section "guards — owned rules files per agent"
 setup
 
 cli init "$PROJECT_DIR" --agents cursor,antigravity,openclaw
-assert_exists "cursor guards .mdc"        "$PROJECT_DIR/.cursor/rules/agentpipe-guards.mdc"
-assert_exists "antigravity guards rule"   "$PROJECT_DIR/.agent/rules/agentpipe-guards.md"
-assert_exists "openclaw advisory doc"     "$PROJECT_DIR/AGENTPIPE-GUARDS.md"
-CR=$(cat "$PROJECT_DIR/.cursor/rules/agentpipe-guards.mdc")
+assert_exists "cursor guards .mdc"        "$PROJECT_DIR/.cursor/rules/specpipe-guards.mdc"
+assert_exists "antigravity guards rule"   "$PROJECT_DIR/.agent/rules/specpipe-guards.md"
+assert_exists "openclaw advisory doc"     "$PROJECT_DIR/SPECPIPE-GUARDS.md"
+CR=$(cat "$PROJECT_DIR/.cursor/rules/specpipe-guards.mdc")
 assert_contains "cursor guards alwaysApply" "alwaysApply: true" "$CR"
 assert_contains "guards body present"       "Never touch secrets" "$CR"
 
@@ -734,7 +734,7 @@ assert_contains "AGENTS.md gains guards section" "operating rules" "$AM"
 
 # Idempotent: re-init --force must not duplicate the section
 cli init "$PROJECT_DIR" --agents codex --force
-COUNT=$(grep -c "agentpipe:guards:begin" "$PROJECT_DIR/AGENTS.md" || true)
+COUNT=$(grep -c "specpipe:guards:begin" "$PROJECT_DIR/AGENTS.md" || true)
 assert_contains "no duplicate guards section" "1" "$COUNT"
 
 cli remove "$PROJECT_DIR"
@@ -750,9 +750,9 @@ setup
 
 cli init "$PROJECT_DIR" --agents codex
 cli init "$PROJECT_DIR" --agents cursor
-assert_exists "first agent (codex) still installed" "$PROJECT_DIR/.agents/skills/ap-plan/SKILL.md"
-assert_exists "second agent (cursor) installed"     "$PROJECT_DIR/.cursor/skills/ap-plan/SKILL.md"
-MA=$(cat "$PROJECT_DIR/.agentpipe/manifest.json")
+assert_exists "first agent (codex) still installed" "$PROJECT_DIR/.agents/skills/sp-plan/SKILL.md"
+assert_exists "second agent (cursor) installed"     "$PROJECT_DIR/.cursor/skills/sp-plan/SKILL.md"
+MA=$(cat "$PROJECT_DIR/.specpipe/manifest.json")
 assert_contains "manifest tracks codex still" 'codex' "$MA"
 assert_contains "manifest tracks cursor"      'cursor' "$MA"
 # remove now cleans BOTH agents (codex would be orphaned without accumulation)
@@ -772,8 +772,8 @@ node --input-type=module <<EOF 2>/dev/null
 import { readFileSync, writeFileSync } from 'node:fs';
 const p = '$PROJECT_DIR/AGENTS.md';
 let s = readFileSync(p, 'utf-8');
-s = s.replace(/<!-- agentpipe:guards:begin -->[\s\S]*?<!-- agentpipe:guards:end -->/,
-  '<!-- agentpipe:guards:begin -->\nSTALE\n<!-- agentpipe:guards:end -->');
+s = s.replace(/<!-- specpipe:guards:begin -->[\s\S]*?<!-- specpipe:guards:end -->/,
+  '<!-- specpipe:guards:begin -->\nSTALE\n<!-- specpipe:guards:end -->');
 writeFileSync(p, s);
 EOF
 cli upgrade "$PROJECT_DIR"
@@ -790,17 +790,17 @@ setup
 cli init "$PROJECT_DIR" --agents codex,cursor
 assert_exists  "codex hooks.json"        "$PROJECT_DIR/.codex/hooks.json"
 assert_json_valid "codex hooks.json valid" "$PROJECT_DIR/.codex/hooks.json"
-assert_executable "codex shell-guard +x"  "$PROJECT_DIR/.codex/hooks/agentpipe-shell-guard.sh"
+assert_executable "codex shell-guard +x"  "$PROJECT_DIR/.codex/hooks/specpipe-shell-guard.sh"
 assert_exists  "cursor hooks.json"       "$PROJECT_DIR/.cursor/hooks.json"
 assert_json_valid "cursor hooks.json valid" "$PROJECT_DIR/.cursor/hooks.json"
-assert_executable "cursor read-guard +x" "$PROJECT_DIR/.cursor/hooks/agentpipe-read-guard.sh"
+assert_executable "cursor read-guard +x" "$PROJECT_DIR/.cursor/hooks/specpipe-read-guard.sh"
 
 # The installed guard actually blocks (exit 2) — real enforcement, not advisory.
-C=$(printf '{"tool_input":{"command":"ls node_modules"}}' | bash "$PROJECT_DIR/.codex/hooks/agentpipe-shell-guard.sh" >/dev/null 2>&1; echo $?)
+C=$(printf '{"tool_input":{"command":"ls node_modules"}}' | bash "$PROJECT_DIR/.codex/hooks/specpipe-shell-guard.sh" >/dev/null 2>&1; echo $?)
 [[ "$C" == "2" ]] && pass "shell-guard blocks node_modules (exit 2)" || fail "shell-guard should block (got $C)"
-C=$(printf '{"command":"ls src"}' | bash "$PROJECT_DIR/.cursor/hooks/agentpipe-shell-guard.sh" >/dev/null 2>&1; echo $?)
+C=$(printf '{"command":"ls src"}' | bash "$PROJECT_DIR/.cursor/hooks/specpipe-shell-guard.sh" >/dev/null 2>&1; echo $?)
 [[ "$C" == "0" ]] && pass "shell-guard allows safe command (exit 0)" || fail "shell-guard should allow (got $C)"
-C=$(printf '{"file_path":"app/.env"}' | bash "$PROJECT_DIR/.cursor/hooks/agentpipe-read-guard.sh" >/dev/null 2>&1; echo $?)
+C=$(printf '{"file_path":"app/.env"}' | bash "$PROJECT_DIR/.cursor/hooks/specpipe-read-guard.sh" >/dev/null 2>&1; echo $?)
 [[ "$C" == "2" ]] && pass "read-guard blocks .env (exit 2)" || fail "read-guard should block (got $C)"
 
 cli remove "$PROJECT_DIR"

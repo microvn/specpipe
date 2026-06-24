@@ -4,7 +4,7 @@ import { hashFile } from './hasher.js';
 
 // Neutral, agent-agnostic location. Older installs used .claude/ — still read
 // as a fallback so existing projects migrate on their next write.
-export const MANIFEST_FILE = '.agentpipe/manifest.json';
+export const MANIFEST_FILE = '.specpipe/manifest.json';
 export const LEGACY_MANIFEST_FILE = '.claude/.devkit-manifest.json';
 
 /**

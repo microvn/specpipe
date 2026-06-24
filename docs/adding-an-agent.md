@@ -42,7 +42,7 @@ Reuse `fmNameDesc` (name + description) unless the agent needs something special
 In the `RULES` map (same file), add how the agent carries the always-on guards:
 
 ```js
-windsurf: { mode: 'file', path: '.windsurf/rules/agentpipe-guards.md',
+windsurf: { mode: 'file', path: '.windsurf/rules/specpipe-guards.md',
             frontmatter: 'activation: always' },
 ```
 
@@ -56,7 +56,7 @@ In `test/agents.mjs`, assert the emitted layout and that no Claude-only tool tok
 
 ```js
 eq('windsurf path', emitSkillFile('windsurf', REL, SKILL).path,
-   '.windsurf/skills/ap-plan/SKILL.md');
+   '.windsurf/skills/sp-plan/SKILL.md');
 not('windsurf: no AskUserQuestion leak',
     emitSkillFile('windsurf', '...', realSkillSrc).content, 'AskUserQuestion');
 ```

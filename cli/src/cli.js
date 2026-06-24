@@ -10,7 +10,7 @@ export function cli(argv) {
   const program = new Command();
 
   program
-    .name('agentpipe')
+    .name('specpipe')
     .description('CLI toolkit for spec-first development with agentic AI coding agents')
     .version(pkg.version);
 

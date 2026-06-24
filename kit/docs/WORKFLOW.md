@@ -11,20 +11,20 @@
 When: Brand-new project — no codebase yet (empty repo, no package manager / `src/`).
 
 ```
-Step 1 → /ap-explore "what you're building"
+Step 1 → /sp-explore "what you're building"
           Detects greenfield → ALSO decides app-type + stack (versions researched,
           current — not recalled from memory) and emits a Bootstrap Brief.
           Output: docs/explore/<feature>.md (with ## Bootstrap Brief)
 
-Step 2 → /ap-scaffold
+Step 2 → /sp-scaffold
           Reads the Bootstrap Brief → generator-first runnable skeleton:
           core/ + ONE pattern-demonstrating module + co-located tests.
           Smoke-gated (install → build → start/smoke must be GREEN, ≥1 real test —
-          this resolves TEST_CMD for /ap-build). Writes ARCHITECTURE.md + ADRs.
+          this resolves TEST_CMD for /sp-build). Writes ARCHITECTURE.md + ADRs.
           Hands off ONLY when it actually runs; otherwise BLOCKED.
 
-Step 3 → /ap-plan → /ap-build
-          Normal New Feature flow, now on a runnable base. /ap-build's Foundation
+Step 3 → /sp-plan → /sp-build
+          Normal New Feature flow, now on a runnable base. /sp-build's Foundation
           Gate confirms the harness exists before the first RED.
 ```
 
@@ -33,13 +33,13 @@ Step 3 → /ap-plan → /ap-build
 When: Requirements are unclear, multiple approaches are possible, or it's a brownfield feature with existing code to understand first.
 
 ```
-Step 1 → /ap-explore "feature description"
+Step 1 → /sp-explore "feature description"
           Clarifies: why the feature is needed, desired behavior, boundaries,
           edge cases, business rules, permissions, UI expectations.
           Asks questions as a Client Technical Lead — one topic at a time.
           Output: docs/explore/<feature>.md
 
-Step 2 → /ap-plan "feature description"
+Step 2 → /sp-plan "feature description"
           Auto-detects docs/explore/<feature>.md → skips redundant codebase
           discovery, uses explore findings as direct input for the spec.
           Continue with the normal New Feature flow from Step 2.
@@ -50,30 +50,30 @@ Step 2 → /ap-plan "feature description"
 When: Building something that doesn't exist yet (no code, no spec).
 
 ```
-Step 1 → /ap-plan "description of feature"
+Step 1 → /sp-plan "description of feature"
           Generates: docs/specs/<feature>/<feature>.md (spec with acceptance scenarios)
           Runs Scope Challenge: reuse check, complexity smell (8+ files = flag),
           framework built-in search, distribution check.
           Adds "What Already Exists" and "Not in Scope" sections to the spec.
           Answers validation questions with effort scales (human: X / CC: Y).
-          At the end, suggests /ap-spec-render if you want a scannable HTML view.
+          At the end, suggests /sp-spec-render if you want a scannable HTML view.
           Review before proceeding.
 
-Step 1.5 → (Optional) /ap-spec-render <feature>
+Step 1.5 → (Optional) /sp-spec-render <feature>
           Generates <feature>.html next to the .md — sidebar TOC, story cards,
           collapsible Given/When/Then, dark/light theme. Useful when the spec
           is long and you want to scan it visually or share it with stakeholders.
           Source .md remains canonical; .html is regenerable, never hand-edit.
           For non-spec markdown (investigation, explore, RFC, retro, README),
-          use /ap-md-render <file.md> instead — same idea, generic content.
+          use /sp-md-render <file.md> instead — same idea, generic content.
 
-Step 2 → (Optional) /ap-challenge docs/specs/<feature>/<feature>.md
+Step 2 → (Optional) /sp-challenge docs/specs/<feature>/<feature>.md
           Adversarial review: spawns hostile reviewers to find flaws.
           Recommended for complex features, auth, data pipelines.
           Skip for simple CRUD or small features.
 
 Step 3 → Implement in chunks. After each chunk:
-          /ap-build
+          /sp-build
           Checks 8 edge case categories (null, empty, invalid types, boundary,
           error paths, race conditions, large data, special chars).
           Draws Coverage Map before writing tests: traces code paths + user flows,
@@ -81,17 +81,17 @@ Step 3 → Implement in chunks. After each chunk:
           Regression rule enforced.
           Repeat until chunk is green.
 
-Step 4 → /ap-review (before merge)
+Step 4 → /sp-review (before merge)
           Checks API/Backend patterns (rate limiting, timeouts, CORS, error leakage).
           Extra layer for AI-generated code: regressions, trust boundaries, cost escalation.
 
-Step 4.5 → (Optional) /ap-voices
+Step 4.5 → (Optional) /sp-voices
           Multi-LLM second opinion: sends the diff (or spec) to 2–3 different LLMs,
           synthesizes consensus + disagreements. Use when: high-stakes change
-          (auth/payment/data), mixed-confidence findings from /ap-review, or
+          (auth/payment/data), mixed-confidence findings from /sp-review, or
           you want cross-model verification before merge. Skip for routine changes.
 
-Step 5 → /ap-commit
+Step 5 → /sp-commit
 ```
 
 ### Update Existing Feature
@@ -99,18 +99,18 @@ Step 5 → /ap-commit
 When: Changing behavior, adding options, refactoring logic.
 
 ```
-Step 1 → /ap-plan docs/specs/<feature>/<feature>.md "description of changes"
+Step 1 → /sp-plan docs/specs/<feature>/<feature>.md "description of changes"
           Mode C handles everything: snapshot → classification → change report → apply.
-          Do NOT manually edit the spec before running /ap-plan — it creates the
+          Do NOT manually edit the spec before running /sp-plan — it creates the
           snapshot first, then applies changes. Manual edits bypass snapshot protection.
-          At the end, suggests /ap-spec-render to refresh <feature>.html if you
+          At the end, suggests /sp-spec-render to refresh <feature>.html if you
           have an HTML view (it's stale after this update).
 
 Step 2 → Implement code changes.
-          /ap-build
+          /sp-build
           Fix until green.
 
-Step 4 → /ap-review → /ap-commit
+Step 4 → /sp-review → /sp-commit
 ```
 
 ### Bug Fix
@@ -118,21 +118,21 @@ Step 4 → /ap-review → /ap-commit
 When: Something is broken and needs fixing.
 
 ```
-Step 0 → (OPTIONAL) /ap-investigate "description of the bug"
+Step 0 → (OPTIONAL) /sp-investigate "description of the bug"
           Use ONLY when: bug is complex, ambiguous, production outage, data
           corruption, regression with unclear cause, or user wants diagnosis
           before any code change. Skip for trivial/obvious bugs.
           Read-only: traces data flow, maps blast radius, lists hypotheses
           with confidence levels. Writes docs/investigate/<slug>-<date>.md.
-          No code changes — hands off the report to /ap-fix.
+          No code changes — hands off the report to /sp-fix.
 
-Step 1 → /ap-fix "description" (or /ap-fix docs/investigate/<slug>-<date>.md)
+Step 1 → /sp-fix "description" (or /sp-fix docs/investigate/<slug>-<date>.md)
           Auto-detects investigation file if passed → skips redundant discovery.
           Draws Bug Path Diagram to confirm hypothesis ([GAP] must be locatable).
           Regression rule: if diff broke existing behavior with no test → CRITICAL test required.
           Writes failing test → fixes code → confirms green → runs full suite.
 
-Step 2 → /ap-commit
+Step 2 → /sp-commit
 
 Optional → If the bug reveals an undocumented edge case, update the spec.
 ```
@@ -142,7 +142,7 @@ Optional → If the bug reveals an undocumented edge case, update the spec.
 When: Deleting a feature, removing deprecated code.
 
 ```
-Step 1 → /ap-plan docs/specs/<feature>/<feature>.md "remove stories S-XXX"
+Step 1 → /sp-plan docs/specs/<feature>/<feature>.md "remove stories S-XXX"
           Mode C creates a snapshot (removing stories = M2 = Major),
           then marks stories and AS as removed in the spec.
           (Or if removing the entire feature: archive the directory.)
@@ -152,7 +152,7 @@ Step 2 → Delete production code and related test code.
 Step 3 → Run the full test suite with the project's native test command.
           Fix any cascading breakage.
 
-Step 4 → /ap-commit
+Step 4 → /sp-commit
 ```
 
 ---
@@ -163,31 +163,31 @@ Use this to decide which workflow to follow:
 
 ```
 Is there a runnable project yet (package manager / src / build)?
-├─ No → New Project (Greenfield). /ap-explore (greenfield) → /ap-scaffold → then /ap-plan.
+├─ No → New Project (Greenfield). /sp-explore (greenfield) → /sp-scaffold → then /sp-plan.
 └─ Yes ↓
 
 Is this a brand new feature (no existing spec or code)?
 ├─ Yes
 │   ├─ Are requirements clear and approach decided?
-│   │   ├─ Yes → New Feature workflow. Start with /ap-plan.
+│   │   ├─ Yes → New Feature workflow. Start with /sp-plan.
 │   │   │   └─ Is the feature complex (auth, data pipeline, multi-service)?
-│   │   │       ├─ Yes → Run /ap-challenge after /ap-plan, before coding.
-│   │   │       └─ No → Skip /ap-challenge, go straight to implementation.
-│   │   └─ No → Explore Before Planning. Start with /ap-explore.
-│   │           Then /ap-plan using the explore output.
+│   │   │       ├─ Yes → Run /sp-challenge after /sp-plan, before coding.
+│   │   │       └─ No → Skip /sp-challenge, go straight to implementation.
+│   │   └─ No → Explore Before Planning. Start with /sp-explore.
+│   │           Then /sp-plan using the explore output.
 └─ No
     ├─ Is this a bug fix?
     │   ├─ Yes → Bug Fix workflow.
     │   │   ├─ Complex / outage / ambiguous cause / data corruption?
-    │   │   │   ├─ Yes → /ap-investigate first, then /ap-fix.
-    │   │   │   └─ No  → /ap-fix directly.
+    │   │   │   ├─ Yes → /sp-investigate first, then /sp-fix.
+    │   │   │   └─ No  → /sp-fix directly.
     │   └─ No
     │       ├─ Are you removing/deprecating code?
     │       │   ├─ Yes → Remove Feature workflow.
-    │       │   └─ No → Update Feature workflow. Start with /ap-plan.
+    │       │   └─ No → Update Feature workflow. Start with /sp-plan.
     │       │
     │       └─ Is the change very small (< 5 lines, behavior unchanged)?
-    │           └─ Yes → Skip spec update. Just /ap-build and /ap-commit.
+    │           └─ Yes → Skip spec update. Just /sp-build and /sp-commit.
 ```
 
 ---
@@ -218,7 +218,7 @@ If the spec seems incomplete, note what's missing but don't change it.
 I'm about to change [description of change].
 Affected files: [list]
 
-1. /ap-plan docs/specs/<feature>/<feature>.md "description of changes"
+1. /sp-plan docs/specs/<feature>/<feature>.md "description of changes"
    (handles snapshot + spec update + acceptance scenarios)
 2. Implement the code change
 3. Update tests to match
@@ -245,7 +245,7 @@ Actual: [broken behavior]
 Removing: [feature name]
 Files to delete: [list]
 
-1. /ap-plan docs/specs/<feature>/<feature>.md "remove stories S-XXX, S-YYY"
+1. /sp-plan docs/specs/<feature>/<feature>.md "remove stories S-XXX, S-YYY"
    (handles snapshot + marks stories and AS as removed)
 2. Delete production code
 3. Delete test code
@@ -258,23 +258,23 @@ Files to delete: [list]
 
 | Workflow | Estimated Tokens | When |
 |----------|-----------------|------|
-| `/ap-explore` | 10–20k | Before /ap-plan when requirements are unclear |
-| `/ap-scaffold` | 15–40k + real install/build time | Greenfield only — once, to stand up a runnable skeleton before the first spec |
-| `/ap-build` (incremental) | 5–10k | Daily, after each code chunk |
-| `/ap-investigate` (complex bug) | 8–15k | OPTIONAL before /ap-fix — complex/outage only |
-| `/ap-fix` (single bug) | 3–5k | As bugs arise |
-| `/ap-commit` | 2–4k | Each commit |
-| `/ap-review` (diff-based) | 10–20k | Before merge |
-| `/ap-plan` (new feature) | 20–40k | Start of new feature |
-| `/ap-challenge` (adversarial) | 15–30k | After /ap-plan, for complex features |
-| `/ap-spec-render` (HTML view) | 3–8k | User-invoked after `/ap-plan` if HTML view wanted, or to refresh stale `.html` |
-| `/ap-md-render` (HTML view, any md) | 3–8k | User-invoked for non-spec markdown — investigation, explore, RFC, retro, README |
-| `/ap-voices` (multi-LLM review) | 10–30k + external API cost | Optional — after /ap-review for high-stakes changes |
-| `/ap-humanize` (rephrase text) | 2–6k | User-invoked — rephrase plan/notes/AI output into send-ready text. Outside the dev cycle |
+| `/sp-explore` | 10–20k | Before /sp-plan when requirements are unclear |
+| `/sp-scaffold` | 15–40k + real install/build time | Greenfield only — once, to stand up a runnable skeleton before the first spec |
+| `/sp-build` (incremental) | 5–10k | Daily, after each code chunk |
+| `/sp-investigate` (complex bug) | 8–15k | OPTIONAL before /sp-fix — complex/outage only |
+| `/sp-fix` (single bug) | 3–5k | As bugs arise |
+| `/sp-commit` | 2–4k | Each commit |
+| `/sp-review` (diff-based) | 10–20k | Before merge |
+| `/sp-plan` (new feature) | 20–40k | Start of new feature |
+| `/sp-challenge` (adversarial) | 15–30k | After /sp-plan, for complex features |
+| `/sp-spec-render` (HTML view) | 3–8k | User-invoked after `/sp-plan` if HTML view wanted, or to refresh stale `.html` |
+| `/sp-md-render` (HTML view, any md) | 3–8k | User-invoked for non-spec markdown — investigation, explore, RFC, retro, README |
+| `/sp-voices` (multi-LLM review) | 10–30k + external API cost | Optional — after /sp-review for high-stakes changes |
+| `/sp-humanize` (rephrase text) | 2–6k | User-invoked — rephrase plan/notes/AI output into send-ready text. Outside the dev cycle |
 | Full audit (manual) | 100k+ | Before release, quarterly |
 
-**Rule of thumb:** Daily work uses templates + `/ap-build` → low token cost.
-Save `/ap-plan` and full audits for significant milestones.
+**Rule of thumb:** Daily work uses templates + `/sp-build` → low token cost.
+Save `/sp-plan` and full audits for significant milestones.
 
 ---
 

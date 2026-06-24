@@ -6,19 +6,19 @@
 const RULES = {
   cursor: {
     mode: 'file',
-    path: '.cursor/rules/agentpipe-guards.mdc',
-    frontmatter: 'description: agentpipe operating rules — spec-first cycle, guardrails, testing, conventions\nglobs:\nalwaysApply: true',
+    path: '.cursor/rules/specpipe-guards.mdc',
+    frontmatter: 'description: specpipe operating rules — spec-first cycle, guardrails, testing, conventions\nglobs:\nalwaysApply: true',
   },
   // Antigravity rules are plain markdown (no documented trigger/glob frontmatter);
   // official Google DevRel uses the singular `.agent/rules/` path.
-  antigravity: { mode: 'doc', path: '.agent/rules/agentpipe-guards.md' },
+  antigravity: { mode: 'doc', path: '.agent/rules/specpipe-guards.md' },
   codex: { mode: 'agents-md', path: 'AGENTS.md' },
-  openclaw: { mode: 'doc', path: 'AGENTPIPE-GUARDS.md' },
-  hermes: { mode: 'doc', path: 'AGENTPIPE-GUARDS.md' },
+  openclaw: { mode: 'doc', path: 'SPECPIPE-GUARDS.md' },
+  hermes: { mode: 'doc', path: 'SPECPIPE-GUARDS.md' },
 };
 
-export const GUARDS_BEGIN = '<!-- agentpipe:guards:begin -->';
-export const GUARDS_END = '<!-- agentpipe:guards:end -->';
+export const GUARDS_BEGIN = '<!-- specpipe:guards:begin -->';
+export const GUARDS_END = '<!-- specpipe:guards:end -->';
 
 /** How an agent carries guardrails: 'file' | 'doc' | 'agents-md' | null (native hooks). */
 export function agentRulesMode(agentId) {
@@ -33,17 +33,17 @@ export function emitRules(agentId, body) {
   const r = RULES[agentId];
   if (!r) return null;
   if (r.mode === 'file') return { mode: 'file', path: r.path, content: `---\n${r.frontmatter}\n---\n${body}` };
-  if (r.mode === 'doc') return { mode: 'doc', path: r.path, content: `# agentpipe — operating rules\n\n${body}` };
+  if (r.mode === 'doc') return { mode: 'doc', path: r.path, content: `# specpipe — operating rules\n\n${body}` };
   // agents-md: a marked section merged into a shared AGENTS.md
-  return { mode: 'agents-md', path: r.path, content: `${GUARDS_BEGIN}\n## agentpipe — operating rules\n\n${body}${GUARDS_END}\n` };
+  return { mode: 'agents-md', path: r.path, content: `${GUARDS_BEGIN}\n## specpipe — operating rules\n\n${body}${GUARDS_END}\n` };
 }
 
 // ── Enforced hooks (block tool calls, not just advise) ──────────────────────
 // Agents whose hook payloads + block primitive (exit 2) are verified compatible
-// with the shared guard scripts (kit/hooks/agentpipe-*.sh). Claude has its own
+// with the shared guard scripts (kit/hooks/specpipe-*.sh). Claude has its own
 // .claude/hooks; Antigravity/Hermes lack a usable blocking-hook surface → omitted.
-const SHELL_GUARD = 'agentpipe-shell-guard.sh';
-const READ_GUARD = 'agentpipe-read-guard.sh';
+const SHELL_GUARD = 'specpipe-shell-guard.sh';
+const READ_GUARD = 'specpipe-read-guard.sh';
 
 const EHOOKS = {
   // Codex PreToolUse payload == Claude's (.tool_input.command); exit 2 blocks.

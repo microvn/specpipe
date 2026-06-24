@@ -1,6 +1,6 @@
 # Architecture
 
-agentpipe authors a spec-first toolkit **once** and installs it for many AI coding
+specpipe authors a spec-first toolkit **once** and installs it for many AI coding
 agents. The whole design follows from one idea: separate *what the toolkit is* (neutral
 content) from *how each agent consumes it* (per-agent emission).
 
@@ -76,7 +76,7 @@ re-emits every file) and reconcile against the manifest:
 - desired ∧ manifest, kit changed, not customized → update
 - ¬desired ∧ manifest → remove
 
-The manifest lives at the neutral `.agentpipe/manifest.json` (legacy
+The manifest lives at the neutral `.specpipe/manifest.json` (legacy
 `.claude/.devkit-manifest.json` is read as a fallback so old installs migrate). Each entry
 records `{ agent, templateRel, kitHash, installedHash, customized }`, so any agent's file
 is reproducible and customization is detectable.

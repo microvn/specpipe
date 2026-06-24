@@ -148,7 +148,7 @@ export async function removeGlobalHooksFromSettings() {
 
 /**
  * Copy a skill to the global ~/.claude/skills/ directory.
- * Strips the 'skills/' prefix so ap-plan/SKILL.md lands at ~/.claude/skills/ap-plan/SKILL.md.
+ * Strips the 'skills/' prefix so sp-plan/SKILL.md lands at ~/.claude/skills/sp-plan/SKILL.md.
  * @returns {{ result: 'copied'|'skipped'|'identical', kitHash: string }}
  */
 export async function installSkillGlobal(skillRelPath, globalSkillsDir, { force = false, globalFiles = {} } = {}) {

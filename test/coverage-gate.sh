@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# test/coverage-gate.sh — Regression tests for ap-build's Spec Coverage Gate (Phase 3.5)
+# test/coverage-gate.sh — Regression tests for sp-build's Spec Coverage Gate (Phase 3.5)
 #
-# The gate is the one DETERMINISTIC part of ap-build: it counts coverage with a
+# The gate is the one DETERMINISTIC part of sp-build: it counts coverage with a
 # command, not LLM judgement, so it can be tested like code. This guards both the
 # gate's behaviour and the exact grep flags in the skill — two real bugs were
 # caught here: `\b` (GNU-ism → phantom "AS-01" on BSD/ugrep) and a missing `-h`
@@ -12,7 +12,7 @@
 
 set -euo pipefail
 
-SKILL="$(cd "$(dirname "$0")/.." && pwd)/kit/skills/ap-build/SKILL.md"
+SKILL="$(cd "$(dirname "$0")/.." && pwd)/kit/skills/sp-build/SKILL.md"
 PASSED=0
 FAILED=0
 
@@ -26,7 +26,7 @@ assert_eq() { # name, got, want
   if [ "$2" = "$3" ]; then pass "$1"; else fail "$1"; printf '      got:  [%s]\n      want: [%s]\n' "$2" "$3"; fi
 }
 
-# ─── The gate, exactly as ap-build Phase 3.5 defines it ────────────────────────
+# ─── The gate, exactly as sp-build Phase 3.5 defines it ────────────────────────
 # Keep these two commands in sync with the skill. The skill-text guards below
 # assert the skill still uses these flags.
 gate_uncovered() { # spec_file, test_dir → prints uncovered ids, space-separated

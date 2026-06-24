@@ -51,14 +51,14 @@ export async function installAgentSkills(agentId, targetDir, { force = false } =
   return { agent: agentId, label: AGENTS[agentId].label, copied, skipped, identical, paths };
 }
 
-const GUARDS_TEMPLATE_REL = 'rules/agentpipe-guards.md';
+const GUARDS_TEMPLATE_REL = 'rules/specpipe-guards.md';
 
 function guardsSectionRegex() {
   const esc = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   return new RegExp(esc(GUARDS_BEGIN) + '[\\s\\S]*?' + esc(GUARDS_END) + '\\n?', '');
 }
 
-/** Merge (or replace) the agentpipe guards section in a shared AGENTS.md. */
+/** Merge (or replace) the specpipe guards section in a shared AGENTS.md. */
 export async function mergeAgentsMdGuards(targetDir, section) {
   const p = join(targetDir, 'AGENTS.md');
   let existing = '';
@@ -70,7 +70,7 @@ export async function mergeAgentsMdGuards(targetDir, section) {
   await writeFile(p, existing);
 }
 
-/** Remove the agentpipe guards section from AGENTS.md (deletes file if now empty). */
+/** Remove the specpipe guards section from AGENTS.md (deletes file if now empty). */
 export async function stripAgentsMdGuards(targetDir) {
   const p = join(targetDir, 'AGENTS.md');
   let existing;
@@ -94,7 +94,7 @@ export async function installAgentRules(agentId, targetDir, { force = false } = 
 
   if (r.mode === 'agents-md') {
     await mergeAgentsMdGuards(targetDir, r.content);
-    log.copy(`${r.path} (agentpipe operating-rules section)`);
+    log.copy(`${r.path} (specpipe operating-rules section)`);
     return { mode: 'agents-md', path: r.path };
   }
 
@@ -118,7 +118,7 @@ export async function installAgentRules(agentId, targetDir, { force = false } = 
 /**
  * Install an agent's ENFORCED (blocking) hooks: the guard scripts + the agent's
  * hook config file. Codex/Cursor only (verified payloads). Returns null otherwise.
- * The hook config is agentpipe-owned; if a different one already exists, we skip
+ * The hook config is specpipe-owned; if a different one already exists, we skip
  * unless --force (don't clobber a user's hooks).
  */
 export async function installAgentHooks(agentId, targetDir, { force = false } = {}) {
@@ -142,7 +142,7 @@ export async function installAgentHooks(agentId, targetDir, { force = false } = 
         return { configPath: h.configPath };
       }
     } catch { /* unreadable */ }
-    log.warn(`${h.configPath} (exists — use --force to install agentpipe enforced hooks)`);
+    log.warn(`${h.configPath} (exists — use --force to install specpipe enforced hooks)`);
     return { configPath: h.configPath };
   }
   await mkdir(dirname(cfgAbs), { recursive: true });

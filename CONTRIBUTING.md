@@ -1,6 +1,6 @@
-# Contributing to agentpipe
+# Contributing to specpipe
 
-Thanks for your interest. agentpipe is a spec-first development toolkit that
+Thanks for your interest. specpipe is a spec-first development toolkit that
 installs the same skills across many AI coding agents. Contributions that add an
 agent, sharpen a skill, or improve the install/lifecycle are all welcome.
 
@@ -27,8 +27,8 @@ docs/             architecture, multi-agent, adding-an-agent
 ## Dev setup
 
 ```bash
-git clone https://github.com/microvn/agentpipe
-cd agentpipe/cli && npm install
+git clone https://github.com/microvn/specpipe
+cd specpipe/cli && npm install
 ```
 
 ## Running tests
@@ -43,7 +43,7 @@ Or run a suite directly: `node test/agents.mjs`, `bash test/cli.sh`, `bash test/
 
 ## Adding a coding agent
 
-agentpipe is designed so adding an agent is a single registry entry. See
+specpipe is designed so adding an agent is a single registry entry. See
 [docs/adding-an-agent.md](docs/adding-an-agent.md). In short:
 
 1. Add an entry to `AGENTS` in `cli/src/lib/agents.js` (label, `skillTarget`, `rules`,

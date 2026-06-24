@@ -9,7 +9,7 @@ export async function listCommand(path) {
   const manifest = await readManifest(targetDir);
 
   if (!manifest) {
-    log.fail('No manifest found. Run `agentpipe init` first.');
+    log.fail('No manifest found. Run `specpipe init` first.');
     process.exit(1);
   }
 
@@ -17,7 +17,7 @@ export async function listCommand(path) {
   await refreshCustomizationStatus(targetDir, manifest);
 
   const agents = getAgents(manifest);
-  log.info(`agentpipe v${manifest.version} — installed ${manifest.installedAt.split('T')[0]}`);
+  log.info(`specpipe v${manifest.version} — installed ${manifest.installedAt.split('T')[0]}`);
   if (manifest.projectType) {
     log.info(`Project: ${manifest.projectType.lang} (${manifest.projectType.framework})`);
   }

@@ -4,7 +4,7 @@ import { hashContent } from './hasher.js';
 import { getAllFiles, COMPONENTS, getTemplateDir } from './installer.js';
 import { emitFile, emitRules } from './agents.js';
 
-export const GUARDS_TEMPLATE_REL = 'rules/agentpipe-guards.md';
+export const GUARDS_TEMPLATE_REL = 'rules/specpipe-guards.md';
 
 /**
  * Template files a given agent receives. Claude gets the full kit

@@ -1,4 +1,4 @@
-# Agentpipe — Private → OSS Migration & Rebuild Plan
+# Specpipe — Private → OSS Migration & Rebuild Plan
 
 Status: draft for review. Author bar: senior AI/SWE. This is a **structured refactor +
 reorganization + OSS hardening**, NOT a from-scratch rewrite — the 6,151 LOC of authored
@@ -8,7 +8,7 @@ skills and ~430 passing test assertions are the asset; we restructure around the
 
 ## 1. Goal & non-goals
 
-**Goal.** Turn `claude-devkit` (private, Claude-only) into `agentpipe` — an OSS,
+**Goal.** Turn `claude-devkit` (private, Claude-only) into `specpipe` — an OSS,
 multi-agent, spec-first development toolkit that installs cleanly for Claude Code,
 Codex, Cursor, Antigravity, OpenClaw, and Hermes, with an architecture that makes
 adding the *next* agent a small, well-defined change.
@@ -16,7 +16,7 @@ adding the *next* agent a small, well-defined change.
 **Non-goals.** No rewrite of skill content from scratch. No new feature scope beyond
 multi-agent + OSS readiness. No docs-site build system yet (defer; ship `docs/` markdown).
 
-**Definition of done.** A stranger can `npx agentpipe init --agents <theirs>`, get a
+**Definition of done.** A stranger can `npx specpipe init --agents <theirs>`, get a
 correct install, read a clear README, and open a PR against a repo with LICENSE, CI,
 CONTRIBUTING, and green tests on every supported agent's emitted format.
 
@@ -27,7 +27,7 @@ CONTRIBUTING, and green tests on every supported agent's emitted format.
 **Solid (keep):**
 - Skill content — 13 skills, carefully authored, the real value.
 - Emitter foundation (this session): agent registry, `emitSkillFile`/`emitFile`/`emitRules`,
-  `--agents`, reconcile-based lifecycle, manifest at `.agentpipe/`, neutral `kit/skills/`.
+  `--agents`, reconcile-based lifecycle, manifest at `.specpipe/`, neutral `kit/skills/`.
 - Test coverage — cli.sh (~161), hooks.sh (203), agents.mjs (66).
 
 **Debt (fix):**
@@ -141,9 +141,9 @@ cli/src/
 
 **P2 — Content parity across agents.**
 - Emit `CLAUDE.md` project-rules per agent (Claude → `.claude/CLAUDE.md`; Cursor →
-  `.cursor/rules/agentpipe-project.mdc`; Codex → `AGENTS.md` section; etc.).
-- Subagent conditional blocks for the 4 orchestration skills (ap-build, ap-voices,
-  ap-challenge, ap-scaffold). Prove on ap-build, review, then replicate.
+  `.cursor/rules/specpipe-project.mdc`; Codex → `AGENTS.md` section; etc.).
+- Subagent conditional blocks for the 4 orchestration skills (sp-build, sp-voices,
+  sp-challenge, sp-scaffold). Prove on sp-build, review, then replicate.
 - Sweep remaining hard Claude references in bodies to the controlled vocabulary.
 
 **P3 — OSS hardening.**
@@ -166,7 +166,7 @@ cli/src/
 
 ## 5. Engineering practices (the 10+ yr bar)
 
-- **Dogfood:** agentpipe should be developed using its own spec-first loop where it fits.
+- **Dogfood:** specpipe should be developed using its own spec-first loop where it fits.
 - **CI is the gate:** no merge without green tests + lint + the per-agent emit check.
 - **Semver discipline:** the rebrand + manifest-location move is breaking → `2.0.0`.
   Document the migration (legacy `.claude/.devkit-manifest.json` is already read as fallback).
@@ -188,7 +188,7 @@ cli/src/
    or ship parity (project-rules) first and treat orchestration degradation as advisory
    notes (current state) for the initial OSS release?
 4. **Docs surface.** Markdown in `docs/` for launch (recommended) vs a docs site later?
-5. **Repo/package name final.** `agentpipe` everywhere is set; confirm npm `2.0.0` publish under it.
+5. **Repo/package name final.** `specpipe` everywhere is set; confirm npm `2.0.0` publish under it.
 
 ---
 
