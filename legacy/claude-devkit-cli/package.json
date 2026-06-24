@@ -1,0 +1,38 @@
+{
+  "name": "claude-devkit-cli",
+  "version": "1.14.0",
+  "description": "Deprecated — renamed to 'agentpipe'. This package redirects to and runs agentpipe.",
+  "bin": {
+    "claude-devkit": "./bin/shim.js",
+    "claude-devkit-cli": "./bin/shim.js"
+  },
+  "files": [
+    "bin/"
+  ],
+  "type": "module",
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "agentpipe": "^1.0.0"
+  },
+  "keywords": [
+    "claude",
+    "claude-code",
+    "claude-devkit",
+    "agentpipe",
+    "spec-first",
+    "ai-agents",
+    "deprecated"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/microvn/agentpipe.git"
+  },
+  "homepage": "https://github.com/microvn/agentpipe#readme",
+  "bugs": {
+    "url": "https://github.com/microvn/agentpipe/issues"
+  },
+  "author": "Microvn <microvn.gm@gmail.com>",
+  "license": "MIT"
+}
