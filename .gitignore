@@ -22,3 +22,6 @@ cli/README.md
 # Test artifacts (created by test/hooks.sh)
 .test-agentignore-*/
 .test-aiignore-*/
+
+# Vercel landing page (deployed separately, not versioned here)
+site/
