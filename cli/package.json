@@ -1,6 +1,6 @@
 {
   "name": "specpipe",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "description": "Spec-first development toolkit for agentic AI coding agents — installs skills + guardrails for Claude Code, Codex, Cursor, Antigravity, and more.",
   "bin": {
     "specpipe": "./bin/devkit.js",
