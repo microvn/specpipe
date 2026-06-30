@@ -24,10 +24,12 @@ fi
 
 cd "$ROOT_DIR"
 
-# Run test suite — must pass before publish
+# Run test suite — must pass before publish (mirrors `npm test`: agents emitter +
+# cli + hooks + coverage-gate). agents.mjs covers the multi-agent emitter/registry.
 echo "running test suite..."
-bash test/hooks.sh         || { echo "error: hooks tests failed — aborting publish"; exit 1; }
+node test/agents.mjs       || { echo "error: agents (multi-agent) tests failed — aborting publish"; exit 1; }
 bash test/cli.sh           || { echo "error: cli tests failed — aborting publish"; exit 1; }
+bash test/hooks.sh         || { echo "error: hooks tests failed — aborting publish"; exit 1; }
 bash test/coverage-gate.sh || { echo "error: coverage-gate tests failed — aborting publish"; exit 1; }
 echo ""
 
@@ -45,6 +47,23 @@ if [[ -n "$(git status --short)" ]]; then
   git commit -m "$COMMIT_MSG"
 fi
 
+# Secret scan — block publish if a real credential value reached a commit.
+# Scans the whole tree about to be pushed (HEAD), not just the last diff.
+# Matches credential VALUES, not the words "secret"/"token" in prose.
+echo "scanning for secrets..."
+if git grep -nIE \
+  -e '(postgres(ql)?(\+[a-z]+)?|mysql|mongodb(\+srv)?)://[^:@/ ]+:[^@/ ]+@' \
+  -e '(sk_live_|rk_live_|ghp_|gho_|github_pat_)[A-Za-z0-9]{16,}' \
+  -e 'AKIA[0-9A-Z]{16}' \
+  -e '-----BEGIN [A-Z ]*PRIVATE KEY-----' \
+  -e '(password|passwd|secret|api[_-]?key|access[_-]?token)["'"'"']?\s*[:=]\s*["'"'"'][^"'"'"' ]{8,}' \
+  -- HEAD 2>/dev/null \
+  | grep -viE 'dummy|example|placeholder|REDACTED|\$\{|<[a-z_]+>|xxx|sk_test_|whsec_dummy'; then
+  echo "error: possible secret found in tracked files (above) — aborting publish. Redact or .gitignore it first."
+  exit 1
+fi
+echo "secret scan clean."
+
 # Bump version
 cd "$CLI_DIR"
 OLD_VERSION=$(node -p "require('./package.json').version")
@@ -57,14 +76,15 @@ cd "$ROOT_DIR"
 git add cli/package.json cli/package-lock.json
 git commit -m "chore: bump version to $NEW_VERSION"
 git tag "v$NEW_VERSION"
-git push && git push --tags
+# Push to the public OSS remote. `origin` = github.com/microvn/specpipe.
+git push origin main && git push origin --tags
 
 # Publish
 cd "$CLI_DIR"
 npm publish
 
 echo ""
-echo "published agentpipe@$NEW_VERSION"
+echo "published specpipe@$NEW_VERSION"
 
 # Update global skills on the publishing machine using local CLI (no global install required)
 echo "updating global skills..."

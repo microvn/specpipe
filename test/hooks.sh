@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# test/hooks.sh — Integration tests for kit/.claude/hooks/*
+# test/hooks.sh — Integration tests for kit/hooks/*
 #
 # Tests actual I/O behavior: pipe JSON to each hook, assert exit code + output.
 # Run from repo root: bash test/hooks.sh
@@ -8,7 +8,7 @@
 
 set -euo pipefail
 
-HOOKS_DIR="$(cd "$(dirname "$0")/../kit/.claude/hooks" && pwd)"
+HOOKS_DIR="$(cd "$(dirname "$0")/../kit/hooks" && pwd)"
 PASSED=0
 FAILED=0
 
@@ -105,11 +105,11 @@ assert_not_contains() {
 }
 
 # ══════════════════════════════════════════════════════════════════════════════
-# path-guard.sh
+# specpipe-shell-guard.sh
 # ══════════════════════════════════════════════════════════════════════════════
-section "path-guard.sh"
+section "specpipe-shell-guard.sh"
 
-PG="$HOOKS_DIR/path-guard.sh"
+PG="$HOOKS_DIR/specpipe-shell-guard.sh"
 
 # Allow: normal commands
 assert_exit "allow: ls src/"               0 "$(exit_bash "$PG" '{"tool_input":{"command":"ls src/"}}')"
@@ -150,7 +150,7 @@ assert_exit "block: PATH_GUARD_EXTRA with pipe-separated patterns" 2 \
   "$(exit_bash "$PG" '{"tool_input":{"command":"ls .vagrant/machines"}}' "PATH_GUARD_EXTRA=\\.terraform|\\.vagrant")"
 
 # ── Remaining blocked dirs (all patterns need coverage) ──────────────────────
-section "path-guard.sh — full pattern coverage"
+section "specpipe-shell-guard.sh — full pattern coverage"
 
 assert_exit "block: .git/refs"                2 "$(exit_bash "$PG" '{"tool_input":{"command":"ls .git/refs/heads"}}')"
 assert_exit "block: bin/Debug (C#)"           2 "$(exit_bash "$PG" '{"tool_input":{"command":"ls bin/Debug/net7.0"}}')"
@@ -208,12 +208,28 @@ assert_exit "allow: malformed JSON"            0 "$(exit_bash "$PG" 'not json at
 assert_exit "allow: JSON with no tool_input"   0 "$(exit_bash "$PG" '{"event":"PreToolUse"}')"
 assert_exit "allow: null command value"        0 "$(exit_bash "$PG" '{"tool_input":{"command":null}}')"
 
-# ══════════════════════════════════════════════════════════════════════════════
-# sensitive-guard.sh
-# ══════════════════════════════════════════════════════════════════════════════
-section "sensitive-guard.sh"
+# ── Antigravity payload shape (toolCall.args) + stdout-JSON deny ──────────────
+# Antigravity wraps args as toolCall.args.* and honors a stdout {"decision":"deny"}
+# JSON, NOT exit codes (a non-zero exit is logged as a hook failure). Verified live
+# on CLI 1.0.13. Block paths must emit deny JSON + exit 0 for this payload shape.
+AG_ENV='{"toolCall":{"args":{"CommandLine":"cat .env"}}}'
+AG_NM='{"toolCall":{"args":{"CommandLine":"ls node_modules/x"}}}'
+AG_OK='{"toolCall":{"args":{"CommandLine":"ls src/"}}}'
+assert_exit     "antigravity: secret block exits 0 (not 2)" 0 "$(exit_bash "$PG" "$AG_ENV")"
+assert_contains "antigravity: secret → stdout deny JSON" '"decision":"deny"' "$(stdout_bash "$PG" "$AG_ENV")"
+assert_contains "antigravity: deny carries a reason"     '"reason":"Blocked' "$(stdout_bash "$PG" "$AG_ENV")"
+assert_contains "antigravity: wasteful-dir → stdout deny" '"decision":"deny"' "$(stdout_bash "$PG" "$AG_NM")"
+assert_exit     "antigravity: clean cmd allows (exit 0)"  0 "$(exit_bash "$PG" "$AG_OK")"
+assert_not_contains "antigravity: clean cmd emits no deny" '"decision"' "$(stdout_bash "$PG" "$AG_OK")"
+# Non-Antigravity (Claude) still blocks via exit 2, no stdout JSON.
+assert_exit     "claude: secret still blocks via exit 2"  2 "$(exit_bash "$PG" '{"tool_input":{"command":"cat .env"}}')"
 
-SG="$HOOKS_DIR/sensitive-guard.sh"
+# ══════════════════════════════════════════════════════════════════════════════
+# specpipe-read-guard.sh
+# ══════════════════════════════════════════════════════════════════════════════
+section "specpipe-read-guard.sh"
+
+SG="$HOOKS_DIR/specpipe-read-guard.sh"
 
 # Block: direct file access (Read/Write/Edit)
 assert_exit "block: .env"                       2 "$(exit_bash "$SG" '{"tool_input":{"file_path":".env"}}')"
@@ -234,13 +250,16 @@ assert_exit "allow: src/index.ts"               0 "$(exit_bash "$SG" '{"tool_inp
 assert_exit "allow: package.json"               0 "$(exit_bash "$SG" '{"tool_input":{"file_path":"package.json"}}')"
 assert_exit "allow: empty input"                0 "$(exit_bash "$SG" '')"
 
-# Warn only (exit 0): bash command referencing .env
-assert_exit "warn exit 0: bash cat .env"        0 "$(exit_bash "$SG" '{"tool_input":{"command":"cat .env"}}')"
-WARN=$(stderr_bash "$SG" '{"tool_input":{"command":"cat .env"}}')
+# Command secrets are handled by the shell guard. Default policy = block (exit 2);
+# Claude wires SECRET_POLICY=warn → exit 0 with a warning (the approval flow).
+SH="$HOOKS_DIR/specpipe-shell-guard.sh"
+assert_exit "shell default: cat .env blocked"   2 "$(exit_bash "$SH" '{"tool_input":{"command":"cat .env"}}')"
+assert_exit "shell warn: cat .env exit 0"       0 "$(exit_bash "$SH" '{"tool_input":{"command":"cat .env"}}' "SECRET_POLICY=warn")"
+WARN=$(SECRET_POLICY=warn stderr_bash "$SH" '{"tool_input":{"command":"cat .env"}}')
 assert_contains "warn: message says Warning"    "Warning" "$WARN"
 
-# Allow: bash with .env.example is fine
-assert_exit "allow: bash cat .env.example"      0 "$(exit_bash "$SG" '{"tool_input":{"command":"cat .env.example"}}')"
+# Allow: command with .env.example is fine
+assert_exit "allow: bash cat .env.example"      0 "$(exit_bash "$SH" '{"tool_input":{"command":"cat .env.example"}}')"
 
 # SENSITIVE_GUARD_EXTRA extends blocked patterns
 # Use .conf extension — yaml/yml are in fast_path_safe so is_sensitive() would be skipped for them
@@ -248,7 +267,7 @@ assert_exit "block: .conf file with EXTRA" 2 \
   "$(exit_bash "$SG" '{"tool_input":{"file_path":"firebase.conf"}}' "SENSITIVE_GUARD_EXTRA=firebase\\.conf")"
 
 # ── More key/cert types ───────────────────────────────────────────────────────
-section "sensitive-guard.sh — extended file type coverage"
+section "specpipe-read-guard.sh — extended file type coverage"
 
 assert_exit "block: .pypirc"                     2 "$(exit_bash "$SG" '{"tool_input":{"file_path":".pypirc"}}')"
 assert_exit "block: .netrc"                      2 "$(exit_bash "$SG" '{"tool_input":{"file_path":".netrc"}}')"
@@ -288,23 +307,24 @@ assert_exit "block: .env.ci"         2 "$(exit_bash "$SG" '{"tool_input":{"file_
 assert_exit "block: tool_input.path = id_rsa"    2 "$(exit_bash "$SG" '{"tool_input":{"path":"id_rsa"}}')"
 assert_exit "allow: tool_input.path = src/index" 0 "$(exit_bash "$SG" '{"tool_input":{"path":"src/index.ts"}}')"
 
-# ── Bash command warn cases ───────────────────────────────────────────────────
-assert_exit "warn exit 0: command references id_rsa"             0 "$(exit_bash "$SG" '{"tool_input":{"command":"ssh -i id_rsa user@host"}}')"
-assert_exit "warn exit 0: command references cert.pem"           0 "$(exit_bash "$SG" '{"tool_input":{"command":"openssl x509 -in cert.pem -text"}}')"
-assert_exit "warn exit 0: command references serviceAccountKey"  0 "$(exit_bash "$SG" '{"tool_input":{"command":"gcloud auth activate-service-account --key-file=serviceAccountKey.json"}}')"
-assert_exit "warn exit 0: command references credentials.json"   0 "$(exit_bash "$SG" '{"tool_input":{"command":"cat mycredentials.json"}}')"
-WARN_KEY=$(stderr_bash "$SG" '{"tool_input":{"command":"ssh -i id_rsa user@host"}}')
+# ── Shell command secret cases (shell guard, warn policy = Claude's mode) ─────
+assert_exit "warn: command references id_rsa"             0 "$(exit_bash "$SH" '{"tool_input":{"command":"ssh -i id_rsa user@host"}}' "SECRET_POLICY=warn")"
+assert_exit "warn: command references cert.pem"           0 "$(exit_bash "$SH" '{"tool_input":{"command":"openssl x509 -in cert.pem -text"}}' "SECRET_POLICY=warn")"
+assert_exit "warn: command references serviceAccountKey"  0 "$(exit_bash "$SH" '{"tool_input":{"command":"gcloud auth activate-service-account --key-file=serviceAccountKey.json"}}' "SECRET_POLICY=warn")"
+assert_exit "warn: command references credentials.json"   0 "$(exit_bash "$SH" '{"tool_input":{"command":"cat mycredentials.json"}}' "SECRET_POLICY=warn")"
+assert_exit "block (default): command references id_rsa"  2 "$(exit_bash "$SH" '{"tool_input":{"command":"ssh -i id_rsa user@host"}}')"
+WARN_KEY=$(SECRET_POLICY=warn stderr_bash "$SH" '{"tool_input":{"command":"ssh -i id_rsa user@host"}}')
 assert_contains "warn message for id_rsa in command" "Warning" "$WARN_KEY"
-assert_exit "allow: command no sensitive references" 0 "$(exit_bash "$SG" '{"tool_input":{"command":"git status"}}')"
+assert_exit "allow: command no sensitive references" 0 "$(exit_bash "$SH" '{"tool_input":{"command":"git status"}}')"
 
 # ── .agentignore integration ──────────────────────────────────────────────────
-section "sensitive-guard.sh — .agentignore"
+section "specpipe-read-guard.sh — .agentignore"
 
 AGENTDIR=$(mktemp -d "$PWD/.test-agentignore-XXXXXXXX")
 printf 'internal-config.dat\nreports/\n# comment line\n\nsecrets.bin\n' > "$AGENTDIR/.agentignore"
 
 # Run hook FROM the dir that has .agentignore so the hook finds it at cwd
-SG_ABS="$HOOKS_DIR/sensitive-guard.sh"
+SG_ABS="$HOOKS_DIR/specpipe-read-guard.sh"
 assert_exit "block: file listed in .agentignore (exact basename)" 2 \
   "$(cd "$AGENTDIR" && bash "$SG_ABS" <<< '{"tool_input":{"file_path":"internal-config.dat"}}' && echo 0 || echo $?)"
 assert_exit "block: file listed in .agentignore (another entry)" 2 \
@@ -562,6 +582,18 @@ OUT_OUTSIDE=$(stdout_node "$FG" "{\"tool_input\":{\"file_path\":\"$OUTSIDE\"}}")
 assert_not_contains "no warning: file outside project dir" "Warning" "$OUT_OUTSIDE"
 rm -f "$OUTSIDE"
 
+# ── Cursor payload: postToolUse Write → additional_context warning ────────────
+# Cursor's generic postToolUse fires for every tool; the guard self-filters to writes
+# by tool_name, scopes via workspace_roots, and injects via `additional_context`.
+CUR_BIG="{\"tool_name\":\"Write\",\"cursor_version\":\"2026.06\",\"hook_event_name\":\"postToolUse\",\"workspace_roots\":[\"$PWD\"],\"tool_input\":{\"file_path\":\"$LARGE\"}}"
+OUT_CUR=$(stdout_node "$FG" "$CUR_BIG")
+assert_contains     "cursor: large write → warning"            "Warning"             "$OUT_CUR"
+assert_contains     "cursor: warning via additional_context"   '"additional_context"' "$OUT_CUR"
+assert_not_contains "cursor: not Claude hookSpecificOutput"    '"continue"'           "$OUT_CUR"
+# Self-filter: a Read tool (not a write) must be ignored even for a large file.
+CUR_READ="{\"tool_name\":\"Read\",\"cursor_version\":\"2026.06\",\"hook_event_name\":\"postToolUse\",\"workspace_roots\":[\"$PWD\"],\"tool_input\":{\"file_path\":\"$LARGE\"}}"
+assert_not_contains "cursor: Read tool self-filtered (no warning)" "Warning" "$(stdout_node "$FG" "$CUR_READ")"
+
 # ── Threshold boundary conditions ─────────────────────────────────────────────
 section "file-guard.js — boundary and exclusion tests"
 
@@ -611,48 +643,6 @@ fi
 
 # Malformed JSON → exits 0
 assert_exit "exits 0: malformed JSON" 0 "$(exit_node "$FG" 'not json')"
-
-# ══════════════════════════════════════════════════════════════════════════════
-# self-review.sh
-# ══════════════════════════════════════════════════════════════════════════════
-section "self-review.sh"
-
-SR="$HOOKS_DIR/self-review.sh"
-
-# Always exits 0 (non-blocking)
-assert_exit "always exits 0" 0 "$(exit_bash "$SR" '')"
-
-# Outputs valid JSON with continue: true
-OUT_SR=$(stdout_bash "$SR" '')
-assert_contains "outputs JSON with continue:true"  '"continue": true' "$OUT_SR"
-assert_contains "output includes checklist content" "TODO" "$OUT_SR"
-
-# SELF_REVIEW_ENABLED=false → exits 0 with no output
-OUT_OFF=$(SELF_REVIEW_ENABLED=false bash "$SR" 2>/dev/null <<< '' || true)
-assert_not_contains "disabled: no output"  "continue" "$OUT_OFF"
-assert_exit "disabled: exits 0" 0 "$(exit_bash "$SR" '' SELF_REVIEW_ENABLED=false)"
-
-# ── Checklist content ─────────────────────────────────────────────────────────
-section "self-review.sh — checklist content"
-
-OUT_SR_FULL=$(stdout_bash "$SR" '')
-assert_contains "checklist: mentions TODO/FIXME"          "TODO"                   "$OUT_SR_FULL"
-assert_contains "checklist: mentions mock/fake"           "mock"                   "$OUT_SR_FULL"
-assert_contains "checklist: mentions placeholder comment" "placeholder"            "$OUT_SR_FULL"
-assert_contains "checklist: mentions compile/typecheck"   "compile"                "$OUT_SR_FULL"
-assert_contains "checklist: mentions test suite"          "test"                   "$OUT_SR_FULL"
-assert_contains "checklist: output parseable as JSON"     '"continue": true'       "$OUT_SR_FULL"
-
-# Verify output is valid JSON (pipe to node to avoid quoting issues)
-JSON_VALID=$(printf '%s' "$OUT_SR_FULL" | node -e "
-const chunks = [];
-process.stdin.on('data', d => chunks.push(d));
-process.stdin.on('end', () => {
-  try { JSON.parse(chunks.join('')); process.stdout.write('ok'); }
-  catch(e) { process.stdout.write('fail'); }
-});
-" 2>/dev/null || echo "fail")
-assert_contains "self-review output is valid JSON" "ok" "$JSON_VALID"
 
 # ══════════════════════════════════════════════════════════════════════════════
 # Summary

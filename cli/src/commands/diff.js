@@ -16,7 +16,7 @@ export async function diffCommand(path) {
     process.exit(1);
   }
 
-  const desired = await computeDesired(getAgents(manifest));
+  const desired = await computeDesired(getAgents(manifest), manifest.skills ? new Set(manifest.skills) : null);
   let hasDiffs = false;
 
   for (const [file, d] of desired) {

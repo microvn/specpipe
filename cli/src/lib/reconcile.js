@@ -1,10 +1,10 @@
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { hashContent } from './hasher.js';
-import { getAllFiles, COMPONENTS, getTemplateDir } from './installer.js';
-import { emitFile, emitRules } from './agents.js';
+import { getAllFiles, COMPONENTS, getTemplateDir, skillAllowed } from './installer.js';
+import { emitFile, emitRules, AGENTS } from './agents.js';
 
-export const GUARDS_TEMPLATE_REL = 'rules/specpipe-guards.md';
+export const RULES_TEMPLATE_REL = 'rules/specpipe-rules.md';
 
 /**
  * Template files a given agent receives. Claude gets the full kit
@@ -13,7 +13,11 @@ export const GUARDS_TEMPLATE_REL = 'rules/specpipe-guards.md';
  * hooks are Claude-specific.
  */
 export function templateFilesForAgent(agentId) {
-  return agentId === 'claude' ? getAllFiles() : COMPONENTS.skills;
+  if (agentId === 'claude') return getAllFiles();
+  // Agents that don't read project-local skills (Hermes scans only ~/.hermes/skills/)
+  // get no per-project skill files — they'd be dead. Their rules doc is still emitted.
+  if (AGENTS[agentId]?.perProjectSkills === false) return [];
+  return COMPONENTS.skills;
 }
 
 /**
@@ -22,13 +26,14 @@ export function templateFilesForAgent(agentId) {
  * @returns {Promise<Map<string, {agent, templateRel, content, kitHash}>>}
  *          keyed by installed (on-disk) relative path.
  */
-export async function computeDesired(agents) {
+export async function computeDesired(agents, skillsSet = null) {
   const dir = getTemplateDir();
   const desired = new Map();
-  const guardsBody = await readFile(join(dir, GUARDS_TEMPLATE_REL), 'utf-8');
+  const guardsBody = await readFile(join(dir, RULES_TEMPLATE_REL), 'utf-8');
 
   for (const agent of agents) {
     for (const templateRel of templateFilesForAgent(agent)) {
+      if (!skillAllowed(templateRel, skillsSet)) continue;
       const content = await readFile(join(dir, templateRel), 'utf-8');
       const emitted = emitFile(agent, templateRel, content);
       desired.set(emitted.path, {
@@ -43,10 +48,10 @@ export async function computeDesired(agents) {
     // are reconciled like any other file. Codex's AGENTS.md is shared, not owned
     // here — it's merged/stripped separately.
     const rules = emitRules(agent, guardsBody);
-    if (rules && rules.mode !== 'agents-md') {
+    if (rules && rules.mode !== 'merge') {
       desired.set(rules.path, {
         agent,
-        templateRel: GUARDS_TEMPLATE_REL,
+        templateRel: RULES_TEMPLATE_REL,
         content: rules.content,
         kitHash: hashContent(rules.content),
       });

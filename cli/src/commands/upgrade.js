@@ -6,9 +6,10 @@ import { fileURLToPath } from 'node:url';
 import { homedir } from 'node:os';
 import { log } from '../lib/logger.js';
 import { readManifest, writeManifest, setFileEntry, refreshCustomizationStatus, getAgents } from '../lib/manifest.js';
-import { setPermissions, COMPONENTS, installSkillGlobal, getGlobalSkillsDir, installHookGlobal, getGlobalHooksDir, mergeGlobalSettings, installAgentRules, installAgentHooks } from '../lib/installer.js';
+import { setPermissions, installAgentRules, installAgentHooks } from '../lib/installer.js';
 import { agentRulesMode, agentHasHooks } from '../lib/agents.js';
 import { computeDesired } from '../lib/reconcile.js';
+import { initGlobal } from './init-global.js';
 import { unlink } from 'node:fs/promises';
 
 const GLOBAL_MANIFEST = join(homedir(), '.claude', '.devkit-manifest.json');
@@ -16,60 +17,21 @@ const GLOBAL_MANIFEST = join(homedir(), '.claude', '.devkit-manifest.json');
 async function readGlobalManifest() {
   try { return JSON.parse(await readFile(GLOBAL_MANIFEST, 'utf-8')); } catch { return null; }
 }
-async function writeGlobalManifest(data) {
-  await mkdir(join(homedir(), '.claude'), { recursive: true });
-  await writeFile(GLOBAL_MANIFEST, JSON.stringify(data, null, 2) + '\n');
-}
 
 export async function upgradeGlobal({ force = false } = {}) {
-  const globalSkillsDir = getGlobalSkillsDir();
-  await mkdir(globalSkillsDir, { recursive: true });
-
   const meta = await readGlobalManifest() || {};
-  const globalFiles = meta.files || {};
-  const updatedFiles = { ...globalFiles };
+  const agents = meta.globalAgents || (meta.globalInstalled ? ['claude'] : ['claude']);
 
-  log.blank();
-  console.log('--- Upgrading global skills ---');
-  let updated = 0; let skipped = 0; let identical = 0;
-
-  for (const relPath of COMPONENTS.skills) {
-    const { result, kitHash } = await installSkillGlobal(relPath, globalSkillsDir, { force, globalFiles });
-    if (result === 'copied') updated++;
-    else if (result === 'identical') identical++;
-    else skipped++;
-    if (result !== 'skipped') updatedFiles[relPath] = { kitHash };
-  }
-
-  let skillParts = [`${updated} updated`, `${identical} unchanged`];
-  if (skipped > 0) skillParts.push(`${skipped} customized (use --force to overwrite)`);
-  log.pass(`Global skills: ${skillParts.join(', ')}`);
-
-  // Upgrade hooks if previously installed globally
-  if (meta.globalHooksInstalled) {
-    const globalHooksDir = getGlobalHooksDir();
-    await mkdir(globalHooksDir, { recursive: true });
-
-    log.blank();
-    console.log('--- Upgrading global hooks ---');
-    let hUpdated = 0; let hSkipped = 0; let hIdentical = 0;
-
-    for (const relPath of COMPONENTS.hooks) {
-      const { result, kitHash } = await installHookGlobal(relPath, globalHooksDir, { force, globalFiles });
-      if (result === 'copied') hUpdated++;
-      else if (result === 'identical') hIdentical++;
-      else hSkipped++;
-      if (result !== 'skipped') updatedFiles[relPath] = { kitHash };
-    }
-
-    await mergeGlobalSettings(globalHooksDir);
-
-    let hookParts = [`${hUpdated} updated`, `${hIdentical} unchanged`];
-    if (hSkipped > 0) hookParts.push(`${hSkipped} customized (use --force to overwrite)`);
-    log.pass(`Global hooks: ${hookParts.join(', ')}`);
-  }
-
-  await writeGlobalManifest({ ...meta, globalInstalled: true, files: updatedFiles, updatedAt: new Date().toISOString() });
+  // initGlobal is idempotent + customization-aware, so it doubles as the upgrade
+  // path. It refreshes every agent installed globally (plus Claude hooks if any) and
+  // rewrites the manifest.
+  await initGlobal({
+    agents,
+    skills: meta.skills ? new Set(meta.skills) : null,
+    hookSelection: meta.hooks ? new Set(meta.hooks) : null,
+    force,
+    hooks: meta.globalHooksInstalled || false,
+  });
 
   // Warn about per-project skills that shadow global
   const projects = meta.projects || [];
@@ -112,9 +74,11 @@ export async function upgradeCommand(path, opts) {
     log.blank();
   }
 
-  // Desired installed state for every agent this project targets.
+  // Desired installed state for every agent this project targets, honoring the
+  // skill selection recorded at install time (so upgrade doesn't resurrect skills
+  // the user deselected).
   const agents = getAgents(manifest);
-  const desired = await computeDesired(agents);
+  const desired = await computeDesired(agents, manifest.skills ? new Set(manifest.skills) : null);
 
   let updated = 0;
   let skippedCustomized = 0;
@@ -183,9 +147,10 @@ export async function upgradeCommand(path, opts) {
   // merged (not reconciled via computeDesired), so re-merge it here to pick up kit
   // changes. Owned rule files were already handled by the reconcile loop above.
   if (!opts.dryRun) {
+    const hooksSet = manifest.hooks ? new Set(manifest.hooks) : null;
     for (const agent of agents) {
-      if (agentRulesMode(agent) === 'agents-md') await installAgentRules(agent, targetDir, { force: opts.force });
-      if (agentHasHooks(agent)) await installAgentHooks(agent, targetDir, { force: opts.force });
+      if (agentRulesMode(agent) === 'merge') await installAgentRules(agent, targetDir, { force: opts.force });
+      if (agentHasHooks(agent)) await installAgentHooks(agent, targetDir, { force: opts.force, hooks: hooksSet });
     }
   }
 

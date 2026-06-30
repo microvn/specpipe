@@ -58,8 +58,45 @@ Don't jump to code. Understand the bug first:
 | Integration failure | Timeout, unexpected response | External API calls, service boundaries |
 | Config drift | Works locally, fails in staging/prod | Env vars, feature flags, DB state |
 | Stale cache | Shows old data, fixes on cache clear | Redis, CDN, browser cache |
+| Lifecycle/parity/cascade | Correct on one state/viewer/surface but wrong on another | `## Behavior Matrix`, read models, queues, dashboard counts, feed, notifications, APIs |
 
 5. **Reproduce deterministically.** If you can't trigger the bug reliably → gather more evidence. Do NOT guess.
+
+6. **Behavior Matrix mapping.** If a related spec contains `## Behavior Matrix`, or the bug mentions status/state, role/viewer, list/detail/worklist/dashboard/feed/API/email/calendar, classify the bug before writing the test:
+
+```
+BM BUG CLASSIFICATION
+════════════════════════════════
+State/status:    <state or transition, e.g. Confirmed -> Rescheduled>
+Viewer/role:     <actor/viewer/relationship, e.g. assigned trainer>
+Surface/path:    <list/detail/API/feed/calendar/etc.>
+Matrix cell:     BM.AS-NNN.<surface> | GAP-NNN | N/A:<reason> | NO_CELL
+Bug class:       lifecycle | viewer-parity | surface-parity | cascade | external-down | other
+Spec status:     covered | gap-open | suspicious-N/A | missing-cell
+```
+
+If the bug maps to `NO_CELL`, `GAP`, or suspicious `N/A`, the fix may still proceed, but Phase 5 must emit a Spec Update Signal. Do not silently fix behavior that the spec cannot name.
+
+Use the invariant registry README/schema as base knowledge; README examples are not runtime entries. Then read project-local invariant entries if present: `docs/invariants/INV-*.md`. If an invariant matches the component or bug class, include it in the hypothesis and regression test. Status handling:
+- `enforced` → the fix must preserve or update the referenced `test_ref` / equivalent regression.
+- `confirmed` → add/update a regression that proves the invariant for the touched component when feasible.
+- `candidate` → use as an investigation hint; do not treat it as a hard build requirement unless the bug confirms it.
+- `retired` → ignore unless this fix reintroduces the retired component.
+
+**Sibling Discovery Pass (candidate only):** Run this for lifecycle/parity/cascade bugs, existing-operation fixes, or any bug whose symptom names one surface but the operation may exist on sibling entry-points. This is the same recipe as `/sp-explore` Phase 0.5, scoped to the bug:
+
+1. Seed nouns/verbs from the raw symptom, failing test, touched component, and matching invariant entries.
+2. Find shared-anchor callers (`ga_callers` if GA is available; otherwise grep) for helpers/constants/schemas that define the operation.
+3. Fuzzy-search parallel names such as `create_from_*`, `*_from_<source>`, `send_*invite*`, `*_outcome*`, `reschedule*`, `book_next*`, `cancel*`, `delete*`, plus domain verbs from the symptom.
+4. Inspect recent git co-change around touched files (`git log --name-only -- <seed-file>`) for repeatedly paired files/functions.
+
+Record a `Sibling Candidate Table` in the investigation notes:
+
+| Candidate | Operation | Evidence | Confidence | Fix disposition |
+|---|---|---|---|---|
+| `<surface/path/symbol>` | same create/update/delete/send/read op? | ga_callers / grep / co-change / invariant / symptom | high / medium / low | test-now / spec-GAP / ignore(reason) |
+
+Do not auto-fix candidates. `test-now` means this bug confirms the sibling belongs in the regression scope. `spec-GAP` means emit a Spec Update Signal because behavior/scope is unclear. `ignore(reason)` means false positive or intentionally out of scope.
 
 > **If GA available, lean on it for steps 2 and 4.** `ga_symbols` resolves names, `ga_callers`/`ga_callees` map the call graph, `ga_impact` returns blast radius + test gaps + risk, `ga_architecture` reveals which module/layer (auth, payment, core) the bug sits in, `ga_risk` scores whether a change here is safe. If GA is unavailable, fall back to grep + `git log` + manual reading.
 
@@ -124,6 +161,16 @@ All test commands below use `TEST_CMD` to mean the resolved command. For filtere
 
 **REGRESSION RULE:** If the bug exists because the diff changed existing behavior AND no test covered that path → this is a regression. A regression test is a **CRITICAL requirement.** Add the comment: `// Regression: <bug> — <file:line> broke this path`
 
+**BEHAVIOR MATRIX REGRESSION RULE:** If Phase 0 mapped the bug to `BM.AS-NNN.<surface>`, the failing test name or description MUST include the AS id or BM id. Prefer the most specific form:
+
+```
+it("BM.AS-012 appointment-list preserves assigned trainer after reschedule", ...)
+```
+
+If the bug maps to `GAP-NNN`, name the test with the eventual AS only after the spec is resolved; until then write a targeted reproduction if needed but mark the Phase 5 status `DONE_WITH_CONCERNS` and emit Spec Update Signal.
+
+If the bug maps to `NO_CELL`, add the reproduction test only if the expected behavior is already unambiguous from product behavior or user instruction. Otherwise stop and request spec clarification before coding.
+
 Write a test that reproduces the bug. It **MUST fail** with current code.
 
 Verify filter match first (see "Filter pattern verification" in the Test Command section). Then run:
@@ -176,6 +223,7 @@ Make the **minimal change** needed.
 **Similar-risk scan (MANDATORY after fix, before Phase 3):** Grep for the same pattern that caused this bug, scoped to:
 1. The same file as the fix (all sibling functions in the fixed file).
 2. Direct callers of the fixed function (one level up — if GA available, `ga_callers`; otherwise grep or IDE refs).
+3. For lifecycle/parity/cascade bugs: sibling surfaces from the Behavior Matrix, handoff axes, project-local invariant entries, and this run's Sibling Candidate Table (list/detail/worklist/dashboard/feed/API/email/calendar/search/export/audit). This is a scan, not an auto-fix.
 
 Do NOT auto-fix findings — the minimal-fix rule stands. Record each under Phase 5 `SIMILAR_RISK:` as `<file:line> — same pattern, unguarded`.
 
@@ -187,6 +235,7 @@ Do NOT auto-fix findings — the minimal-fix rule stands. Record each under Phas
 
 1. Run the bug test: `TEST_CMD --filter "<test name>"` → must PASS.
 2. Run full suite: `TEST_CMD` → no regressions.
+3. For `BM.AS-NNN` fixes, verify the relevant cell-level test is not vacuous: it must assert the named surface/source/timing. A test that mocks the exact boundary under test (API projection, read-model query, queue/feed, email provider, calendar provider) is not sufficient by itself.
 
 If other tests break → the fix caused a regression. Investigate. Do NOT weaken existing tests.
 
@@ -205,6 +254,14 @@ Prevention: <suggest one: type constraint, validation, lint rule, spec update (i
 
 This is non-optional for serious bugs. For trivial bugs, the fix summary is enough.
 
+For lifecycle/parity/cascade bugs, include:
+
+```
+Behavior Matrix cell: <BM.AS-NNN.surface | GAP-NNN | NO_CELL>
+Invariant impact: <existing invariant preserved | new invariant should be logged | none>
+Regression class: <carry-forward | viewer-relative | invite-on-reschedule | orphan cleanup | stale projection | other>
+```
+
 ---
 
 ## Phase 5: Summary
@@ -221,6 +278,8 @@ Evidence:        <paste raw failing-then-passing test output, verbatim>
 Regression test: <file:test name>
 Full suite:      All passing ✓
 Similar risk:    [SIMILAR_RISK findings from Phase 2 scan, or "none"]
+Behavior Matrix: <BM.AS-NNN.surface | GAP-NNN | NO_CELL | N/A>
+Invariant:       <matched invariant / new invariant recommended / none>
 Manual needed:   [→MANUAL gaps, or "none"]
 Status:          DONE | DONE_WITH_CONCERNS | BLOCKED
 ════════════════════════════════════════
@@ -237,6 +296,8 @@ After fixing, check these conditions. If ANY is true → **must** signal.
 | S1 | Fix covers an edge case or error path with no corresponding AS in the spec |
 | S2 | Bug existed because an AS described wrong behavior — After fix, code and AS now conflict |
 | S3 | Fix adds a new constraint or guard (null check, balance guard, validation) not in spec |
+| S4 | Bug maps to `NO_CELL`, `GAP-NNN`, or suspicious `N/A` in `## Behavior Matrix` |
+| S5 | Fix reveals a repeated lifecycle/parity/cascade invariant not present in invariant logs |
 
 **Do not signal when:**
 - Fix is a clear typo/off-by-one — code was always wrong relative to spec, no new behavior
@@ -245,7 +306,18 @@ After fixing, check these conditions. If ANY is true → **must** signal.
 **Signal format:**
 ```
 ⚠️ Spec Update Needed — run `/sp-plan docs/specs/<feature>/<feature>.md '<describe change>'`
-Reason: [S1 | S2 | S3] — <one line: what is missing or mismatched>
+Reason: [S1 | S2 | S3 | S4 | S5] — <one line: what is missing or mismatched>
+```
+
+If S5 applies, also emit:
+
+```
+⚠️ Invariant Log Update Needed
+Component: <component/module>
+Invariant: <state/viewer/surface rule that must stay true>
+Reason: repeated bug class — <carry-forward/viewer-relative/invite-on-reschedule/orphan/etc.>
+Suggested registry path: docs/invariants/INV-###-<short-name>.md
+Suggested status: candidate (promote to confirmed when accepted; enforced only when test_ref exists and passes)
 ```
 
 ## Multiple Bugs

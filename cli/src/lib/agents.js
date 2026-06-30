@@ -91,7 +91,8 @@ export const AGENTS = {
     label: 'Claude Code',
     // Verified: code.claude.com/docs/en/skills
     skillTarget: (name, inner) => `.claude/skills/${name}/${inner}`,
-    globalRoot: '.claude/skills',
+    // Global (user-level) skills dir, relative to home. Verified: ~/.claude/skills/.
+    globalSkillRoot: '.claude/skills',
     skillFile: 'SKILL.md',
     hooks: 'native',
     capabilities: 'full',
@@ -104,9 +105,12 @@ export const AGENTS = {
     label: 'Antigravity',
     // Verified: official Google Codelab — .agents/skills/<name>/SKILL.md
     skillTarget: (name, inner) => `.agents/skills/${name}/${inner}`,
-    globalRoot: '.agents/skills',
+    // Global differs from the project path: Antigravity CLI reads ~/.gemini/antigravity-cli/skills/
+    // (the IDE uses ~/.gemini/config/skills/ and also reads ~/.agents/skills/). Verified: Google
+    // Antigravity codelab. We target the CLI's global dir.
+    globalSkillRoot: '.gemini/antigravity-cli/skills',
     skillFile: 'SKILL.md',
-    hooks: 'rules', // guards emitted to .agent/rules/ (plain markdown)
+    hooks: 'rules', // guards emitted to .agents/rules/ (plain markdown)
     capabilities: 'router-no-hooks',
     emitFrontmatter: fmNameDesc,
   },
@@ -114,7 +118,9 @@ export const AGENTS = {
     label: 'OpenClaw',
     // Verified: github.com/openclaw/openclaw  skills/<name>/SKILL.md
     skillTarget: (name, inner) => `skills/${name}/${inner}`,
-    globalRoot: 'skills',
+    // Verified (docs.openclaw.ai): global skills live in ~/.openclaw/skills/ (the `--global`
+    // target; OpenClaw also reads ~/.agents/skills/).
+    globalSkillRoot: '.openclaw/skills',
     skillFile: 'SKILL.md',
     hooks: 'none',
     capabilities: 'router-no-hooks',
@@ -122,9 +128,14 @@ export const AGENTS = {
   },
   hermes: {
     label: 'Hermes-Agent',
-    // Verified: github.com/NousResearch/hermes-agent  optional-skills/<cat>/<name>/SKILL.md
-    skillTarget: (name, inner) => `optional-skills/specpipe/${name}/${inner}`,
-    globalRoot: 'optional-skills/specpipe',
+    // Hermes discovers skills ONLY from ~/.hermes/skills/ ("the primary directory and source
+    // of truth") + explicitly-configured external_dirs — it does NOT scan the project/workspace.
+    // So per-project skill files are dead (never read); Hermes is global-only for skills. The
+    // skillTarget is still used to shape the GLOBAL emission (globalSkillRoot + name + inner).
+    // Source: hermes-agent.nousresearch.com/docs/user-guide/features/skills
+    skillTarget: (name, inner) => `${name}/${inner}`,
+    perProjectSkills: false,
+    globalSkillRoot: '.hermes/skills',
     skillFile: 'SKILL.md',
     hooks: 'none',
     capabilities: 'router-no-hooks',
@@ -136,7 +147,10 @@ export const AGENTS = {
     // Skills live in the vendor-neutral `.agents/skills/` (NOT `.codex/skills/`, which
     // is a known non-working path — openai/codex#15136). Custom-prompts are deprecated.
     skillTarget: (name, inner) => `.agents/skills/${name}/${inner}`,
-    globalRoot: '.agents/skills',
+    // Global differs from the project path: Codex reads user skills from ~/.codex/skills/
+    // (ships system skills in ~/.codex/skills/.system), NOT ~/.agents/skills/. Verified:
+    // developers.openai.com/codex/skills.
+    globalSkillRoot: '.codex/skills',
     skillFile: 'SKILL.md',
     hooks: 'agents-md', // guards fold into AGENTS.md (plain markdown, no frontmatter)
     capabilities: 'router-no-hooks',
@@ -149,7 +163,10 @@ export const AGENTS = {
     // Skills are on-demand (/skill, @skill) — the correct home, not always-on .mdc rules.
     // Guards stay an always-on .cursor/rules/*.mdc (see RULES.cursor).
     skillTarget: (name, inner) => `.cursor/skills/${name}/${inner}`,
-    globalRoot: '.cursor/skills',
+    // Cursor reads a user-level skills dir at ~/.cursor/skills/ (verified: cursor.com/docs/skills
+    // — it loads .cursor/skills, .agents/skills, ~/.cursor/skills, ~/.agents/skills, plus
+    // .claude/.codex for compat). So `--global` installs Cursor's own global skills here.
+    globalSkillRoot: '.cursor/skills',
     skillFile: 'SKILL.md',
     hooks: 'rules', // advisory now; Cursor DOES support blocking hooks (.cursor/hooks.json) — roadmapped
     capabilities: 'router-no-hooks',
@@ -205,6 +222,26 @@ export function emitSkillFile(agentId, canonicalRel, content) {
   return { path, content: compose(agent.emitFrontmatter(parsed, skill), body) };
 }
 
+/**
+ * Emit one skill file for an agent's GLOBAL (user-level) install. Same per-agent
+ * content transformation as emitSkillFile, but the returned path is rooted at the
+ * agent's home-relative globalSkillRoot — which differs from the project skillTarget
+ * for Codex (~/.codex/skills), Antigravity (~/.gemini/antigravity-cli/skills), etc.
+ * Returns null when the agent has no native global skills dir (Cursor) or the input
+ * isn't a skill file.
+ * @returns {{ path: string, content: string } | null} path is relative to the user's home dir
+ */
+export function emitSkillFileGlobal(agentId, canonicalRel, content) {
+  const agent = AGENTS[agentId];
+  if (!agent) throw new Error(`Unknown agent: ${agentId}`);
+  if (!agent.globalSkillRoot) return null;
+  const parts = parseSkillPath(canonicalRel);
+  if (!parts) return null;
+  const emitted = emitSkillFile(agentId, canonicalRel, content);
+  if (!emitted) return null;
+  return { path: `${agent.globalSkillRoot}/${parts.skill}/${parts.inner}`, content: emitted.content };
+}
+
 /** Tools a canonical skill declares (from its `allowed-tools` frontmatter). */
 function toolsOf(parsed) {
   const block = getKeyBlock(parsed, 'allowed-tools');
@@ -251,7 +288,12 @@ function adaptBody(agentId, body, tools) {
   let out = rewriteAsk(body);
 
   if (has('Agent') || has('Task')) {
-    out = `${out.replace(/\s*$/, '')}\n\n---\n\n## Running on ${AGENTS[agentId].label}\n\n` +
+    // Header is agent-NEUTRAL on purpose: codex and antigravity share the same
+    // emit path (.agents/skills/<name>/), so the caveat must be byte-identical
+    // between them or computeDesired's Map sees divergent content and a clean
+    // install false-flags the file as "customized". The caveat text is already
+    // runtime-agnostic, so a fixed heading loses nothing.
+    out = `${out.replace(/\s*$/, '')}\n\n---\n\n## Running outside Claude Code\n\n` +
       '- **Subagents:** parts of this skill describe Claude subagent orchestration ' +
       '(parallel waves, worktrees, auto-mode dispatch). If your runtime has no ' +
       'subagents, do that work yourself — one item at a time, sequentially, in this ' +
@@ -275,6 +317,6 @@ export function emitFile(agentId, templateRel, content) {
 // Guardrails (advisory rules) + enforced (blocking) hooks live in agent-guards.js;
 // re-exported here so callers keep importing them from agents.js.
 export {
-  GUARDS_BEGIN, GUARDS_END, HOOKS_SRC_DIR,
+  RULES_BEGIN, RULES_END, HOOKS_SRC_DIR,
   agentRulesMode, emitRules, agentHasHooks, emitHooks,
 } from './agent-guards.js';

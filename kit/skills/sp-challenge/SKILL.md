@@ -30,6 +30,7 @@ Map the plan's attack surface:
 - Scope boundaries (in/out/suspiciously unmentioned)
 - Risk acknowledgments (mentioned vs. conspicuously absent)
 - Story↔AS consistency (stories without acceptance scenarios? contradictions?)
+- Behavior Matrix coverage if present: every state/viewer/surface cell, its AS/GAP/N/A coverage, suspicious N/A cells, weak AS cells, missing surfaces, and cascade/parity obligations
 
 Collect all file paths the reviewers will need to read.
 
@@ -42,8 +43,10 @@ Assess plan complexity and select which lenses to deploy:
 | Simple (1 spec section, <20 acceptance scenarios, no auth/data) | 2 | Assumptions + Scope |
 | Standard (multiple sections, auth or data involved) | 3 | + Security |
 | Complex (multiple integrations, concurrency, migrations, 6+ phases) | 4 | + Failure Modes |
+| Behavior Matrix present (`## Behavior Matrix`) | +1 reviewer, replacing the lowest-value generic lens if needed to stay capped at 4 | + Lifecycle & Parity |
 
 When in doubt, use 3 reviewers. 4 is for genuinely complex plans.
+If `## Behavior Matrix` exists, always include the Lifecycle & Parity lens. This lens is not optional: the matrix exists because the feature has state/viewer/surface risk.
 
 ## Phase 3: Spawn Parallel Reviewers
 
@@ -152,6 +155,33 @@ Examine the plan for:
 - Test burden: Test cases harder to maintain than the feature itself?
 ```
 
+**Lifecycle & Parity Adversary (Behavior Matrix lens):**
+```
+You are the QA lead who historically found state/viewer/surface bugs on staging. Your job is to attack the Behavior Matrix before code exists.
+
+Use ONLY the plan's stated states, viewers, surfaces, AS, GAP, N/A, constraints, linked fields, and impact map. Do not invent unrelated edge cases. Focus on whether the matrix faithfully covers the behavior the plan already triggered.
+
+Examine the plan for:
+- Missing axes: states/statuses, viewer roles/relationships, or surfaces named elsewhere in the spec but absent from `## Behavior Matrix`.
+- Missing sibling discovery: if the plan changes an existing operation or bug-fix path, check whether it has `## Sibling Surface Map` or an explicit reason discovery is not applicable. High/medium sibling candidates must be `cover`, `GAP-NNN`, or `ignore(reason)`; only `cover` candidates may feed Behavior Matrix surfaces.
+- Missing invariant context: if the plan touches a component named by project-local `docs/invariants/INV-*.md`, confirm the relevant invariant is represented in Constraints, GAPs, Behavior Matrix, or explicitly ignored with a reason. Use the invariant registry README/schema as base knowledge only; README examples are not runtime entries. Do not invent new invariant entries here.
+- Suspicious N/A cells: any `N/A` that could actually occur, lacks a concrete reason, or hides a known QA failure mode.
+- GAP triage: any `GAP` cell that is too important to leave open before build because code would otherwise guess behavior.
+- Weak AS cells: an AS referenced by a matrix cell but not asserting the same state, viewer, surface, source/timing, label/visibility/action, or cascade/parity obligation.
+- Surface parity holes: list/detail/feed/dashboard/worklist/API/email/calendar values that should match but are covered only globally or on one surface.
+- Cascade holes: state transitions that update one surface but omit queues, counts, feed/timeline, notifications/email, calendar/provider state, or read-model invalidation.
+- Delete/orphan/incomplete/out-of-order handling when the matrix implies cross-module data flow: deleted source record, orphan target reference, incomplete source data, target created before source, refresh timing mismatch.
+- Timing/source ambiguity: cells that say "updated" without realtime vs refresh-required vs persisted+served vs transient-in-response.
+
+Mandatory output discipline for this lens:
+- Include a section or finding line named **Suspicious N/A/GAP Review** whenever the matrix has any `N/A` or `GAP` cell.
+- For every `N/A`, state one of: `accepted N/A: <reason is concrete>` or `suspicious N/A: <why this may actually occur>`.
+- For every `GAP`, state one of: `safe GAP: <why build can proceed without guessing>` or `blocking GAP: <why code would otherwise guess behavior>`.
+- If there are no suspicious cells, explicitly write `Suspicious N/A/GAP Review: no suspicious N/A/GAP cells found; all reasons concrete and non-release-blocking`.
+
+For suggested fixes, do not say "add tests". Fix the spec: add/modify matrix row, convert N/A to AS/GAP, strengthen the AS Then clause, or add a constraint with per-surface coverage.
+```
+
 ## Phase 4: Collect and Consolidate
 
 After all reviewers complete:
@@ -169,6 +199,10 @@ After all reviewers complete:
 4. **Sort** by severity: Critical → High → Medium → Low
 5. **Cap** at 15 findings: keep all Critical, top High by specificity, note how many Medium were dropped
 6. **Cross-reference check** (you, not reviewers): Flag any stories without acceptance scenarios, and any AS that contradicts the story description
+7. **Behavior Matrix cross-check** (you, not reviewers, when present): Every matrix `Coverage = AS-NNN` must point to an AS that actually asserts the same state/viewer/surface outcome; every `GAP-NNN` must exist in `## Gaps`; every `N/A` must have a reason. Missing or mismatched cells are accepted findings unless another reviewer already caught them.
+8. **Suspicious N/A/GAP Review cross-check** (you, not reviewers, when present): If the plan has `## Behavior Matrix` and any `N/A` or `GAP` cell, the final challenge output MUST include a `Suspicious N/A/GAP Review` section. Omission is itself a Medium finding because it lets lifecycle/viewer/surface blind spots hide behind "not applicable" or unresolved gaps.
+9. **Sibling Surface Map cross-check** (you, not reviewers, when present): If `## Sibling Surface Map` exists, every high/medium candidate must have a disposition (`cover`, `GAP-NNN`, or `ignore(reason)`). If the plan touches an existing operation and has no map, flag missing discovery unless the plan states why sibling discovery is not applicable.
+10. **Invariant registry cross-check** (you, not reviewers, when present): If project-local `docs/invariants/INV-*.md` contains an entry matching the planned component, the plan must either carry it into Constraints/Behavior Matrix/GAPs or explicitly state why it does not apply. Missing invariant handling is a Medium/High finding depending on `status`.
 
 ## Phase 5: Adjudicate
 

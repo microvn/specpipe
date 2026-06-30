@@ -25,3 +25,15 @@ cli/README.md
 
 # Vercel landing page (deployed separately, not versioned here)
 site/
+
+# Internal R&D / client-specific — NEVER published to the public OSS repo.
+# These reference private client work (Vantage / agentfolk), real bug IDs,
+# QA staff names, and local credentials. Kept on disk, out of git.
+test/real-replay/
+test/qa-benchmark/
+test/qa-benchmark.sh
+docs/qa-audit-*.md
+docs/sibling-drift-*.md
+
+# Scratch comparison clones — superseded by the ported originals in kit/skills/sp-*
+kit/skills/*-behavior-matrix/

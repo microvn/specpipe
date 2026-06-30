@@ -1,6 +1,6 @@
 # Automatic Guards (Hooks)
 
-Hooks run automatically — you do not invoke them. They provide passive protection. Enforced (blocking) for Claude, Codex, and Cursor; advisory rules for the other agents.
+Hooks run automatically — you do not invoke them. They provide passive protection. Enforced (blocking) for Claude, Codex, Cursor, and Antigravity; advisory rules for OpenClaw and Hermes. `--hooks none` turns guardrails off; `--hooks <list>` picks a subset.
 
 [← Back to README](../README.md)
 
@@ -25,19 +25,25 @@ export FILE_GUARD_THRESHOLD=500
 export FILE_GUARD_EXCLUDE="*.generated.swift,*.pb.go,*.min.js"
 ```
 
-### Path Guard (`path-guard.sh`)
+### Shell Guard (`specpipe-shell-guard.sh`)
 
-**Trigger:** Before every Bash command.
-**Action:** Blocks commands that reference large directories (node_modules, build artifacts, etc.).
-**Blocking:** Yes — prevents the command from running.
+**Trigger:** Before every shell command (Bash). The single shell guard for every agent —
+it reads the command from `.tool_input.command` (Claude/Codex), `.command` (Cursor), or
+`.tool_args.CommandLine` (Antigravity).
+**Action:** (1) Blocks exploring large directories (node_modules, build artifacts, …).
+(2) Flags secret access in commands (`.env`, keys, credentials) — `SECRET_POLICY=block`
+(default, used by Codex/Cursor/Antigravity) denies; `SECRET_POLICY=warn` (Claude's wiring)
+warns and allows so the user can approve.
+**Blocking:** Yes — exit 2 (the portable block primitive).
 
 **Default blocked paths:**
-`node_modules`, `__pycache__`, `.git/objects`, `dist/`, `build/`, `.next/`, `vendor/`, `Pods/`, `.build/`, `DerivedData/`, `.gradle/`, `target/debug`, `target/release`, `.nuget`, `.cache`
+`node_modules`, `__pycache__`, `.git/objects`, `dist/`, `build/`, `.next/`, `vendor/`, `Pods/`, `.build/`, `DerivedData/`, `.gradle/`, `target/Debug|Release`, `.venv/`, `bin/Debug`, `.turbo/`, `.svelte-kit/`, … (and more)
 
 **Configuration:**
 ```bash
-# Add project-specific blocked paths (pipe-separated)
-export PATH_GUARD_EXTRA="\.terraform|\.vagrant|\.docker"
+export PATH_GUARD_EXTRA="\.terraform|\.vagrant|\.docker"   # extra blocked dir patterns
+export SENSITIVE_GUARD_EXTRA="\.vault|.*_token\.json"      # extra secret patterns
+export SECRET_POLICY=block                                 # block|warn (per-agent default differs)
 ```
 
 ### Glob Guard (`glob-guard.js`)
@@ -76,13 +82,13 @@ export PATH_GUARD_EXTRA="\.terraform|\.vagrant|\.docker"
 - Adding comments alongside code (new content has both)
 - Normal code replacements
 
-### Sensitive Guard (`sensitive-guard.sh`)
+### Read Guard (`specpipe-read-guard.sh`)
 
-**Trigger:** Before every Read, Write, Edit, and Bash command.
-**Action:** Protects files containing secrets: `.env`, private keys, credentials, tokens.
-**Blocking:** Read/Write/Edit → **blocks** (exit 2). Bash commands → **warns only** (allows access).
-
-The Bash warn-only behavior enables an approval flow: Claude asks the user for permission, and if approved, can use `bash cat .env` to read the file.
+**Trigger:** Before every file Read/Write/Edit. Reads the path from `.tool_input.file_path`
+(Claude/Codex) or `.file_path` (Cursor `beforeReadFile`).
+**Action:** Blocks reads/writes of secret files: `.env`, private keys, credentials, tokens.
+**Blocking:** Yes — exit 2. (Secret access *in shell commands* is handled by the shell
+guard above, where Claude's `SECRET_POLICY=warn` enables the ask-then-`cat .env` approval flow.)
 
 **Protected files:**
 - `.env`, `.env.local`, `.env.production`, etc. (but NOT `.env.example`)
@@ -100,39 +106,23 @@ The Bash warn-only behavior enables an approval flow: Claude asks the user for p
 export SENSITIVE_GUARD_EXTRA="\.vault|.*_token\.json"
 ```
 
-### Self-Review (`self-review.sh`)
-
-**Trigger:** When Claude is about to stop (Stop event).
-**Action:** Injects a self-review checklist reminding Claude to verify quality before finishing.
-**Blocking:** No — just a reminder.
-
-**Questions asked:**
-1. Did you leave any TODO/FIXME that should be resolved now?
-2. Did you create mock/fake implementations just to pass tests?
-3. Did you replace real code with placeholder comments?
-4. Do all changed files compile and typecheck cleanly?
-5. Did you run the full test suite, not just the new tests?
-6. Are there any files you modified but forgot to include in the summary?
-
-**Configuration:**
-```bash
-# Disable self-review
-export SELF_REVIEW_ENABLED=false
-```
-
 ### Testing Hooks Manually
 
 You can test hooks by piping mock JSON payloads:
 
 ```bash
-# ── Path Guard ──
+# ── Shell Guard ── (dirs + secret access in commands)
 # Should exit 2 (blocked)
-echo '{"tool_input":{"command":"ls node_modules"}}' | bash .claude/hooks/path-guard.sh
+echo '{"tool_input":{"command":"ls node_modules"}}' | bash .claude/hooks/specpipe-shell-guard.sh
 echo $?  # expect: 2
 
 # Should exit 0 (allowed)
-echo '{"tool_input":{"command":"ls src"}}' | bash .claude/hooks/path-guard.sh
+echo '{"tool_input":{"command":"ls src"}}' | bash .claude/hooks/specpipe-shell-guard.sh
 echo $?  # expect: 0
+
+# Secret in command: block by default, warn (exit 0) under Claude's SECRET_POLICY=warn
+echo '{"tool_input":{"command":"cat .env"}}' | bash .claude/hooks/specpipe-shell-guard.sh; echo $?  # expect: 2
+echo '{"tool_input":{"command":"cat .env"}}' | SECRET_POLICY=warn bash .claude/hooks/specpipe-shell-guard.sh; echo $?  # expect: 0 (warning on stderr)
 
 # ── File Guard ──
 seq 1 250 > /tmp/test-large.txt
@@ -148,18 +138,14 @@ echo $?  # expect: 2
 echo '{"tool_input":{"old_string":"return a;","new_string":"return b;"}}' | node .claude/hooks/comment-guard.js
 echo $?  # expect: 0
 
-# ── Sensitive Guard ──
+# ── Read Guard ── (secret file reads)
 # Should exit 2 (blocked)
-echo '{"tool_input":{"file_path":".env"}}' | bash .claude/hooks/sensitive-guard.sh
+echo '{"tool_input":{"file_path":".env"}}' | bash .claude/hooks/specpipe-read-guard.sh
 echo $?  # expect: 2
 
 # Should exit 0 (allowed)
-echo '{"tool_input":{"file_path":".env.example"}}' | bash .claude/hooks/sensitive-guard.sh
+echo '{"tool_input":{"file_path":".env.example"}}' | bash .claude/hooks/specpipe-read-guard.sh
 echo $?  # expect: 0
-
-# Should exit 0 (warn only — bash commands are allowed for approved access)
-echo '{"tool_input":{"command":"cat .env.local"}}' | bash .claude/hooks/sensitive-guard.sh
-echo $?  # expect: 0 (with warning on stderr)
 
 # ── Glob Guard ──
 # Should exit 2 (blocked — broad pattern at root)

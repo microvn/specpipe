@@ -10,7 +10,7 @@ labels: enhancement
 
 **Proposal**
 
-<!-- What you'd like agentpipe to do. -->
+<!-- What you'd like specpipe to do. -->
 
 **Scope**
 

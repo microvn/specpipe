@@ -33,9 +33,11 @@ Before Phase 0:
    git log --oneline "$BASE"...HEAD
    ```
 2. Check for spec in `docs/specs/<feature>/<feature>.md` — review against INTENT.
-3. Read the diff: `git diff "$BASE"...HEAD`
-4. **Expand blast radius.** **If GA available (per Phase 0a):** run `ga_impact(diff=<full diff>)` (or `changed_files=[...]`) to get impacted files, affected tests, affected routes/configs, and a 4-dim risk score in one call — this is the flagship review tool, prefer it over any chain of grep + manual reading. Cross-check with `ga_architecture` for module/layer membership (auth, payment, core) and `ga_risk(changed_files=[...])` for a refactor-safety gate. **If GA unavailable:** grep for each changed function/type name across the rest of the tree to find affected files; identify sensitive paths (`auth/`, `payment/`, `core/`) by directory.
-5. **What already exists:** List any code/flows that already partially solve the problem in this diff. Flag if the diff rebuilds something that already exists.
+3. If the spec contains `## Behavior Matrix`, treat each `BM.AS-NNN.<surface>` row as review intent. Keep the matrix open while reading the diff.
+4. Use the invariant registry README/schema as base knowledge; README examples are not runtime entries. Then read project-local invariant entries if present: `docs/invariants/INV-*.md`. If none exist, continue and note "No invariant registry found" internally.
+5. Read the diff: `git diff "$BASE"...HEAD`
+6. **Expand blast radius.** **If GA available (per Phase 0a):** run `ga_impact(diff=<full diff>)` (or `changed_files=[...]`) to get impacted files, affected tests, affected routes/configs, and a 4-dim risk score in one call — this is the flagship review tool, prefer it over any chain of grep + manual reading. Cross-check with `ga_architecture` for module/layer membership (auth, payment, core) and `ga_risk(changed_files=[...])` for a refactor-safety gate. **If GA unavailable:** grep for each changed function/type name across the rest of the tree to find affected files; identify sensitive paths (`auth/`, `payment/`, `core/`) by directory.
+7. **What already exists:** List any code/flows that already partially solve the problem in this diff. Flag if the diff rebuilds something that already exists.
 
 If `$ARGUMENTS` provided → scope to those files only.
 If diff > 500 lines → review file-by-file, prioritize by smart focus below.
@@ -55,6 +57,8 @@ Auto-detect primary focus from diff content:
 | Test files only | Test quality (skip security deep-dive) |
 | Docs/comments only | Accuracy only (minimal review) |
 | Payment, billing, transaction | Correctness + idempotency |
+| Spec has `## Behavior Matrix`, or diff contains state/status/role/viewer/surface/read-model/feed/calendar/email/list/detail/worklist/dashboard | Lifecycle + parity + cascade |
+| Diff touches code named in invariant logs | Regression invariants for that component |
 
 Spend 60% of analysis on the primary focus. Cover all categories, but proportionally.
 
@@ -94,6 +98,28 @@ Spend 60% of analysis on the primary focus. Cover all categories, but proportion
   - AS in spec with no matching test → "AS-NNN: \<description\> has no corresponding test"
   - Test referencing an AS-NNN that no longer exists in the spec → "Test references removed AS-NNN"
   Keep this lightweight — match on AS-NNN identifiers and story name substrings, not semantic analysis.
+
+### Behavior Matrix & Invariants (High)
+
+Use this section when the spec has `## Behavior Matrix`, `## Sibling Surface Map`, or project-local invariant logs match the diff.
+
+- **Cell-to-diff trace:** For each changed state transition, viewer rule, read surface, notification, queue, dashboard count, feed, calendar, or API projection, identify the corresponding `BM.AS-NNN.<surface>` row. If code changes behavior for a matrix cell but tests do not reference that AS ID or `BM.AS-NNN`, flag High.
+- **Surface parity:** If the diff updates one read surface for a state/viewer change, check matrix siblings for list/detail/worklist/dashboard/feed/API/email/calendar parity. Flag missing sibling updates unless the matrix marks them `N/A` with a concrete reason.
+- **Sibling candidate disposition:** If the spec has `## Sibling Surface Map`, every high/medium candidate must be `cover`, `GAP-NNN`, or `ignore(reason)`. Flag missing dispositions. If the diff changes a confirmed sibling surface but omits sibling tests/updates for the other confirmed surfaces, flag High unless a GAP/N/A covers it.
+- **Discovery drift:** If the diff introduces or modifies an entry-point whose name/evidence matches the operation (`create_from_*`, `*_from_*`, `send_*invite*`, `*_outcome*`, `reschedule*`, `book_next*`, etc.) but it is absent from the Sibling Surface Map and invariant registry, flag "Invariant candidate missing" as Medium/High depending on risk.
+- **Suspicious N/A/GAP:** If changed code exercises a matrix row marked `N/A` or `GAP`, flag the spec/code mismatch. `GAP` is not a test obligation, but it is a review concern when the diff implements or depends on that behavior.
+- **Viewer-relative behavior:** Confirm visibility, labels, allowed actions, recipients, and queue membership are derived from `state/status × viewer/role`, not only from owner/assignee shortcuts.
+- **Cascade propagation:** State transitions must update derived queues, counts, feeds, read models, notifications, calendars, and APIs named by the matrix. Flag partial propagation and stale read-path risks.
+- **Delete/orphan/incomplete/out-of-order:** For lifecycle changes, check delete/cancel/reschedule/reassign paths for orphaned rows, stale external events, incomplete rollback, and out-of-order async delivery.
+- **Timing/source parity:** When matrix rows imply sync/async/external-down timing, confirm tests assert the correct timing tier and user-visible source of truth.
+- **No-vacuous boundary tests:** If a test covers `BM.AS-NNN.<surface>` but mocks the exact boundary that surface depends on (API projection, calendar provider, email provider, read-model query, queue feed), flag it. Mock outside the boundary, not the behavior being claimed.
+- **Invariant registry check:** For each project-local `docs/invariants/INV-*.md` entry whose `component_keys`, `sibling_set`, `shared_anchor`, or keywords match the diff, verify code and tests preserve it. Status handling:
+  - `enforced` → hard review gate: if the diff touches one sibling/component in the invariant but does not update or run the `test_ref` / equivalent regression, flag High.
+  - `confirmed` → High risk advisory: flag missing sibling updates/tests unless the spec intentionally changes the invariant.
+  - `candidate` → Medium/High depending on evidence: flag as "Invariant candidate needs confirmation" if the diff repeats the class.
+  - `retired` → ignore unless the diff revives the retired component.
+  A repeated class such as carry-forward, viewer-relative labels, invite-on-reschedule, orphan cleanup, or stale dashboard count is High unless intentionally changed in the spec.
+- **Review fix direction:** Suggested fixes should usually update the spec/test/code triangle: add or correct the matrix cell, add a `BM.AS-NNN` regression test, then fix code. Do not suggest "add generic coverage" when a precise cell is available.
 
 ### Code Quality (Medium)
 - Dead code: removed functions still imported elsewhere?

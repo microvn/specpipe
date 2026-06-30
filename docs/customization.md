@@ -11,7 +11,6 @@
 | `FILE_GUARD_EXCLUDE` | _(empty)_ | Comma-separated globs to skip (e.g. `*.generated.swift`) |
 | `PATH_GUARD_EXTRA` | _(empty)_ | Additional pipe-separated patterns to block (e.g. `\.terraform`) |
 | `SENSITIVE_GUARD_EXTRA` | _(empty)_ | Additional pipe-separated patterns for sensitive files (e.g. `\.vault`) |
-| `SELF_REVIEW_ENABLED` | `true` | Set to `false` to disable the self-review checklist on Stop |
 
 Set these in your shell profile or project `.envrc` (if using direnv).
 

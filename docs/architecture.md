@@ -6,17 +6,20 @@ content) from *how each agent consumes it* (per-agent emission).
 
 ## The artifact taxonomy
 
-Everything the kit ships is exactly one of three kinds:
+Everything the kit ships is one of two kinds:
 
 | Class | Examples | Source | How it installs |
 |---|---|---|---|
-| **Neutral content** | skills, guardrails, project-rules | `kit/skills/`, `kit/rules/` | **emitted** per agent into that agent's native location |
-| **Claude-platform** | hook scripts, `settings.json` | `kit/.claude/` | copied **verbatim** to `.claude/` — Claude-only (it's Claude's enforcement engine; other agents have none) |
-| **Per-agent output** | `.cursor/rules/*.mdc`, `AGENTS.md`, `.agents/skills/` | generated | written at install, tracked in the manifest |
+| **Neutral source** | skills, project-rules, guard scripts | `kit/skills/`, `kit/rules/`, `kit/hooks/` | **emitted** per agent into that agent's native location |
+| **Per-agent output** | `.claude/settings.json`, `.codex/hooks.json`, `.cursor/rules/*.mdc`, `AGENTS.md` | generated from the registry | written at install, tracked in the manifest |
 
-Why hooks stay Claude-only: a hook is a *mechanism* (`.claude/settings.json` registers
-scripts that Claude Code runs at tool-call time). No other agent has that mechanism, so
-they receive the same guard **intent** as always-on advisory rules instead.
+A hook is a *mechanism*: an agent that exposes a pre-tool-call hook gets the neutral
+guard scripts wired into its native config and **enforced** — a blocking exit stops the
+call. Today that's Claude (`.claude/settings.json`), Codex (`.codex/hooks.json`), Cursor
+(`.cursor/hooks.json`), and Antigravity (`.agents/hooks.json`). Agents without that
+mechanism (OpenClaw, Hermes) receive the same guard **intent** as always-on advisory
+rules instead. The scripts themselves are authored once in `kit/hooks/`; only the
+per-agent config that registers them differs.
 
 ## The registry is the single extension point
 
@@ -39,8 +42,8 @@ with the same frontmatter — one emission serves the family. Families today:
 
 - `claude` → `.claude/` (skills + hooks + settings + CLAUDE.md)
 - **`.agents/` standard** (Codex, Antigravity, …) → `.agents/skills/` + `AGENTS.md`
-- `cursor` → `.cursor/rules/*.mdc`
-- `openclaw` → `skills/`  ·  `hermes` → `optional-skills/`
+- `cursor` → `.cursor/skills/` + `.cursor/rules/*.mdc`
+- `openclaw` → `skills/`  ·  `hermes` → global-only (`~/.hermes/skills/`)
 
 ## Emission pipeline
 
@@ -95,7 +98,6 @@ cli/src/
     hasher.js, detector.js, logger.js
 kit/
   skills/             neutral skill sources (one SKILL.md per skill)
-  rules/              neutral guardrails source
-  .claude/            Claude-platform artifacts (hooks + settings.json + CLAUDE.md)
-  docs/WORKFLOW.md
+  rules/              specpipe-rules.md — the single rich rules source (emitted per agent)
+  hooks/              guard scripts (shell/read/comment/glob/file), emitted per agent
 ```

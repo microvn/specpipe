@@ -11,11 +11,13 @@ import { readFile } from 'node:fs/promises';
 import { computeDesired } from '../lib/reconcile.js';
 import {
   getAllFiles, getFilesForComponents, installFile,
-  ensurePlaceholderDir, setPermissions, fillTemplate,
-  verifySettingsJson, PLACEHOLDER_DIRS, COMPONENTS,
-  getTemplateDir, installSkillForAgent,
+  setPermissions, fillTemplate,
+  verifySettingsJson, COMPONENTS,
+  getTemplateDir, installSkillForAgent, installAgentHooks, installAgentRules, resolveSkills, skillAllowed,
+  pruneOrphans,
 } from '../lib/installer.js';
-import { AGENTS, parseSkillPath } from '../lib/agents.js';
+import { resolveHooks } from '../lib/hooks.js';
+import { AGENTS, parseSkillPath, resolveAgents } from '../lib/agents.js';
 import { initMultiAgent } from './init-agents.js';
 import { adoptExisting } from './init-adopt.js';
 import { readGlobalManifest, writeGlobalManifest, initGlobal } from './init-global.js';
@@ -36,9 +38,29 @@ export async function initCommand(path, opts) {
   log.info(`Target: ${targetDir}`);
   log.blank();
 
-  // --- Global mode ---
+  // --- Interactive picker --- (TTY only, and only when no selection flags were
+  // passed; -y / any of --global/--agents/--skills/--only/--adopt/--dry-run skips it)
+  const wantsInteractive = process.stdin.isTTY && !opts.yes && !opts.global
+    && !opts.agents && !opts.skills && !opts.only && !opts.adopt && !opts.dryRun;
+  if (wantsInteractive) {
+    const { runInteractiveInit } = await import('./init-interactive.js');
+    const choice = await runInteractiveInit();
+    if (!choice) return; // cancelled
+    if (choice.scope === 'global') opts.global = true;
+    opts.agents = choice.agents.join(',');
+    if (choice.skills) opts.skills = choice.skills;
+    if (choice.hooks) opts.hooks = choice.hooks;
+  }
+
+  // --- Global mode --- (honors --agents + --skills; defaults to claude + all skills)
   if (opts.global) {
-    await initGlobal({ force: opts.force, hooks: true });
+    await initGlobal({
+      agents: resolveAgents(opts.agents),
+      skills: resolveSkills(opts.skills),
+      hookSelection: resolveHooks(opts.hooks),
+      force: opts.force,
+      hooks: true,
+    });
     return;
   }
 
@@ -85,7 +107,10 @@ export async function initCommand(path, opts) {
     }
   }
 
-  const files = opts.only ? getFilesForComponents(components) : getAllFiles();
+  const skillsSet = resolveSkills(opts.skills);
+  const hooksSet = resolveHooks(opts.hooks);
+  const files = (opts.only ? getFilesForComponents(components) : getAllFiles())
+    .filter((f) => skillAllowed(f, skillsSet));
 
   // --- Dry run ---
   if (opts.dryRun) {
@@ -108,6 +133,8 @@ export async function initCommand(path, opts) {
   console.log('--- Installing ---');
 
   const manifest = createManifest(pkg.version, null, components);
+  if (skillsSet) manifest.skills = [...skillsSet];
+  if (hooksSet) manifest.hooks = [...hooksSet];
   let copied = 0;
   let skipped = 0;
   let identical = 0;
@@ -139,11 +166,24 @@ export async function initCommand(path, opts) {
     setFileEntry(manifest, outPath, kitHash, installedHash, { agent: 'claude', templateRel: file });
   }
 
+  // Enforced guard hooks + generated .claude/settings.json — emitted from the hook
+  // registry (not static files). Only when the hooks component is in scope.
+  if (components.includes('hooks')) {
+    await installAgentHooks('claude', targetDir, { force: opts.force, hooks: hooksSet });
+  }
+
+  // Claude's rules hub (CLAUDE.md) is a marked section emitted from the single rules
+  // source. It's part of the 'config' component; --hooks none (option A) skips it too.
+  const noGuards = hooksSet && hooksSet.size === 0;
+  if (!noGuards && components.includes('config')) {
+    await installAgentRules('claude', targetDir, { force: opts.force });
+  }
+
   // Accumulate: keep agents installed by an earlier run so a plain `init` doesn't
   // orphan files from a prior `init --agents …`. Record their on-disk files too.
   const prior = await readManifest(targetDir);
   manifest.agents = mergeAgents(prior?.agents, ['claude']);
-  for (const [relPath, d] of await computeDesired(manifest.agents.filter((a) => a !== 'claude'))) {
+  for (const [relPath, d] of await computeDesired(manifest.agents.filter((a) => a !== 'claude'), skillsSet)) {
     if (manifest.files[relPath]) continue;
     try {
       const installedHash = hashContent(await readFile(resolve(targetDir, relPath), 'utf-8'));
@@ -151,9 +191,12 @@ export async function initCommand(path, opts) {
     } catch { /* prior agent's file not on disk — don't record a phantom */ }
   }
 
-  // Placeholder directories
-  for (const dir of PLACEHOLDER_DIRS) {
-    await ensurePlaceholderDir(dir, targetDir);
+  // Migration: drop predecessor files a prior manifest tracked but we no longer
+  // install (mf-* / ap-* skills, renamed hooks) so an install over an old version
+  // doesn't leave orphaned /mf-* commands beside the new /sp-* ones.
+  if (prior?.files) {
+    const n = await pruneOrphans(targetDir, prior.files, new Set(Object.keys(manifest.files)));
+    if (n) log.info(`Migrated: removed ${n} superseded file(s) from a previous version.`);
   }
 
   // --- Permissions ---
@@ -203,11 +246,10 @@ export async function initCommand(path, opts) {
   console.log('=== Setup Complete ===');
   log.blank();
   console.log('Installed:');
-  console.log('  .claude/CLAUDE.md          — Project rules (review and customize)');
-  console.log('  .claude/settings.json      — Hook configuration');
-  console.log('  .claude/hooks/             — 6 guards (file, path, glob, comment, sensitive, self-review)');
-  console.log('  .claude/skills/            — /sp-plan, /sp-challenge, /sp-build, /sp-fix, /sp-review, /sp-commit, /sp-voices');
-  console.log('  docs/WORKFLOW.md           — Workflow reference');
+  console.log('  .claude/CLAUDE.md          — rules hub (workflow + guardrails + project info)');
+  console.log('  .claude/settings.json      — hook configuration');
+  console.log('  .claude/hooks/             — 5 guards (shell, read, comment, glob, file)');
+  console.log('  .claude/skills/            — sp-* skills (/sp-explore … /sp-commit, /sp-voices)');
   log.blank();
   const parts = [`${copied} copied`];
   if (identical > 0) parts.push(`${identical} identical`);
@@ -225,14 +267,20 @@ export async function initCommand(path, opts) {
     console.log(`⚠ ${warnings} warning(s) above — review before proceeding.`);
   }
 
-  // --- Global install prompt (first-time only) ---
+  // --- Global install prompt (first-time only; never on -y or non-TTY) ---
   if (!opts.global) {
     const globalMeta = await readGlobalManifest();
-    if (globalMeta?.globalInstalled === undefined) {
+    if (globalMeta?.globalInstalled === undefined && process.stdin.isTTY && !opts.yes) {
       await promptGlobalInstall(opts);
     } else if (globalMeta?.globalInstalled === true) {
-      // Auto-upgrade global on init if previously installed
-      await initGlobal({ force: opts.force });
+      // Auto-upgrade global on init for every agent previously installed globally,
+      // preserving the skill selection recorded at global install time.
+      await initGlobal({
+        agents: globalMeta.globalAgents || ['claude'],
+        skills: globalMeta.skills ? new Set(globalMeta.skills) : null,
+        hookSelection: globalMeta.hooks ? new Set(globalMeta.hooks) : null,
+        force: opts.force,
+      });
     }
   }
 }

@@ -141,6 +141,41 @@ Also note the **project domain** from CLAUDE.md (payment, booking, content, heal
 
 ---
 
+## Phase 0.5 — Sibling Discovery Pass (candidate only)
+
+Run this after Phase 0 when the feature changes an existing operation, fixes a bug, or touches state/viewer/surface behavior. Purpose: find sibling entry-points that perform the same domain operation but may not be named in the ticket.
+
+This pass produces candidates, not requirements. A candidate may become a confirmed surface only after the user/spec/code evidence supports it. Do not auto-promote noisy matches into acceptance scenarios.
+
+**Inputs:** raw symptom text, feature nouns, touched component/module, existing code hits from Phase 0, matching project-local `docs/invariants/INV-*.md` entries, and any shared anchors/constants already found.
+
+**Deterministic recipe:**
+
+1. **Seed nouns and verbs:** extract 3-8 terms such as domain object (`appointment`, `invite`, `matchup`), operation (`create`, `reschedule`, `cancel`, `send`), and surface nouns (`outreach`, `modal`, `guide`, `calendar`, `queue`).
+2. **Shared-anchor callers:** if a helper/constant/schema appears central, use `ga_callers` when GA is available; otherwise grep the anchor. Examples: `_stamp_*`, `*_status`, `send_*invite*`, `log_*outcome*`, `create_*`.
+3. **Fuzzy sibling names:** search for parallel naming patterns: `create_from_*`, `*_from_<source>`, `send_*invite*`, `*_outcome*`, `reschedule*`, `book_next*`, `cancel*`, `delete*`, and domain-specific verbs from Phase 0.
+4. **Git change-coupling:** inspect recent co-change around seed files with `git log --name-only -- <seed-file>` and look for files/functions repeatedly changed with the seed. This is recall-oriented evidence, not proof.
+5. **GA blast radius if available:** use `ga_impact` for touched symbols/files to find connected blast radius, but do not treat importers-only output as complete sibling discovery. Siblings may be co-changed or share anchors without importing each other.
+
+Record every plausible sibling in a table:
+
+| Candidate | Operation | Evidence | Confidence | Obligation |
+|---|---|---|---|---|
+| `<surface/path/symbol>` | same create/update/delete/send/read op? | `ga_callers` / grep / co-change / invariant / user text | high / medium / low | cover / GAP / ignore(reason) |
+
+Rules:
+
+- `high`: direct shared anchor, explicit invariant sibling, or same operation named in user/spec text.
+- `medium`: strong fuzzy naming or repeated co-change with the seed.
+- `low`: weak name similarity only.
+- `cover`: candidate is confirmed in current scope and must feed `/sp-plan` surfaces.
+- `GAP`: candidate seems material but expected behavior/scope is unknown.
+- `ignore(reason)`: candidate is false positive or intentionally out of scope.
+
+Exit condition: every high/medium candidate has `cover`, `GAP`, or `ignore(reason)`. Low-confidence candidates can be listed as notes and do not block handoff.
+
+---
+
 ## Phase 1 — Why, not what
 
 **If Phase 0 found existing code > 30%:**
@@ -466,6 +501,69 @@ If B or C → fix and confirm again. Do not proceed to Phase 6.5 until the user 
 
 ---
 
+## Phase 6.25 — Behavior Matrix discovery axes
+
+Run this before the self-audit when the feature touches any state/status/stage, permissions, multiple roles/viewers, repeated read surfaces, cross-module write/read propagation, notification, feed, dashboard, calendar, or external integration.
+
+Purpose: capture the three axes that `/sp-plan` needs to build `## Behavior Matrix`. Do not fill matrix cells here. Discovery only identifies axes, source paths, and open questions.
+
+### Axis A — States / lifecycle
+
+Derive from the user's flow, business rules, existing code, and scenarios:
+
+- Explicit statuses/states/stages, including terminal states.
+- Transition triggers: user action, system event, webhook, cron, retry, admin override.
+- Blocked states: states where the action is hidden, disabled, rejected, or should be `N/A`.
+- Timing: immediate, eventually consistent, queued, retryable, or external-service-dependent.
+
+If any state is implied but unnamed, ask:
+> "This behavior depends on record state. Which statuses should support it, and which statuses should block it?"
+
+### Axis B — Viewers / roles / relationships
+
+Derive from permissions, multi-role flow, ownership, assignment, and notification recipients:
+
+- Actor roles: who can perform the write action.
+- Viewer roles: who can see the result after the write.
+- Relationship variants: owner vs assignee vs manager vs admin vs unrelated user vs invited participant.
+- Recipient identity rules: which email/account/contact identity is authoritative when notifications/calendar/events are sent.
+
+If the same role can be in different relationships to the record, treat those as separate viewers. Example: `trainer assigned` and `trainer unassigned` are different viewers even if both have role `trainer`.
+
+If any viewer is implied but unnamed, ask:
+> "After this change, who needs to see the updated state: actor only, assigned user, manager/admin, external participant, or everyone with list access?"
+
+### Axis C — Surfaces / module paths
+
+Derive from codebase scan, UI sketches, affected screens, APIs, notifications, and integrations:
+
+- Write surfaces: page/action/form/API/webhook/cron/provider callback that can create or change the state.
+- Read surfaces: list row, detail page, dashboard count, worklist/queue, feed/activity log, API list, API single-get, export/report, email, push/in-app notification, calendar/provider event, search/index, audit log.
+- Module Dependency Map: for each write surface, list every read surface/module expected to reflect it.
+- Existing evidence: attach file paths or route names when Phase 0 found them; mark unknown surfaces as `X / needs confirmation`.
+
+For every material write/read pair, record:
+
+| Write / CREATE surface | Read surface | Direction | Timing tier | Source of truth | Open question |
+|------------------------|--------------|-----------|-------------|-----------------|---------------|
+| `<form/API/event>` | `<list/detail/feed/...>` | write -> read | `sync` / `async` / `external-down` | DB/read model/provider/cache | `none` / question |
+| `<read/API/provider>` | `<write form/action>` | read -> write | `sync` / `async` / `external-down` | DB/read model/provider/cache | `none` / question |
+
+Use both directions when the read surface can initiate or constrain the next write. Example: a worklist row is not just read-only if it contains a reschedule/assign/cancel action.
+
+Timing tier definitions:
+
+- `sync` — user should see the result immediately after the transaction or page refresh.
+- `async` — background worker, projection, queue, webhook, polling, or eventual consistency is expected.
+- `external-down` — behavior changes when a provider/API is unavailable, delayed, or retries.
+
+If any surface pair is unknown, ask:
+> "Besides the detail page, where else must this state appear or be actionable: list, dashboard, queue/worklist, feed, API, email, calendar, or reports?"
+
+Exit condition: the handoff has non-empty States, Viewers, and Surfaces lists for stateful features, plus at least one write/read pair for every write surface. If a list is genuinely not applicable, record `N/A` with reason.
+
+---
+
 ## Phase 6.5 — Self-audit (blind spot sweep)
 
 **Purpose:** Before writing the handoff summary, step back and think like a senior dev who just received this spec. What would they immediately ask? This step catches the 80% of obvious questions that phase-by-phase discovery misses because it was too focused on following the script. The more thorough this step is, the fewer surprises during implementation.
@@ -619,6 +717,36 @@ Timeout: [if role B does not act within X hours then...]
 - [New or changed fields/tables]
 - Migration: [backfill needed / format conversion / data cleanup]
 
+**Behavior Matrix discovery axes:** _(required for stateful / role-sensitive / multi-surface features; consumed by `/sp-plan`)_
+
+Sibling Candidate Table: _(required when Phase 0.5 ran; consumed by `/sp-plan`)_
+| Candidate | Operation | Evidence | Confidence | Obligation |
+|---|---|---|---|---|
+| [surface/path/symbol] | [same create/update/delete/send/read op?] | [ga_callers / grep / co-change / invariant / user text] | high / medium / low | cover / GAP / ignore(reason) |
+
+Confirmed sibling surfaces for planning:
+- [surface/path/symbol confirmed from candidate table, or N/A with reason]
+
+States / lifecycle:
+- [State/status/stage 1 — transition trigger, terminal? yes/no, blocked? yes/no]
+- [State/status/stage 2 — transition trigger, terminal? yes/no, blocked? yes/no]
+
+Viewers / roles / relationships:
+- [Actor/viewer 1 — role + relationship to record + allowed actions]
+- [Actor/viewer 2 — role + relationship to record + allowed actions]
+- [Recipient identity rule if notifications/calendar exist]
+
+Surfaces / module paths:
+- Write surfaces: [form/action/API/webhook/cron/provider callback + file/route evidence if known]
+- Read surfaces: [list/detail/dashboard/worklist/feed/API/email/calendar/search/audit/export + file/route evidence if known]
+- Unknown surfaces: [X / needs confirmation, or N/A with reason]
+
+CREATE/READ pair map:
+| Write / CREATE surface | Read surface | Direction | Timing tier | Source of truth | Open question |
+|------------------------|--------------|-----------|-------------|-----------------|---------------|
+| [write surface] | [read surface] | write -> read | sync / async / external-down | DB/read model/provider/cache | none / question |
+| [read/action surface] | [write surface] | read -> write | sync / async / external-down | DB/read model/provider/cache | none / question |
+
 **Impact on existing system:**
 - [Affected screens/flows + description of impact]
 
@@ -689,6 +817,8 @@ Self-check before writing the output file:
 - [ ] Input validation is clear for every user-facing field
 - [ ] Permissions are clear for every relevant role
 - [ ] If multi-role: cross-role flow confirmed, including timeouts and conflicts
+- [ ] If stateful / role-sensitive / multi-surface: Behavior Matrix discovery axes are filled with States, Viewers, Surfaces, and CREATE/READ pair map
+- [ ] If existing-operation or bug-fix discovery ran: Sibling Candidate Table lists every high/medium candidate with cover / GAP / ignore(reason)
 - [ ] UI expectation confirmed — dev team has no room to improvise
 - [ ] Edge cases covered for critical paths *(can be deferred if time-boxed — log as Open questions)*
 - [ ] Out of scope has at least 1 item listed
@@ -728,3 +858,5 @@ If any item is unchecked → return to the corresponding phase and ask more — 
 | T17 | No phasing discussion | Large scope, short timeline, features cut mid-build with no plan |
 | T18 | Only asking, never suggesting defaults when client is unsure | Client gets stuck, session drags, no decision made |
 | T19 | Not suggesting a simpler approach when client's expectations are high | Spec says Three.js for a simple animation — CSS was enough; WebSocket for 5-minute data updates — polling was enough |
+| T20 | Not extracting state/viewer/surface axes | `/sp-plan` has to reconstruct the matrix from prose and misses lifecycle/parity bugs |
+| T21 | Listing surfaces without CREATE/READ timing | Async projections, external-down behavior, and stale read paths are left to QA to discover after code |

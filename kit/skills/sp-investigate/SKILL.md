@@ -113,6 +113,46 @@ If 2+ required fields are missing → ask ONE question via `AskUserQuestion`:
 
 **Do NOT proceed past Phase 1 without clear symptom + expected + actual.**
 
+### 1.5 — Behavior Matrix context
+
+If the report mentions status/state, role/viewer, list/detail/worklist/dashboard/feed/API/email/calendar, notification, external provider, or cross-module inconsistency, look for a related spec with `## Behavior Matrix`. Use the invariant registry README/schema as base knowledge; README examples are not runtime entries. Then read project-local invariant entries if present:
+
+- `docs/specs/<feature>/<feature>.md`
+- `docs/invariants/INV-*.md`
+
+Record the current mapping hypothesis. This is allowed to be partial until Phase 4:
+
+```
+BM CONTEXT
+═══════════════════════════════
+State/status:    <state or transition | unknown>
+Viewer/role:     <actor/viewer/relationship | unknown>
+Surface/path:    <list/detail/API/feed/calendar/etc. | unknown>
+Matrix cell:     BM.AS-NNN.<surface> | GAP-NNN | N/A:<reason> | NO_CELL | unknown
+Invariant match: <INV/C id + status | invariant text | none | no registry found>
+```
+
+If no spec or invariant registry exists, continue. Do not invent one during investigation; report the absence as a gap if it matters. If the bug confirms a repeated lifecycle/parity/cascade rule, end the report with `Invariant action needed: add/update invariant: ...`.
+
+### 1.6 — Sibling Discovery Pass (candidate only)
+
+Run this for lifecycle/parity/cascade bugs, existing-operation investigations, or any report whose symptom names one surface but the operation may exist on sibling entry-points.
+
+Purpose: diagnose blast radius before deciding root cause. This produces candidates, not requirements or fixes.
+
+1. Seed nouns/verbs from the raw symptom, touched component, related spec/BM context, and matching invariant entries.
+2. Find shared-anchor callers (`ga_callers` if GA is available; otherwise grep) for helpers/constants/schemas that define the operation.
+3. Fuzzy-search parallel names such as `create_from_*`, `*_from_<source>`, `send_*invite*`, `*_outcome*`, `reschedule*`, `book_next*`, `cancel*`, `delete*`, plus domain verbs from the symptom.
+4. Inspect recent git co-change around touched files (`git log --name-only -- <seed-file>`) for repeatedly paired files/functions.
+
+Record a `Sibling Candidate Table` in the investigation output:
+
+| Candidate | Operation | Evidence | Confidence | Investigation disposition |
+|---|---|---|---|---|
+| `<surface/path/symbol>` | same create/update/delete/send/read op? | ga_callers / grep / co-change / invariant / symptom | high / medium / low | likely-related / needs-spec-GAP / ignore(reason) |
+
+Do not auto-fix candidates. `likely-related` means the candidate belongs in the root-cause/blast-radius analysis. `needs-spec-GAP` means the report exposes an underspecified sibling. `ignore(reason)` must name why the candidate is false positive or out of scope.
+
 ---
 
 ## Phase 2: Locate
@@ -249,6 +289,9 @@ Don't mechanically check every row — scan for patterns that FIT the evidence y
 | 10 | **Resource leak** | Gradually degrades, OOM, connection pool exhausted, file descriptor limit | Find open/acquire without close/release. Check: error path also closes? Loop creates without releasing? |
 | 11 | **Incorrect merge / conflict resolution** | Bug appears after merge, code has conflicting logic | `git log --merges -5 -- <file>`. Check: merge conflict resolved incorrectly? Both sides kept when one should win? |
 | 12 | **API contract mismatch** | Caller sends X, receiver expects Y | Find both sides of the boundary. Check: field names match? Types match? Optional vs required? |
+| 13 | **Lifecycle / viewer / surface parity** | Correct on one status/role/surface but wrong on another | Map state x viewer x surface; compare write model, read models, queues, dashboard counts, feed, APIs, notifications, calendar |
+| 14 | **Cascade propagation gap** | Write succeeds but derived surfaces are stale/missing | Trace write side effects into projections, cache invalidation, event handlers, queues, external integrations |
+| 15 | **External-down divergence** | Internal state updates but provider/email/calendar state is wrong or invisible | Trace retry queue, provider status, user-visible retry surface, idempotency key |
 
 For each matching pattern, record:
 ```
@@ -313,6 +356,13 @@ Chain:        <input> → <step 1> → <step 2> → ... → <symptom>
 Disproof:     <what evidence would prove this wrong>
 Confidence:   HIGH / MEDIUM / LOW
 Basis:        <list evidence that supports this>
+Behavior Matrix:
+  State/status: <state or transition>
+  Viewer/role:  <viewer/relationship>
+  Surface/path: <surface>
+  Cell:         BM.AS-NNN.<surface> | GAP-NNN | N/A:<reason> | NO_CELL
+  Spec gap:     none | gap-open | suspicious-N/A | missing-cell
+Invariant:      <matched invariant | new invariant candidate | none>
 ```
 
 ### Confidence Levels
@@ -455,6 +505,10 @@ User-facing impact:
   - <feature/screen> — user sees <wrong behavior>
   - <API endpoint> — returns <wrong response>
 
+Behavior Matrix impact:
+  - <BM.AS-NNN.surface> — <broken state/viewer/surface behavior>
+  - <GAP-NNN or NO_CELL> — <spec hole exposed by bug>
+
 Impact scope: ISOLATED | MODULE | CROSS-MODULE | SYSTEM-WIDE
 ```
 
@@ -518,6 +572,7 @@ RECOMMENDED ACTIONS
 
 Test strategy:
   - Regression test: <what to test, at what level (unit/integration)>
+  - Behavior Matrix regression: <BM.AS-NNN.surface test name, or "spec gap before test">
   - Existing tests to verify: <list test names that should still pass>
   - Manual verification: <what to check visually, if applicable>
 
@@ -558,6 +613,13 @@ HYPOTHESIS A (PRIMARY — <confidence>)
   Location:     <file:line>
   Mechanism:    <what is wrong>
   Chain:        <cause> → <step> → ... → <symptom>
+  Behavior Matrix:
+    State/status: <state or transition>
+    Viewer/role:  <viewer/relationship>
+    Surface/path: <surface>
+    Cell:         BM.AS-NNN.<surface> | GAP-NNN | N/A:<reason> | NO_CELL
+    Spec gap:     none | gap-open | suspicious-N/A | missing-cell
+  Invariant:    <matched invariant | new invariant candidate | none>
   Evidence:
     - <file:line> — <what this code shows>
     - <git commit> — <what this change reveals>
@@ -592,6 +654,14 @@ These are inputs for refactor/tech-debt decisions, not immediate fixes.
 ─── BLAST RADIUS ───
 Scope: <ISOLATED | MODULE | CROSS-MODULE | SYSTEM-WIDE>
 <Impact details from Phase 5.2>
+
+─── BEHAVIOR MATRIX IMPACT ───
+Cells:
+  - <BM.AS-NNN.surface> — <affected behavior>
+  - <GAP-NNN / NO_CELL> — <spec hole if found>
+State/viewer/surface class: <lifecycle | viewer-parity | surface-parity | cascade | external-down | other>
+Spec action needed: <none | resolve GAP | add matrix cell | correct suspicious N/A | update AS wording>
+Invariant action needed: <none | add/update invariant: ...>
 
 ─── SIMILAR RISK ───
 (omit if scan skipped)

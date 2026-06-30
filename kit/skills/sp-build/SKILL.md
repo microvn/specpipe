@@ -84,6 +84,7 @@ The prompt MUST contain:
 2. **The dispatched-subagent contract** (paste verbatim — this is what keeps the controller the single owner of cross-story state):
    - Build only your assigned story; the Phase 2 loop runs exactly once.
    - Name every test with the `AS-NNN` it covers (`AS-NNN: <scenario>`), one test node per primary AS — the controller's Spec Coverage Gate (Phase 3.5) counts coverage by that ID, so an untagged test is invisible to it.
+   - If your pasted checklist contains `BM.<AS-NNN>.<surface>` lines, treat each as a cell-level test obligation. Your test evidence must include the AS id and exercise that exact surface/source/timing cell. Do not satisfy a BM line with a mock of the boundary named by the cell.
    - Do NOT write `.build-progress` or `.build-checklist` — the controller owns them. Report your checklist ticks in the contract instead.
    - Do NOT run Phase 3 (full-suite), Phase 4.5 (cross-story checklist review), or Phase 5 (summary/cleanup) — those are the controller's job. Run only your story's filtered tests.
    - Do NOT surface a spec signal to the user or edit the spec — return it in the `Spec signal` field.
@@ -109,6 +110,7 @@ Files changed: [...]
 Tests added: [exact test names]
 Checklist: [lines ticked]
 Edge compliance: [the 8-row table for this story — each ✓ or N/A+reason] (depth forcing-function; the controller aggregates these into Phase 5)
+Behavior Matrix evidence: [BM lines covered with test refs; BM lines partial with destinations; mocked-boundary concerns]
 Spec signal: none | S1 <gap> | S2 <conflict> | S3 <added guard>
 ```
 
@@ -266,10 +268,15 @@ Derive a checklist from the spec — each "promise" in this build's scope become
 **Sources (all in `docs/specs/<feature>/<feature>.md`) — anchor on IDENTITY, not nouns:**
 - **Each `AS-NNN` → at least one line carrying that ID** (`AS-NNN`, or `AS-NNN.Tk` when one AS needs several assertions). This is the primary anchor: the checklist is keyed on the spec's case IDs, not on text it happens to mention. A Then with several fields/effects becomes several `AS-NNN.Tk` lines — but they all carry the same AS-NNN, so the AS is never lost.
 - Each Constraint → one `C-NNN` line.
+- Each `## Behavior Matrix` cell with `Coverage = AS-NNN` → one `BM.<AS-NNN>.<surface>` line carrying the referenced `AS-NNN`. This is a stricter obligation than the generic AS line: it preserves the exact state/viewer/surface cell that QA will test.
+- Each `## Behavior Matrix` cell with `Coverage = GAP-NNN` → a normal `GAP-NNN` checklist line annotated `BM cell unresolved: <state>/<viewer>/<surface>`. It is visible, but it is NOT a BM test obligation.
+- Each `## Behavior Matrix` cell with `Coverage = N/A: <reason>` → one `[N/A] BM.NA.<surface>` line with the reason.
 - Each open `GAP-NNN` (status not `resolved`) → one `[ ]` line tagged `GAP` (so a parked gap is visible, not silently dropped — see Spec Coverage Gate).
 - Each Not-in-Scope row → one `[N/A]` line (prevents accidental ticking).
+- Each matching project-local invariant entry under `docs/invariants/INV-*.md` with `status: enforced` and a `test_ref` → one `INV-###` checklist line carrying the invariant id and test ref. `candidate` and `confirmed` entries are visible risks/spec obligations but not build gates unless the spec turned them into AS/GAP/BM lines. Use the invariant registry README/schema as base knowledge; README examples are not runtime entries.
+- Each `## Sibling Surface Map` confirmed surface is checked through its AS/GAP/BM coverage, not by a separate checklist line. Candidate rows with `GAP-NNN` or `ignore(reason)` are visible context only. A candidate row with missing disposition is a spec signal, not a build requirement to implement.
 
-**Completeness invariant (checked, not hoped):** every `AS-NNN` and `C-NNN` in the spec's `## Stories`/Constraints MUST appear on ≥1 checklist line. An AS with no line = the checklist is wrong (re-derive), not the spec. Deriving from Then-nouns alone silently drops AS whose Then is verb-shaped ("retries", "must not send") or whose nouns collide with another AS — anchoring on the ID closes that.
+**Completeness invariant (checked, not hoped):** every `AS-NNN` and `C-NNN` in the spec's `## Stories`/Constraints MUST appear on ≥1 checklist line. Every `Coverage = AS-NNN` Behavior Matrix cell MUST appear on exactly one `BM.AS-*` checklist line; every `Coverage = GAP-NNN` Behavior Matrix cell MUST appear on exactly one `GAP-* — BM cell unresolved` checklist line; every `Coverage = N/A` Behavior Matrix cell MUST appear on one `[N/A] BM.NA.*` checklist line. An AS with no line = the checklist is wrong (re-derive), not the spec. A Behavior Matrix cell with no line = QA coverage was dropped. Deriving from Then-nouns alone silently drops AS whose Then is verb-shaped ("retries", "must not send") or whose nouns collide with another AS — anchoring on the ID closes that.
 
 **Granularity rule (so two devs produce the same checklist):**
 - 1 line per **observable output field** (appears in Then result, independently assertable)
@@ -287,6 +294,9 @@ Example: Then "returns sorted list of {file, confidence, edges}" → 3 lines (on
 [ ] AS-012.T2 — affected_tests includes TESTED_BY edges              | owner: S-003
 [ ] AS-012.T3 — output sorted by confidence                          | owner: S-004
 [ ] C-003     — query completes under 50ms                           | owner: S-005
+[ ] BM.AS-012.appointment-list — Confirmed/trainer/list row parity    | owner: S-003
+[ ] GAP-004   — BM cell unresolved: Requested/booker/reschedule action | owner: GAP
+[N/A] BM.NA.cancelled-client-calendar — terminal state has no invite  | owner: —
 [N/A] AS-015  — out of scope (M3)                                    | owner: —
 ```
 
@@ -374,6 +384,22 @@ Before writing tests, trace all paths and draw a diagram to see gaps upfront —
 
 **Step 2 — Trace user flows:** For multi-step features, trace the user journey. Edge cases: double-click/rapid resubmit, navigate away mid-op, submit stale data (session expired), slow connection, concurrent actions (2 tabs open).
 
+**Step 2b — Trace Behavior Matrix cells:** If the spec has `## Behavior Matrix`, copy every non-N/A cell into the Coverage Map before drawing the diagram. Each cell is a QA-visible obligation, not just prose. Classify the test level by the cell's surface:
+- Same-process logic/state cell → unit or integration is acceptable if it observes the public boundary.
+- Cross-surface parity cell (list/detail/feed/API/dashboard/worklist) → integration/E2E over the real producer/consumer path.
+- External/provider surface (calendar/email/payment/identity) → contract/integration against the verified boundary or provider fake that is itself verified; never a pure mock of the boundary under test.
+- Timing/source cell (`realtime`, `refresh-required`, `persisted+served`, `transient`) → the test must assert that lifecycle point, not just the immediate action response.
+
+In the diagram, prefix these rows with `[BM]` and keep the AS id visible:
+
+```
+BEHAVIOR MATRIX COVERAGE
+========================
+[BM] Confirmed × trainer × worklist — AS-004
+    ├── [GAP] [→E2E] assigned trainer sees updated item
+    └── [GAP] [→E2E] non-runner does not see item
+```
+
 **Step 3 — Draw the diagram:**
 
 ```
@@ -445,6 +471,20 @@ If every path is already covered, the diagram will have zero `[GAP]` rows — th
 **REGRESSION RULE:** If the diff changes existing behavior AND no test covers that path → a regression test is a **CRITICAL requirement. No asking. No skipping.**
 
 **LINKED-FIELD SEAM RULE:** If the spec has a `## Linked Fields` block (it is one side of a producer/consumer split), each linked field's **seam AS is a real-integration test** — run it against the ACTUAL producer (build the producer side first; the consumer spec's seam tests run against it), **never a mocked consumer**. A mocked seam is a vacuous test: the mismatch it exists to catch — field on the wrong surface (list vs single-get) or wrong lifecycle (transient-in-response vs persisted+served) — is exactly what the mock hides. Do NOT mark a consumer story `done` on a mocked seam. **Auto-Mode:** a single-side subagent cannot see the seam — the controller runs the cross-spec seam tests after both sibling specs are built (A4b/A7).
+
+**BEHAVIOR MATRIX NO-VACUOUS-MOCK RULE:** If a `## Behavior Matrix` cell names a surface/source/timing boundary, the test for that cell must not mock the boundary it is meant to verify. Examples:
+- API list vs single-get parity → do not assert against fabricated response fixtures only; exercise the real read serializers/handlers or an integration path that uses them.
+- Calendar/email parity → do not mock both email and calendar recipients from the same test fixture; verify the mapping into each outbound contract or a verified provider fake.
+- Worklist/feed/dashboard cascade → do not mock the read model that should be updated; verify the persisted/read-model result after the state transition.
+
+A mocked dependency is allowed only outside the boundary under test. If you cannot test the boundary with the current harness, mark the BM checklist line `[~]` with a concrete destination (`/sp-scaffold` E2E harness, contract-test story, or Known-Gap). Do not mark it `[x]`.
+
+**TERMINAL LIFECYCLE CASCADE TEST RULE:** If a Behavior Matrix cell or AS describes a terminal lifecycle action (`done`, `completed`, `cancelled`, `declined`, `log outcome`, `terminal outcome`, `overdue outcome`, `reschedule creates replacement`) that removes, cancels, replaces, or advances pending work, the owning checklist MUST include a named cascade test. The test name or evidence must contain the word `cascade` and assert the downstream work surface changed, not only the primary record. Examples:
+- Pending matchup terminal outcome → assert pending matchup queue/assignment affordance is removed or cancelled.
+- Reschedule/next appointment → assert old and new appointment state, runner/owner carry-forward, and affected calendar/worklist surfaces.
+- Outcome-created tracker/todo/FNA/production records → assert the downstream record is visible to the required viewer(s) with the expected role fields.
+
+Do not satisfy this rule with a unit test that only checks `is_done`, status text, or a returned DTO. If the downstream surface cannot be exercised in the current harness, mark the BM line `[~]` with a concrete cascade-test destination. A terminal lifecycle BM line without a cascade test is not DONE.
 
 ---
 
@@ -551,8 +591,14 @@ Record for the Phase 5 summary: `S-00X added N tests: <list exact test names>`. 
 ```
 [x] AS-012.T1 — covered by affected_tests_test.rs:test_convention_match
 [~] AS-012.T2 — PARTIAL: query wired, emit deferred → M3 S-008
+[x] BM.AS-012.appointment-list — covered by appointment_reschedule_e2e.ts:AS-012 list row parity
 ```
 For `[x]`, record `file:test-name`. For `[~]`, record the destination.
+
+If a checklist line starts with `BM.`:
+- The `file:test-name` must include the AS id from the BM line.
+- The test must assert the exact cell surface/source/timing from the Behavior Matrix row.
+- Before ticking `[x]`, apply the Behavior Matrix No-Vacuous-Mock Rule. If the test mocks the named boundary, mark `[~]` with a concrete destination instead.
 
 **Carve-out scan on the story diff:**
 ```
@@ -647,6 +693,57 @@ comm -23 /tmp/spec-ids.txt /tmp/covered-ids.txt
 
 **Auto-mode:** the controller runs this gate at A7 (finish) over the whole spec, and may run the per-story slice after each story's gates (A4). Dispatched subagents are told (A2 contract) to embed `AS-NNN` in every test name so the gate can see their work.
 
+### Behavior Matrix Coverage Gate
+
+Run this in addition to the AS/C identity gate when the spec contains `## Behavior Matrix`.
+
+The AS/C gate proves every acceptance scenario has at least one test. It does not prove every state/viewer/surface cell was tested, because several cells can share one AS id. The Behavior Matrix gate is the stricter cell-level check.
+
+Required evidence for each matrix cell:
+- For `Coverage = AS-NNN`: a `.build-checklist` line named `BM.<AS-NNN>.<surface>` is `[x]`.
+- That line includes a concrete test reference (`file:test-name`) and the test name contains the cell's `AS-NNN`.
+- The referenced test exercises the named surface/source/timing boundary, not a mock of that boundary.
+- If the cell is a terminal lifecycle/cascade cell, the referenced evidence includes a named cascade test per the Terminal Lifecycle Cascade Test Rule.
+- For `Coverage = GAP-NNN`: a normal `GAP-NNN — BM cell unresolved: ...` checklist line exists. It stays visible in the open-gaps summary and is not a test obligation until `/sp-plan` resolves it into an AS.
+- For `Coverage = N/A`: an `[N/A] BM.NA.<surface>` checklist line exists with a concrete reason.
+
+Minimal shell check (identity only; still review the checklist line for surface/boundary evidence):
+
+```bash
+CHECKLIST=docs/specs/<feature>/.build-checklist
+
+# Any BM.AS line not ticked is an uncovered matrix test obligation.
+grep '^\\[ \\] BM\\.AS\\|^\\[~\\] BM\\.AS' "$CHECKLIST" || true
+
+# Any ticked BM.AS line without a test reference is suspicious and must be reviewed.
+grep '^\\[x\\] BM\\.AS' "$CHECKLIST" | grep -vE '[[:alnum:]_./-]+:[[:alnum:]_ -]+' || true
+```
+
+- **Any `[ ] BM.AS...` line → BLOCKED.** The QA cell has no test.
+- **Any `[~] BM.AS...` line → DONE_WITH_CONCERNS**, unless the destination is a concrete future story/Known-Gap and the feature is not release-critical.
+- **Any `[x] BM.AS...` line with only mocked-boundary evidence → treat as `[~]`**, not done.
+- **Any terminal lifecycle BM line without a named cascade test → treat as `[~]` or BLOCKED**, depending on release criticality.
+- **Any `GAP-NNN — BM cell unresolved` line → visible open gap, not a build test failure.** Do not implement or test that cell until `/sp-plan` resolves it.
+
+### Sibling Surface Map Gate
+
+Run this when the spec contains `## Sibling Surface Map`.
+
+- Confirmed sibling surfaces must be covered indirectly by AS/GAP/BM lines. If a confirmed surface has no AS/GAP/BM coverage, emit a Spec Signal and mark DONE_WITH_CONCERNS or BLOCKED depending on release criticality.
+- Candidate rows are not build gates. Do not implement a candidate solely because it was discovered.
+- A high/medium candidate without `cover`, `GAP-NNN`, or `ignore(reason)` means `/sp-plan` did not finish disposition. Emit a Spec Signal; do not silently choose behavior in code.
+
+### Invariant Registry Gate
+
+Use the invariant registry README/schema as base knowledge; README examples are not runtime entries. Run this when the current project has `docs/invariants/INV-*.md`.
+
+- `status: enforced` with `test_ref` → the referenced test, or an equivalent regression named in the build summary, must be present and run. Missing evidence → BLOCKED.
+- `status: confirmed` → not a hard build gate by itself; verify the spec has AS/GAP/BM coverage when this build touches the component.
+- `status: candidate` → advisory only; do not invent requirements. If the build confirms it, emit a Spec Signal to promote it via `/sp-plan` or `/sp-fix`.
+- `status: retired` → ignore unless this build revives the component.
+
+This gate prevents "memory exists but is never enforced" while avoiding false requirements from noisy candidate entries.
+
 ---
 
 ## Phase 4: Fix Loop
@@ -722,6 +819,9 @@ Stories: [AS-001 ✓, AS-002 ✓, AS-005 new]
 TDD evidence: [S-001: RED (paste 1st failing assertion raw) → GREEN ✓ | tests added: <names>, S-002: RED (raw output) → GREEN ✓ | tests added: <names>]
 Checklist: X/Y [x], A/Y [~] (destinations: <story-id list or Known-Gap refs>), B/Y [ ] (reasons), C/Y [N/A]
 Coverage gate (Phase 3.5): PASS — all AS/C carry a test | BLOCKED — uncovered: <AS/C ids>   (breadth)
+Behavior Matrix gate: PASS — all BM cells [x] | BLOCKED — uncovered: <BM lines> | CONCERNS — partial/mocked-boundary: <BM lines>
+Sibling Surface Map gate: PASS — confirmed surfaces covered | CONCERNS — candidate disposition/spec signal: <candidate ids> | N/A
+Invariant gate: PASS — enforced invariants covered | BLOCKED — missing enforced invariant tests: <INV ids> | N/A — no enforced invariants touched
 Edge Case Compliance: [per-story table — every row ✓ or N/A+reason]   (depth)
 Open gaps: [GAP-NNN not yet resolved, or "none"]
 E2E: [authored + green: <test names> | deferred non-critical (with reason): <flows> | none]. A critical [→E2E] left unwritten → status is DONE_WITH_CONCERNS, not DONE.

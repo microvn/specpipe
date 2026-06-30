@@ -147,10 +147,18 @@ function main() {
   const filePath = payload.tool_input?.file_path;
   if (!filePath) process.exit(0);
 
-  // Skip files outside the project directory (e.g. ~/.claude/plans/)
-  const projectDir = process.cwd() + path.sep;
+  // Cursor's generic postToolUse fires for EVERY tool (Read, Grep, Shell, …); only act
+  // on writes/edits. Claude's PostToolUse matcher already restricts this, so tool_name is
+  // either a write-ish name or absent there — both pass.
+  const toolName = payload.tool_name;
+  if (toolName && !/^(Write|Edit|MultiEdit|write_to_file|replace_file_content)/i.test(toolName)) process.exit(0);
+
+  // Skip files outside the project directory (e.g. ~/.claude/plans/). Cursor passes the
+  // project root in workspace_roots; otherwise fall back to cwd.
+  const projectRoot = (Array.isArray(payload.workspace_roots) && payload.workspace_roots[0]) || process.cwd();
+  const projectDir = projectRoot + path.sep;
   const resolvedFile = path.resolve(filePath);
-  if (!resolvedFile.startsWith(projectDir) && resolvedFile !== process.cwd()) process.exit(0);
+  if (!resolvedFile.startsWith(projectDir) && resolvedFile !== projectRoot) process.exit(0);
 
   // Skip non-source-code files (docs, configs, templates are naturally long)
   const ext = path.extname(filePath).toLowerCase();
@@ -173,14 +181,8 @@ function main() {
   try {
     const stat = fs.statSync(filePath);
     if (stat.size > MAX_BYTES) {
-      const rel = path.relative(process.cwd(), filePath);
-      process.stdout.write(JSON.stringify({
-        continue: true,
-        hookSpecificOutput: {
-          hookEventName: "PostToolUse",
-          additionalContext: `Warning: ${rel} is ${Math.round(stat.size / 1024)}KB. Consider splitting into smaller modules.`,
-        },
-      }) + "\n");
+      const rel = path.relative(projectRoot, filePath);
+      emitWarning(`Warning: ${rel} is ${Math.round(stat.size / 1024)}KB. Consider splitting into smaller modules.`, payload);
       process.exit(0);
     }
     const buf = fs.readFileSync(filePath);
@@ -194,18 +196,21 @@ function main() {
   if (lineCount <= THRESHOLD) process.exit(0);
 
   // Inject non-blocking warning
-  const rel = path.relative(process.cwd(), filePath);
-  const warning = `Warning: ${rel} has ${lineCount} lines (threshold: ${THRESHOLD}). Consider splitting into smaller, focused modules.`;
+  const rel = path.relative(projectRoot, filePath);
+  emitWarning(`Warning: ${rel} has ${lineCount} lines (threshold: ${THRESHOLD}). Consider splitting into smaller, focused modules.`, payload);
+}
 
-  process.stdout.write(
-    JSON.stringify({
+// Inject an advisory warning in the agent's native shape. Cursor's postToolUse reads
+// `additional_context`; Claude (and Codex PostToolUse) read hookSpecificOutput.additionalContext.
+function emitWarning(warning, payload) {
+  if (payload.cursor_version || payload.hook_event_name === "postToolUse") {
+    process.stdout.write(JSON.stringify({ additional_context: warning }) + "\n");
+  } else {
+    process.stdout.write(JSON.stringify({
       continue: true,
-      hookSpecificOutput: {
-        hookEventName: "PostToolUse",
-        additionalContext: warning,
-      },
-    }) + "\n"
-  );
+      hookSpecificOutput: { hookEventName: "PostToolUse", additionalContext: warning },
+    }) + "\n");
+  }
 }
 
 try {

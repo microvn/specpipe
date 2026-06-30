@@ -42,7 +42,7 @@ Reuse `fmNameDesc` (name + description) unless the agent needs something special
 In the `RULES` map (same file), add how the agent carries the always-on guards:
 
 ```js
-windsurf: { mode: 'file', path: '.windsurf/rules/specpipe-guards.md',
+windsurf: { mode: 'file', path: '.windsurf/rules/specpipe-rules.md',
             frontmatter: 'activation: always' },
 ```
 

@@ -126,21 +126,16 @@ assert_exists "skills: sp-md-render/components.md"     "$PROJECT_DIR/.claude/ski
 assert_exists "skills: sp-humanize/SKILL.md"          "$PROJECT_DIR/.claude/skills/sp-humanize/SKILL.md"
 
 # Hooks
-assert_exists "hooks: path-guard.sh"      "$PROJECT_DIR/.claude/hooks/path-guard.sh"
-assert_exists "hooks: sensitive-guard.sh" "$PROJECT_DIR/.claude/hooks/sensitive-guard.sh"
+assert_exists "hooks: specpipe-shell-guard.sh"      "$PROJECT_DIR/.claude/hooks/specpipe-shell-guard.sh"
+assert_exists "hooks: specpipe-read-guard.sh" "$PROJECT_DIR/.claude/hooks/specpipe-read-guard.sh"
 assert_exists "hooks: comment-guard.js"   "$PROJECT_DIR/.claude/hooks/comment-guard.js"
 assert_exists "hooks: glob-guard.js"      "$PROJECT_DIR/.claude/hooks/glob-guard.js"
 assert_exists "hooks: file-guard.js"      "$PROJECT_DIR/.claude/hooks/file-guard.js"
-assert_exists "hooks: self-review.sh"     "$PROJECT_DIR/.claude/hooks/self-review.sh"
 
 # Config, docs
 assert_exists "config: settings.json"  "$PROJECT_DIR/.claude/settings.json"
 assert_exists "config: CLAUDE.md"      "$PROJECT_DIR/.claude/CLAUDE.md"
-assert_exists "docs: WORKFLOW.md"      "$PROJECT_DIR/docs/WORKFLOW.md"
 
-# Placeholder dirs
-assert_exists "placeholder: docs/specs/.gitkeep"      "$PROJECT_DIR/docs/specs/.gitkeep"
-assert_exists "placeholder: docs/test-plans/.gitkeep" "$PROJECT_DIR/docs/test-plans/.gitkeep"
 
 # Manifest
 assert_exists "manifest: created" "$PROJECT_DIR/.specpipe/manifest.json"
@@ -148,15 +143,14 @@ assert_json_valid "manifest: valid JSON" "$PROJECT_DIR/.specpipe/manifest.json"
 MANIFEST=$(cat "$PROJECT_DIR/.specpipe/manifest.json")
 assert_contains "manifest: has version key" '"version"' "$MANIFEST"
 assert_contains "manifest: has files key"   '"files"'   "$MANIFEST"
-assert_contains "manifest: tracks a hook"   'path-guard.sh' "$MANIFEST"
+assert_contains "manifest: tracks a skill"  'sp-plan' "$MANIFEST"
 
 # settings.json valid JSON
 assert_json_valid "settings.json: valid JSON" "$PROJECT_DIR/.claude/settings.json"
 
 # Executable permissions
-assert_executable "path-guard.sh is executable"      "$PROJECT_DIR/.claude/hooks/path-guard.sh"
-assert_executable "sensitive-guard.sh is executable" "$PROJECT_DIR/.claude/hooks/sensitive-guard.sh"
-assert_executable "self-review.sh is executable"     "$PROJECT_DIR/.claude/hooks/self-review.sh"
+assert_executable "specpipe-shell-guard.sh is executable"      "$PROJECT_DIR/.claude/hooks/specpipe-shell-guard.sh"
+assert_executable "specpipe-read-guard.sh is executable" "$PROJECT_DIR/.claude/hooks/specpipe-read-guard.sh"
 
 teardown
 
@@ -167,8 +161,26 @@ setup
 cli init "$PROJECT_DIR" --only skills
 
 assert_exists "skills present with --only skills"  "$PROJECT_DIR/.claude/skills/sp-plan/SKILL.md"
-assert_absent "hooks absent with --only skills"    "$PROJECT_DIR/.claude/hooks/path-guard.sh"
-assert_absent "docs absent with --only skills"     "$PROJECT_DIR/docs/WORKFLOW.md"
+assert_absent "hooks absent with --only skills"    "$PROJECT_DIR/.claude/hooks/specpipe-shell-guard.sh"
+assert_absent "rules absent with --only skills"    "$PROJECT_DIR/.claude/CLAUDE.md"
+
+teardown
+
+# ── init: project-info fill reaches every agent's rules file ──────────────────
+section "init fills [CUSTOMIZE] in all rules files (incl. Antigravity .agents/rules)"
+setup
+# Detectable project so fillTemplate has values to substitute.
+printf '{"name":"x","devDependencies":{"vitest":"^1"}}\n' > "$PROJECT_DIR/package.json"
+mkdir -p "$PROJECT_DIR/src" "$PROJECT_DIR/test"
+
+cli init "$PROJECT_DIR" --agents claude,antigravity,cursor
+# grep -c prints "0" and exits 1 on zero matches — capture the count, ignore the exit.
+CM_LEFT=$(grep -c '\[CUSTOMIZE\]' "$PROJECT_DIR/.claude/CLAUDE.md" 2>/dev/null || true); CM_LEFT=${CM_LEFT:-99}
+AG_LEFT=$(grep -c '\[CUSTOMIZE\]' "$PROJECT_DIR/.agents/rules/specpipe-rules.md" 2>/dev/null || true); AG_LEFT=${AG_LEFT:-99}
+CU_LEFT=$(grep -c '\[CUSTOMIZE\]' "$PROJECT_DIR/.cursor/rules/specpipe-rules.mdc" 2>/dev/null || true); CU_LEFT=${CU_LEFT:-99}
+[[ "$CM_LEFT" -eq 0 ]] && pass "CLAUDE.md project-info filled" || fail "CLAUDE.md still has [CUSTOMIZE] ($CM_LEFT)"
+[[ "$AG_LEFT" -eq 0 ]] && pass "Antigravity .agents/rules filled (RULE_FILES regression guard)" || fail "Antigravity rules still has [CUSTOMIZE] ($AG_LEFT)"
+[[ "$CU_LEFT" -eq 0 ]] && pass "Cursor .mdc rules filled" || fail "Cursor rules still has [CUSTOMIZE] ($CU_LEFT)"
 
 teardown
 
@@ -179,7 +191,7 @@ setup
 cli init "$PROJECT_DIR" --dry-run
 
 assert_absent "no skills with --dry-run"   "$PROJECT_DIR/.claude/skills/sp-plan/SKILL.md"
-assert_absent "no hooks with --dry-run"    "$PROJECT_DIR/.claude/hooks/path-guard.sh"
+assert_absent "no hooks with --dry-run"    "$PROJECT_DIR/.claude/hooks/specpipe-shell-guard.sh"
 assert_absent "no manifest with --dry-run" "$PROJECT_DIR/.specpipe/manifest.json"
 
 teardown
@@ -200,9 +212,9 @@ section "init --force"
 setup
 
 cli init "$PROJECT_DIR"
-printf '# CUSTOM CONTENT\n' > "$PROJECT_DIR/.claude/hooks/path-guard.sh"
+printf '# CUSTOM CONTENT\n' > "$PROJECT_DIR/.claude/hooks/specpipe-shell-guard.sh"
 cli init "$PROJECT_DIR" --force
-CONTENT=$(cat "$PROJECT_DIR/.claude/hooks/path-guard.sh")
+CONTENT=$(cat "$PROJECT_DIR/.claude/hooks/specpipe-shell-guard.sh")
 assert_not_contains "force: custom content overwritten" "CUSTOM CONTENT" "$CONTENT"
 
 teardown
@@ -239,13 +251,14 @@ section "upgrade (customized file — skip)"
 setup
 
 cli init "$PROJECT_DIR"
-# Patch manifest kitHash → upgrade thinks kit changed; file content also differs → customized
-fake_kit_hash "$PROJECT_DIR" ".claude/hooks/path-guard.sh"
-printf '# CUSTOM CONTENT\n' >> "$PROJECT_DIR/.claude/hooks/path-guard.sh"
+# Patch manifest kitHash → upgrade thinks kit changed; file content also differs → customized.
+# Use a skill (manifest-tracked, customization-aware). Hooks are now emitted, not tracked.
+fake_kit_hash "$PROJECT_DIR" ".claude/skills/sp-plan/SKILL.md"
+printf '\n# CUSTOM CONTENT\n' >> "$PROJECT_DIR/.claude/skills/sp-plan/SKILL.md"
 
 OUT_SKIP=$(cli_out upgrade "$PROJECT_DIR")
 assert_contains "upgrade: skips customized file" "customized" "$OUT_SKIP"
-CONTENT=$(cat "$PROJECT_DIR/.claude/hooks/path-guard.sh")
+CONTENT=$(cat "$PROJECT_DIR/.claude/skills/sp-plan/SKILL.md")
 assert_contains "upgrade: custom content preserved" "CUSTOM CONTENT" "$CONTENT"
 
 teardown
@@ -255,11 +268,11 @@ section "upgrade --force (overwrites customized)"
 setup
 
 cli init "$PROJECT_DIR"
-fake_kit_hash "$PROJECT_DIR" ".claude/hooks/path-guard.sh"
-printf '# CUSTOM CONTENT\n' >> "$PROJECT_DIR/.claude/hooks/path-guard.sh"
+fake_kit_hash "$PROJECT_DIR" ".claude/skills/sp-plan/SKILL.md"
+printf '\n# CUSTOM CONTENT\n' >> "$PROJECT_DIR/.claude/skills/sp-plan/SKILL.md"
 
 cli upgrade "$PROJECT_DIR" --force
-CONTENT=$(cat "$PROJECT_DIR/.claude/hooks/path-guard.sh")
+CONTENT=$(cat "$PROJECT_DIR/.claude/skills/sp-plan/SKILL.md")
 assert_not_contains "force upgrade: custom content gone" "CUSTOM CONTENT" "$CONTENT"
 
 teardown
@@ -290,16 +303,33 @@ section "remove (per-project)"
 setup
 
 cli init "$PROJECT_DIR"
+# A user spec (created by /sp-plan in real use) must survive remove.
+mkdir -p "$PROJECT_DIR/docs/specs/myfeature"
+echo "spec" > "$PROJECT_DIR/docs/specs/myfeature/myfeature.md"
 cli remove "$PROJECT_DIR"
 
-assert_absent "hooks removed"     "$PROJECT_DIR/.claude/hooks/path-guard.sh"
+assert_absent "hooks removed"     "$PROJECT_DIR/.claude/hooks/specpipe-shell-guard.sh"
 assert_absent "skills removed"    "$PROJECT_DIR/.claude/skills/sp-plan/SKILL.md"
 assert_absent "manifest removed"  "$PROJECT_DIR/.specpipe/manifest.json"
 
-# Preserved items
-assert_exists "CLAUDE.md preserved"   "$PROJECT_DIR/.claude/CLAUDE.md"
-assert_exists "docs/ preserved"       "$PROJECT_DIR/docs/WORKFLOW.md"
-assert_exists "docs/specs preserved"  "$PROJECT_DIR/docs/specs/.gitkeep"
+# A specpipe-only CLAUDE.md (just our section) is removed; the user's specs are preserved.
+assert_absent "specpipe-only CLAUDE.md removed" "$PROJECT_DIR/.claude/CLAUDE.md"
+assert_exists "user specs preserved"  "$PROJECT_DIR/docs/specs/myfeature/myfeature.md"
+
+teardown
+
+# ── remove: preserves the user's own CLAUDE.md content (strips only our section) ──
+section "remove (preserves user content in CLAUDE.md)"
+setup
+
+mkdir -p "$PROJECT_DIR/.claude"
+printf '# My Project\n\nMy own notes.\n' > "$PROJECT_DIR/.claude/CLAUDE.md"
+cli init "$PROJECT_DIR"
+cli remove "$PROJECT_DIR"
+assert_exists   "user CLAUDE.md kept"            "$PROJECT_DIR/.claude/CLAUDE.md"
+CONTENT=$(cat "$PROJECT_DIR/.claude/CLAUDE.md")
+assert_contains "user content preserved"         "My own notes" "$CONTENT"
+assert_not_contains "specpipe section stripped"  "specpipe:rules:begin" "$CONTENT"
 
 teardown
 
@@ -328,6 +358,75 @@ assert_exit_code "remove with no manifest exits 1" 1 "$EXIT"
 
 teardown
 
+# ── migration: init over an old (mf-*/legacy) install prunes the predecessors ─
+section "init migrates: prunes legacy files a prior manifest tracked"
+setup
+# Mock an old claude-devkit install: mf-* skills + a legacy hook, tracked in the
+# legacy manifest location. A user's own untracked file must survive.
+mkdir -p "$PROJECT_DIR/.claude/skills/mf-plan" "$PROJECT_DIR/.claude/skills/my-own" "$PROJECT_DIR/.claude/hooks"
+echo old > "$PROJECT_DIR/.claude/skills/mf-plan/SKILL.md"
+echo mine > "$PROJECT_DIR/.claude/skills/my-own/SKILL.md"
+echo old > "$PROJECT_DIR/.claude/hooks/path-guard.sh"
+printf '{"version":"1.13.1","agents":["claude"],"files":{".claude/skills/mf-plan/SKILL.md":{"kitHash":"a"},".claude/hooks/path-guard.sh":{"kitHash":"c"}}}\n' \
+  > "$PROJECT_DIR/.claude/.devkit-manifest.json"
+
+cli init "$PROJECT_DIR" -y
+assert_absent "migration: legacy mf-plan skill pruned"   "$PROJECT_DIR/.claude/skills/mf-plan"
+assert_absent "migration: legacy path-guard hook pruned" "$PROJECT_DIR/.claude/hooks/path-guard.sh"
+assert_exists "migration: new sp-plan installed"         "$PROJECT_DIR/.claude/skills/sp-plan/SKILL.md"
+assert_exists "migration: user's own untracked skill kept" "$PROJECT_DIR/.claude/skills/my-own/SKILL.md"
+
+teardown
+
+# ── remove: leaves no empty agent dir behind (.codex) ─────────────────────────
+section "remove (no empty agent dir left behind)"
+setup
+
+cli init "$PROJECT_DIR" --agents claude,codex
+assert_exists "codex hook config installed" "$PROJECT_DIR/.codex/hooks.json"
+cli remove "$PROJECT_DIR"
+assert_absent "full remove deletes the empty .codex dir" "$PROJECT_DIR/.codex"
+
+teardown
+
+# ── remove --agents: drop one agent, keep the rest + shared files ─────────────
+section "remove --agents (selective; shared files survive)"
+setup
+
+cli init "$PROJECT_DIR" --agents antigravity,codex
+assert_exists "AGENTS.md (codex rules) present"            "$PROJECT_DIR/AGENTS.md"
+assert_exists "codex hooks present"                        "$PROJECT_DIR/.codex/hooks.json"
+assert_exists "shared .agents/skills present"              "$PROJECT_DIR/.agents/skills/sp-plan/SKILL.md"
+
+# Dry run changes nothing.
+OUT_RM=$(cli_out remove "$PROJECT_DIR" --agents codex --dry-run)
+assert_contains "dry-run announces what it would remove" "would remove" "$OUT_RM"
+assert_exists "dry-run leaves codex hooks in place"        "$PROJECT_DIR/.codex/hooks.json"
+assert_exists "dry-run leaves AGENTS.md in place"          "$PROJECT_DIR/AGENTS.md"
+
+# Real selective removal.
+cli remove "$PROJECT_DIR" --agents codex
+assert_absent "codex merge rules (AGENTS.md) removed"      "$PROJECT_DIR/AGENTS.md"
+assert_absent "codex agent dir removed"                    "$PROJECT_DIR/.codex"
+assert_exists "antigravity shared skill kept"              "$PROJECT_DIR/.agents/skills/sp-plan/SKILL.md"
+assert_exists "antigravity owned rules kept"               "$PROJECT_DIR/.agents/rules/specpipe-rules.md"
+MF=$(cat "$PROJECT_DIR/.specpipe/manifest.json")
+assert_contains "manifest agents pruned to antigravity"    '"antigravity"' "$MF"
+[[ "$MF" != *'"codex"'* ]] && pass "manifest no longer lists codex" || fail "manifest still lists codex"
+
+teardown
+
+# ── remove --agents: openclaw+hermes share SPECPIPE-RULES.md ──────────────────
+section "remove --agents (shared rules doc survives partner)"
+setup
+
+cli init "$PROJECT_DIR" --agents openclaw,hermes
+assert_exists "shared SPECPIPE-RULES.md present" "$PROJECT_DIR/SPECPIPE-RULES.md"
+cli remove "$PROJECT_DIR" --agents openclaw
+assert_exists "SPECPIPE-RULES.md kept for hermes" "$PROJECT_DIR/SPECPIPE-RULES.md"
+
+teardown
+
 # ══════════════════════════════════════════════════════════════════════════════
 # INIT — Global
 # ══════════════════════════════════════════════════════════════════════════════
@@ -349,17 +448,15 @@ assert_exists "global skills: sp-voices"    "$TEST_HOME/.claude/skills/sp-voices
 assert_exists "global skills: sp-humanize"  "$TEST_HOME/.claude/skills/sp-humanize/SKILL.md"
 
 # All 6 hooks
-assert_exists "global hooks: path-guard.sh"      "$TEST_HOME/.claude/hooks/path-guard.sh"
-assert_exists "global hooks: sensitive-guard.sh"  "$TEST_HOME/.claude/hooks/sensitive-guard.sh"
+assert_exists "global hooks: specpipe-shell-guard.sh"      "$TEST_HOME/.claude/hooks/specpipe-shell-guard.sh"
+assert_exists "global hooks: specpipe-read-guard.sh"  "$TEST_HOME/.claude/hooks/specpipe-read-guard.sh"
 assert_exists "global hooks: comment-guard.js"    "$TEST_HOME/.claude/hooks/comment-guard.js"
 assert_exists "global hooks: glob-guard.js"       "$TEST_HOME/.claude/hooks/glob-guard.js"
 assert_exists "global hooks: file-guard.js"       "$TEST_HOME/.claude/hooks/file-guard.js"
-assert_exists "global hooks: self-review.sh"      "$TEST_HOME/.claude/hooks/self-review.sh"
 
 # Executable permissions
-assert_executable "global: path-guard.sh executable"      "$TEST_HOME/.claude/hooks/path-guard.sh"
-assert_executable "global: sensitive-guard.sh executable"  "$TEST_HOME/.claude/hooks/sensitive-guard.sh"
-assert_executable "global: self-review.sh executable"      "$TEST_HOME/.claude/hooks/self-review.sh"
+assert_executable "global: specpipe-shell-guard.sh executable"      "$TEST_HOME/.claude/hooks/specpipe-shell-guard.sh"
+assert_executable "global: specpipe-read-guard.sh executable"  "$TEST_HOME/.claude/hooks/specpipe-read-guard.sh"
 
 teardown
 
@@ -375,13 +472,11 @@ assert_json_valid   "global: settings.json valid JSON" "$SETTINGS"
 S=$(cat "$SETTINGS")
 assert_contains "settings: PreToolUse section"       '"PreToolUse"'       "$S"
 assert_contains "settings: PostToolUse section"      '"PostToolUse"'      "$S"
-assert_contains "settings: Stop section"             '"Stop"'             "$S"
-assert_contains "settings: path-guard.sh registered"      "path-guard.sh"      "$S"
-assert_contains "settings: sensitive-guard.sh registered" "sensitive-guard.sh" "$S"
+assert_contains "settings: specpipe-shell-guard.sh registered"      "specpipe-shell-guard.sh"      "$S"
+assert_contains "settings: specpipe-read-guard.sh registered" "specpipe-read-guard.sh" "$S"
 assert_contains "settings: comment-guard.js registered"   "comment-guard.js"   "$S"
 assert_contains "settings: glob-guard.js registered"      "glob-guard.js"      "$S"
 assert_contains "settings: file-guard.js registered"      "file-guard.js"      "$S"
-assert_contains "settings: self-review.sh registered"     "self-review.sh"     "$S"
 
 teardown
 
@@ -398,6 +493,24 @@ assert_contains "global manifest: globalHooksInstalled=true" '"globalHooksInstal
 teardown
 
 # ── init --global: idempotent (no duplicate settings entries) ─────────────────
+# ── init --global migrates: prunes legacy no-agent skills, keeps user's own ──
+section "init --global migrates legacy mf-* skills (no agent field)"
+setup
+# Mock an old claude-devkit GLOBAL install: skills tracked WITHOUT an `agent` field
+# (the legacy manifest format), plus a user's own skill that was never tracked.
+mkdir -p "$TEST_HOME/.claude/skills/mf-plan" "$TEST_HOME/.claude/skills/autoplan"
+echo old  > "$TEST_HOME/.claude/skills/mf-plan/SKILL.md"
+echo mine > "$TEST_HOME/.claude/skills/autoplan/SKILL.md"
+printf '{"globalInstalled":true,"globalAgents":["claude"],"files":{".claude/skills/mf-plan/SKILL.md":{"kitHash":"x"}}}\n' \
+  > "$TEST_HOME/.claude/.devkit-manifest.json"
+
+cli init --global --agents claude
+assert_absent "global migrate: legacy mf-plan pruned"        "$TEST_HOME/.claude/skills/mf-plan"
+assert_exists "global migrate: user's untracked skill kept"  "$TEST_HOME/.claude/skills/autoplan/SKILL.md"
+assert_exists "global migrate: new sp-plan installed"        "$TEST_HOME/.claude/skills/sp-plan/SKILL.md"
+
+teardown
+
 section "init --global (idempotent — no duplicate hook entries)"
 setup
 
@@ -405,12 +518,12 @@ cli init --global
 cli init --global
 
 S=$(cat "$TEST_HOME/.claude/settings.json")
-# sensitive-guard.sh appears in 2 matcher groups (Bash + Read|Write|...)
+# specpipe-read-guard.sh appears in 2 matcher groups (Bash + Read|Write|...)
 # Running init twice must not double it to 4
-COUNT=$(printf '%s' "$S" | grep -c "sensitive-guard.sh" || true)
+COUNT=$(printf '%s' "$S" | grep -c "specpipe-read-guard.sh" || true)
 [[ "$COUNT" -le 2 ]] \
-  && pass "no duplicate sensitive-guard entries after 2x init (count=$COUNT)" \
-  || fail "duplicate sensitive-guard entries after 2x init (count=$COUNT, expected ≤2)"
+  && pass "no duplicate read-guard entries after 2x init (count=$COUNT)" \
+  || fail "duplicate read-guard entries after 2x init (count=$COUNT, expected ≤2)"
 
 teardown
 
@@ -426,7 +539,7 @@ cli init --global
 
 S=$(cat "$TEST_HOME/.claude/settings.json")
 assert_contains "user hook preserved after global init" "custom-hook.sh" "$S"
-assert_contains "devkit hooks added alongside user hook" "path-guard.sh"  "$S"
+assert_contains "devkit hooks added alongside user hook" "specpipe-shell-guard.sh"  "$S"
 
 teardown
 
@@ -451,8 +564,29 @@ setup
 
 cli init --global
 OUT_UG=$(cli_out upgrade --global)
-assert_contains "global upgrade no changes: skills unchanged"  "unchanged" "$OUT_UG"
-assert_contains "global upgrade no changes: hooks unchanged"   "unchanged" "$OUT_UG"
+assert_contains "global upgrade no changes: skills identical"  "identical" "$OUT_UG"
+assert_contains "global upgrade no changes: hooks identical"   "identical" "$OUT_UG"
+# Hooks MUST be recorded in the global manifest (else savedKitHash is always
+# undefined → every version bump looks "customized" and stale hooks never update).
+MF=$(cat "$TEST_HOME/.claude/.devkit-manifest.json")
+assert_contains "global manifest tracks shell-guard hook" '.claude/hooks/specpipe-shell-guard.sh' "$MF"
+
+teardown
+
+# ── upgrade --global: a STALE (tracked) hook auto-updates, not stranded ───────
+section "upgrade --global (stale tracked hook auto-updates)"
+setup
+
+cli init --global
+# Simulate an OLD specpipe version on disk that we DID write (manifest kitHash set to
+# its hash) — the difference is version drift, not a user edit → must auto-update.
+SG="$TEST_HOME/.claude/hooks/specpipe-shell-guard.sh"
+printf '#!/usr/bin/env bash\n# STALE\nexit 0\n' > "$SG"
+OLD=$(node -e 'const c=require("crypto"),fs=require("fs");process.stdout.write(c.createHash("sha256").update(fs.readFileSync(process.argv[1])).digest("hex"))' "$SG")
+node -e 'const f=process.argv[1],fs=require("fs");const m=JSON.parse(fs.readFileSync(f));m.files[".claude/hooks/specpipe-shell-guard.sh"]={kitHash:process.argv[2]};fs.writeFileSync(f,JSON.stringify(m))' "$TEST_HOME/.claude/.devkit-manifest.json" "$OLD"
+cli upgrade --global
+assert_not_contains "stale hook not left as STALE" "# STALE" "$(cat "$SG")"
+assert_contains     "stale hook refreshed to current kit" "specpipe-shell-guard.sh" "$(cat "$SG")"
 
 teardown
 
@@ -461,10 +595,10 @@ section "upgrade --global (customized hook — skip)"
 setup
 
 cli init --global
-printf '# CUSTOM\n' >> "$TEST_HOME/.claude/hooks/path-guard.sh"
+printf '# CUSTOM\n' >> "$TEST_HOME/.claude/hooks/specpipe-shell-guard.sh"
 OUT_UGSKIP=$(cli_out upgrade --global)
 assert_contains "global upgrade: skips customized hook" "customized" "$OUT_UGSKIP"
-CONTENT=$(cat "$TEST_HOME/.claude/hooks/path-guard.sh")
+CONTENT=$(cat "$TEST_HOME/.claude/hooks/specpipe-shell-guard.sh")
 assert_contains "global upgrade: custom content preserved" "CUSTOM" "$CONTENT"
 
 teardown
@@ -474,9 +608,9 @@ section "upgrade --global --force (overwrites customized)"
 setup
 
 cli init --global
-printf '# CUSTOM\n' >> "$TEST_HOME/.claude/hooks/path-guard.sh"
+printf '# CUSTOM\n' >> "$TEST_HOME/.claude/hooks/specpipe-shell-guard.sh"
 cli upgrade --global --force
-CONTENT=$(cat "$TEST_HOME/.claude/hooks/path-guard.sh")
+CONTENT=$(cat "$TEST_HOME/.claude/hooks/specpipe-shell-guard.sh")
 assert_not_contains "global force upgrade: custom content gone" "CUSTOM" "$CONTENT"
 
 teardown
@@ -503,7 +637,7 @@ cli init --global
 printf '{"hooks":{}}\n' > "$TEST_HOME/.claude/settings.json"
 cli upgrade --global
 S=$(cat "$TEST_HOME/.claude/settings.json")
-assert_contains "global upgrade re-registers path-guard" "path-guard.sh" "$S"
+assert_contains "global upgrade re-registers shell-guard" "specpipe-shell-guard.sh" "$S"
 
 teardown
 
@@ -524,7 +658,7 @@ assert_absent "global hooks dir removed"     "$TEST_HOME/.claude/hooks"
 assert_absent "legacy build-test.sh removed" "$TEST_HOME/.claude/scripts/build-test.sh"
 assert_absent "global manifest removed"      "$TEST_HOME/.claude/.devkit-manifest.json"
 S=$(cat "$TEST_HOME/.claude/settings.json")
-assert_not_contains "settings.json: devkit entries removed" "path-guard.sh" "$S"
+assert_not_contains "settings.json: devkit entries removed" "specpipe-shell-guard.sh" "$S"
 
 teardown
 
@@ -540,7 +674,7 @@ cli remove --global
 
 S=$(cat "$TEST_HOME/.claude/settings.json")
 assert_contains     "user hook preserved after global remove" "custom-hook.sh" "$S"
-assert_not_contains "devkit entries gone after global remove" "path-guard.sh"  "$S"
+assert_not_contains "devkit entries gone after global remove" "specpipe-shell-guard.sh"  "$S"
 
 teardown
 
@@ -564,8 +698,161 @@ cli init --global
 cli remove --global
 
 # Per-project files must still be there
-assert_exists "per-project hooks untouched after global remove" "$PROJECT_DIR/.claude/hooks/path-guard.sh"
+assert_exists "per-project hooks untouched after global remove" "$PROJECT_DIR/.claude/hooks/specpipe-shell-guard.sh"
 assert_exists "per-project skills untouched after global remove" "$PROJECT_DIR/.claude/skills/sp-plan/SKILL.md"
+
+teardown
+
+# ══════════════════════════════════════════════════════════════════════════════
+# SKILL SELECTION — --skills
+# ══════════════════════════════════════════════════════════════════════════════
+section "init --skills core (drops the 3 optional skills)"
+setup
+
+cli init "$PROJECT_DIR" --skills core
+assert_exists "core: sp-build present"        "$PROJECT_DIR/.claude/skills/sp-build/SKILL.md"
+assert_absent "core: sp-humanize absent"      "$PROJECT_DIR/.claude/skills/sp-humanize/SKILL.md"
+assert_absent "core: sp-spec-render absent"   "$PROJECT_DIR/.claude/skills/sp-spec-render/SKILL.md"
+assert_absent "core: sp-md-render absent"     "$PROJECT_DIR/.claude/skills/sp-md-render/SKILL.md"
+M=$(cat "$PROJECT_DIR/.specpipe/manifest.json")
+assert_contains     "core: manifest records selection" "sp-build" "$M"
+assert_not_contains "core: manifest excludes optional"  "sp-humanize" "$M"
+
+teardown
+
+section "init --skills <subset> (explicit names)"
+setup
+
+cli init "$PROJECT_DIR" --skills sp-build,sp-fix
+assert_exists "subset: sp-build present"  "$PROJECT_DIR/.claude/skills/sp-build/SKILL.md"
+assert_exists "subset: sp-fix present"    "$PROJECT_DIR/.claude/skills/sp-fix/SKILL.md"
+assert_absent "subset: sp-plan absent"    "$PROJECT_DIR/.claude/skills/sp-plan/SKILL.md"
+
+teardown
+
+section "init --skills <bogus> (exits non-zero)"
+setup
+
+EXIT=$(cli_exit init "$PROJECT_DIR" --skills nope)
+assert_exit_code "bad skill name exits non-zero" 1 "$EXIT"
+
+teardown
+
+section "upgrade respects recorded skill selection"
+setup
+
+cli init "$PROJECT_DIR" --skills core
+cli upgrade "$PROJECT_DIR"
+assert_absent "upgrade doesn't resurrect deselected sp-humanize" "$PROJECT_DIR/.claude/skills/sp-humanize/SKILL.md"
+assert_exists "upgrade keeps selected sp-build"                  "$PROJECT_DIR/.claude/skills/sp-build/SKILL.md"
+
+teardown
+
+# ══════════════════════════════════════════════════════════════════════════════
+# HOOK SELECTION — --hooks
+# ══════════════════════════════════════════════════════════════════════════════
+section "init --hooks none (option A — no guardrails at all)"
+setup
+
+cli init "$PROJECT_DIR" --agents codex --hooks none
+assert_absent "none: no codex hooks.json"     "$PROJECT_DIR/.codex/hooks.json"
+assert_absent "none: no AGENTS.md guard rules" "$PROJECT_DIR/AGENTS.md"
+assert_exists "none: skills still install"    "$PROJECT_DIR/.agents/skills/sp-plan/SKILL.md"
+
+teardown
+
+section "init --hooks none (claude — no settings/hooks)"
+setup
+
+cli init "$PROJECT_DIR" --hooks none
+assert_absent "none: no .claude/settings.json"        "$PROJECT_DIR/.claude/settings.json"
+assert_absent "none: no shell guard"                  "$PROJECT_DIR/.claude/hooks/specpipe-shell-guard.sh"
+assert_absent "none: no .claude/CLAUDE.md rules"      "$PROJECT_DIR/.claude/CLAUDE.md"
+assert_exists "none: skills still install"            "$PROJECT_DIR/.claude/skills/sp-plan/SKILL.md"
+
+teardown
+
+# ── init: --only is ignored (warned) with --agents ──────────────────────────
+section "init --only + --agents (component selection is single-agent only)"
+setup
+
+OUT_ONLY=$(cli_out init "$PROJECT_DIR" --agents codex --only skills)
+assert_contains "warns --only ignored with --agents" "--only is ignored" "$OUT_ONLY"
+# Ignored, not honored: codex still gets rules emitted (would be absent if honored).
+assert_exists "ignored: codex rules still emitted" "$PROJECT_DIR/AGENTS.md"
+
+teardown
+
+section "init --hooks <subset> (claude)"
+setup
+
+cli init "$PROJECT_DIR" --hooks shell,read
+assert_exists "subset: shell guard present"  "$PROJECT_DIR/.claude/hooks/specpipe-shell-guard.sh"
+assert_exists "subset: read guard present"   "$PROJECT_DIR/.claude/hooks/specpipe-read-guard.sh"
+assert_absent "subset: comment guard absent" "$PROJECT_DIR/.claude/hooks/comment-guard.js"
+M=$(cat "$PROJECT_DIR/.specpipe/manifest.json")
+assert_contains "subset: manifest records hook selection" "shell-guard" "$M"
+
+teardown
+
+# ══════════════════════════════════════════════════════════════════════════════
+# GLOBAL — multi-agent (--global --agents)
+# ══════════════════════════════════════════════════════════════════════════════
+section "init --global --agents claude,codex (per-agent global dirs)"
+setup
+
+cli init --global --agents claude,codex
+assert_exists "global: claude skill at ~/.claude/skills"  "$TEST_HOME/.claude/skills/sp-plan/SKILL.md"
+assert_exists "global: codex skill at ~/.codex/skills"    "$TEST_HOME/.codex/skills/sp-plan/SKILL.md"
+CODEX_FM=$(awk '/^---$/{c++; if(c==2) exit} {print}' "$TEST_HOME/.codex/skills/sp-plan/SKILL.md")
+assert_contains "global: codex skill emitted with name: frontmatter" "name: sp-plan" "$CODEX_FM"
+CLAUDE_FM=$(awk '/^---$/{c++; if(c==2) exit} {print}' "$TEST_HOME/.claude/skills/sp-plan/SKILL.md")
+assert_not_contains "global: claude skill keeps no name: field" "name: sp-plan" "$CLAUDE_FM"
+M=$(cat "$TEST_HOME/.claude/.devkit-manifest.json")
+assert_contains "global manifest records both agents" "codex" "$M"
+
+teardown
+
+# ── --global --agents cursor: Cursor has its own ~/.cursor/skills ─────────────
+section "init --global --agents cursor (native global dir)"
+setup
+
+cli init --global --agents cursor
+assert_exists "global cursor: skill written to ~/.cursor/skills" "$TEST_HOME/.cursor/skills/sp-plan/SKILL.md"
+
+teardown
+
+# ── --global --agents hermes: global-only skills land in ~/.hermes/skills ─────
+section "init --global --agents hermes (global skills)"
+setup
+
+cli init --global --agents hermes
+assert_exists "global hermes: skill written to ~/.hermes/skills" "$TEST_HOME/.hermes/skills/sp-plan/SKILL.md"
+
+teardown
+
+# ── remove --global: preserves non-specpipe global skills ────────────────────
+section "remove --global (preserves a non-specpipe global skill)"
+setup
+
+cli init --global --agents claude,codex
+mkdir -p "$TEST_HOME/.codex/skills/my-own"
+echo "keep me" > "$TEST_HOME/.codex/skills/my-own/SKILL.md"
+cli remove --global
+assert_absent "remove --global: specpipe codex skill gone"          "$TEST_HOME/.codex/skills/sp-plan"
+assert_exists "remove --global: non-specpipe codex skill preserved" "$TEST_HOME/.codex/skills/my-own/SKILL.md"
+
+teardown
+
+# ── re-install with a narrower selection prunes the now-stale global files ────
+section "init --global: re-install prunes deselected skills"
+setup
+
+cli init --global --skills all
+assert_exists "global all: sp-humanize installed" "$TEST_HOME/.claude/skills/sp-humanize/SKILL.md"
+cli init --global --skills core
+assert_absent "global re-install prunes sp-humanize dir" "$TEST_HOME/.claude/skills/sp-humanize"
+assert_exists "global re-install keeps sp-build"         "$TEST_HOME/.claude/skills/sp-build/SKILL.md"
 
 teardown
 
@@ -595,10 +882,10 @@ cli init --global
 cli init --global
 
 S=$(cat "$TEST_HOME/.claude/settings.json")
-PG_COUNT=$(printf '%s' "$S" | grep -c "path-guard.sh" || true)
+PG_COUNT=$(printf '%s' "$S" | grep -c "specpipe-shell-guard.sh" || true)
 [[ "$PG_COUNT" -le 2 ]] \
-  && pass "no duplicate path-guard entries after 3x init (count=$PG_COUNT)" \
-  || fail "duplicate path-guard entries (count=$PG_COUNT, expected ≤2)"
+  && pass "no duplicate shell-guard entries after 3x init (count=$PG_COUNT)" \
+  || fail "duplicate shell-guard entries (count=$PG_COUNT, expected ≤2)"
 
 teardown
 
@@ -646,7 +933,7 @@ cli init "$PROJECT_DIR" --agents all
 assert_exists "claude settings.json present" "$PROJECT_DIR/.claude/settings.json"
 assert_exists "claude skill present" "$PROJECT_DIR/.claude/skills/sp-plan/SKILL.md"
 assert_exists "openclaw skill present" "$PROJECT_DIR/skills/sp-plan/SKILL.md"
-assert_exists "hermes skill present" "$PROJECT_DIR/optional-skills/specpipe/sp-plan/SKILL.md"
+assert_absent "hermes per-project skill NOT emitted (global-only)" "$PROJECT_DIR/optional-skills/specpipe/sp-plan/SKILL.md"
 assert_exists "codex skill present" "$PROJECT_DIR/.agents/skills/sp-plan/SKILL.md"
 
 teardown
@@ -713,10 +1000,10 @@ section "guards — owned rules files per agent"
 setup
 
 cli init "$PROJECT_DIR" --agents cursor,antigravity,openclaw
-assert_exists "cursor guards .mdc"        "$PROJECT_DIR/.cursor/rules/specpipe-guards.mdc"
-assert_exists "antigravity guards rule"   "$PROJECT_DIR/.agent/rules/specpipe-guards.md"
-assert_exists "openclaw advisory doc"     "$PROJECT_DIR/SPECPIPE-GUARDS.md"
-CR=$(cat "$PROJECT_DIR/.cursor/rules/specpipe-guards.mdc")
+assert_exists "cursor guards .mdc"        "$PROJECT_DIR/.cursor/rules/specpipe-rules.mdc"
+assert_exists "antigravity guards rule"   "$PROJECT_DIR/.agents/rules/specpipe-rules.md"
+assert_exists "openclaw advisory doc"     "$PROJECT_DIR/SPECPIPE-RULES.md"
+CR=$(cat "$PROJECT_DIR/.cursor/rules/specpipe-rules.mdc")
 assert_contains "cursor guards alwaysApply" "alwaysApply: true" "$CR"
 assert_contains "guards body present"       "Never touch secrets" "$CR"
 
@@ -734,7 +1021,7 @@ assert_contains "AGENTS.md gains guards section" "operating rules" "$AM"
 
 # Idempotent: re-init --force must not duplicate the section
 cli init "$PROJECT_DIR" --agents codex --force
-COUNT=$(grep -c "specpipe:guards:begin" "$PROJECT_DIR/AGENTS.md" || true)
+COUNT=$(grep -c "specpipe:rules:begin" "$PROJECT_DIR/AGENTS.md" || true)
 assert_contains "no duplicate guards section" "1" "$COUNT"
 
 cli remove "$PROJECT_DIR"
@@ -772,8 +1059,8 @@ node --input-type=module <<EOF 2>/dev/null
 import { readFileSync, writeFileSync } from 'node:fs';
 const p = '$PROJECT_DIR/AGENTS.md';
 let s = readFileSync(p, 'utf-8');
-s = s.replace(/<!-- specpipe:guards:begin -->[\s\S]*?<!-- specpipe:guards:end -->/,
-  '<!-- specpipe:guards:begin -->\nSTALE\n<!-- specpipe:guards:end -->');
+s = s.replace(/<!-- specpipe:rules:begin -->[\s\S]*?<!-- specpipe:rules:end -->/,
+  '<!-- specpipe:rules:begin -->\nSTALE\n<!-- specpipe:rules:end -->');
 writeFileSync(p, s);
 EOF
 cli upgrade "$PROJECT_DIR"

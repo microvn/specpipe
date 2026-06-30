@@ -1,4 +1,4 @@
-import { copyFile as fsCopyFile, mkdir, readFile, writeFile } from 'node:fs/promises';
+import { copyFile as fsCopyFile, mkdir, readFile, writeFile, unlink, rmdir } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { join, dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -11,14 +11,10 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
  * Component → file mappings.
  */
 export const COMPONENTS = {
-  hooks: [
-    '.claude/hooks/file-guard.js',
-    '.claude/hooks/path-guard.sh',
-    '.claude/hooks/comment-guard.js',
-    '.claude/hooks/glob-guard.js',
-    '.claude/hooks/self-review.sh',
-    '.claude/hooks/sensitive-guard.sh',
-  ],
+  // Hooks + settings.json are no longer static files — they're emitted per agent
+  // from the hook registry (hooks.js) via installAgentHooks. Kept as an (empty)
+  // component so `--only hooks` still resolves; init routes it to the emitter.
+  hooks: [],
   skills: [
     'skills/sp-explore/SKILL.md',
     'skills/sp-scaffold/SKILL.md',
@@ -44,31 +40,54 @@ export const COMPONENTS = {
     'skills/sp-md-render/components.md',
     'skills/sp-humanize/SKILL.md',
   ],
-  config: [
-    '.claude/settings.json',
-    '.claude/CLAUDE.md',
-  ],
-  docs: [
-    'docs/WORKFLOW.md',
-  ],
+  // CLAUDE.md is no longer a static file — it's emitted from the single rules source
+  // (kit/rules/specpipe-rules.md) as a marked section, like every other agent's rules.
+  config: [],
+  // docs/WORKFLOW.md was dropped — its content is covered by the skills (detailed) and
+  // the rules hub's workflow table. The user's docs/ holds only their own specs.
+  docs: [],
 };
 
-/**
- * Placeholder directories to create.
- */
-export const PLACEHOLDER_DIRS = [
-  'docs/specs',
-  'docs/test-plans',
-];
+// ── Skill selection ─────────────────────────────────────────────────────────
+// Skills installed by default but safe to drop — standalone, not part of the
+// spec→build→review pipeline. Tagged "(optional)" in the interactive picker.
+export const OPTIONAL_SKILLS = ['sp-spec-render', 'sp-md-render', 'sp-humanize'];
+
+/** Every skill name (sp-*), derived from the skill component list. */
+export const ALL_SKILL_NAMES = [...new Set(COMPONENTS.skills.map((p) => p.split('/')[1]))];
 
 /**
- * Files that need +x permission.
+ * Resolve a `--skills` value into a Set of selected skill names, or null = all.
+ * Accepts 'all', 'core' (all minus OPTIONAL_SKILLS), or a comma list of names
+ * (with or without the `sp-` prefix). Throws on an unknown name.
  */
-export const EXECUTABLE_FILES = [
-  '.claude/hooks/path-guard.sh',
-  '.claude/hooks/self-review.sh',
-  '.claude/hooks/sensitive-guard.sh',
-];
+export function resolveSkills(spec) {
+  if (!spec || spec === 'all') return null;
+  if (spec === 'core') return new Set(ALL_SKILL_NAMES.filter((n) => !OPTIONAL_SKILLS.includes(n)));
+  const names = spec.split(',').map((s) => s.trim()).filter(Boolean)
+    .map((n) => (n.startsWith('sp-') ? n : `sp-${n}`));
+  const unknown = names.filter((n) => !ALL_SKILL_NAMES.includes(n));
+  if (unknown.length) {
+    throw new Error(`Unknown skill(s): ${unknown.join(', ')}. Valid: ${ALL_SKILL_NAMES.join(', ')}, all, core`);
+  }
+  return new Set(names);
+}
+
+/**
+ * Whether a template file path is allowed under a skill selection (null = all).
+ * Non-skill files (hooks, config, docs) always pass; skill files pass only when
+ * their skill name is in the set.
+ */
+export function skillAllowed(filePath, skillsSet) {
+  if (!skillsSet) return true;
+  const m = filePath.replace(/\\/g, '/').match(/^skills\/([^/]+)\//);
+  return !m || skillsSet.has(m[1]);
+}
+
+
+// Files needing +x. Empty: guard scripts get +x at emit time (installAgentHooks
+// chmods them); none are installed as plain COMPONENTS files anymore.
+export const EXECUTABLE_FILES = [];
 
 /**
  * Get path to kit (templates) directory.
@@ -131,27 +150,43 @@ export async function installFile(relativePath, targetDir, { force = false } = {
   return 'copied';
 }
 
+/**
+ * Migration prune: delete files a PRIOR manifest tracked that the new install no
+ * longer wants — e.g. the predecessor `mf-*` (claude-devkit) / `ap-*` (agentpipe)
+ * skills, or renamed/removed hooks. Safe because it only touches paths the kit
+ * itself recorded as installed; a user's own files (e.g. a personal `mf-commit`
+ * skill that was never in our manifest) are never in `priorFiles`, so untouched.
+ * Skips preserved paths and the user's docs/. Cleans up emptied dirs.
+ * @returns {Promise<number>} count pruned
+ */
+export async function pruneOrphans(targetDir, priorFiles, keepSet, { preserve = ['.claude/CLAUDE.md'] } = {}) {
+  let pruned = 0;
+  const dirs = new Set();
+  for (const rel of Object.keys(priorFiles || {})) {
+    if (keepSet.has(rel) || preserve.includes(rel) || rel.startsWith('docs/')) continue;
+    const p = join(targetDir, rel);
+    if (!existsSync(p)) continue;
+    try {
+      await unlink(p);
+      log.del(`${rel} (legacy — superseded, removed)`);
+      pruned++;
+      let d = dirname(rel);
+      while (d && d !== '.' && d !== '/') { dirs.add(d); d = dirname(d); }
+    } catch { /* ignore */ }
+  }
+  for (const d of [...dirs].sort((a, b) => b.split('/').length - a.split('/').length)) {
+    try { await rmdir(join(targetDir, d)); } catch { /* not empty / missing */ }
+  }
+  return pruned;
+}
+
 // Per-agent install (emit skills + guardrails) lives in agent-install.js;
 // re-exported here so callers keep importing from installer.js.
 export {
   installSkillForAgent, installAgentSkills, installAgentRules,
-  mergeAgentsMdGuards, stripAgentsMdGuards,
+  mergeRulesSection, stripRulesSection,
   installAgentHooks, removeAgentHooks,
 } from './agent-install.js';
-
-/**
- * Create a placeholder directory with .gitkeep.
- */
-export async function ensurePlaceholderDir(dir, targetDir) {
-  const fullPath = join(targetDir, dir);
-  if (existsSync(fullPath)) {
-    log.skip(`${dir}/ (exists)`);
-    return;
-  }
-  await mkdir(fullPath, { recursive: true });
-  await writeFile(join(fullPath, '.gitkeep'), '');
-  log.make(`${dir}/`);
-}
 
 /**
  * Set executable permissions on relevant files.
@@ -167,28 +202,34 @@ export async function setPermissions(targetDir) {
   }
 }
 
+// Every file the rules section can land in (per agent). fillTemplate fills the
+// detected Project Info into whichever ones exist.
+export const RULE_FILES = [
+  '.claude/CLAUDE.md',
+  'AGENTS.md',
+  '.cursor/rules/specpipe-rules.mdc',
+  '.agents/rules/specpipe-rules.md',
+  'SPECPIPE-RULES.md',
+];
+
 /**
- * Fill [CUSTOMIZE] placeholders in CLAUDE.md with detected project info.
+ * Fill the `[CUSTOMIZE]` Project Info placeholders in every installed rules file with
+ * the detected project info. Rules are emitted per agent (CLAUDE.md, AGENTS.md, …), so
+ * fill all of them, not just CLAUDE.md.
  */
 export async function fillTemplate(targetDir, projectInfo) {
   if (!projectInfo) return;
-
-  const claudeMdPath = join(targetDir, '.claude/CLAUDE.md');
-  try {
-    let content = await readFile(claudeMdPath, 'utf-8');
-    content = content
-      .replace(/\[CUSTOMIZE\] Language:.*/, `**Language:** ${projectInfo.lang}`)
-      .replace(/\[CUSTOMIZE\] Test framework:.*/, `**Test framework:** ${projectInfo.framework}`)
-      .replace(/\[CUSTOMIZE\] Source directory:.*/, `**Source directory:** ${projectInfo.srcDir}`)
-      .replace(/\[CUSTOMIZE\] Test directory:.*/, `**Test directory:** ${projectInfo.testDir}`)
-      // Also handle the format without [CUSTOMIZE] prefix
-      .replace(/\*\*Language:\*\* \[CUSTOMIZE\]/, `**Language:** ${projectInfo.lang}`)
-      .replace(/\*\*Test framework:\*\* \[CUSTOMIZE\]/, `**Test framework:** ${projectInfo.framework}`)
-      .replace(/\*\*Source directory:\*\* \[CUSTOMIZE\]/, `**Source directory:** ${projectInfo.srcDir}`)
-      .replace(/\*\*Test directory:\*\* \[CUSTOMIZE\]/, `**Test directory:** ${projectInfo.testDir}`);
-    await writeFile(claudeMdPath, content);
-  } catch {
-    // CLAUDE.md might not exist
+  for (const rel of RULE_FILES) {
+    const p = join(targetDir, rel);
+    try {
+      const before = await readFile(p, 'utf-8');
+      const after = before
+        .replace(/\*\*Language:\*\* \[CUSTOMIZE\]/, `**Language:** ${projectInfo.lang}`)
+        .replace(/\*\*Test framework:\*\* \[CUSTOMIZE\]/, `**Test framework:** ${projectInfo.framework}`)
+        .replace(/\*\*Source directory:\*\* \[CUSTOMIZE\]/, `**Source directory:** ${projectInfo.srcDir}`)
+        .replace(/\*\*Test directory:\*\* \[CUSTOMIZE\]/, `**Test directory:** ${projectInfo.testDir}`);
+      if (after !== before) await writeFile(p, after);
+    } catch { /* file not installed for this agent — skip */ }
   }
 }
 
@@ -208,6 +249,7 @@ export async function verifySettingsJson(targetDir) {
 // Claude's global install (~/.claude/skills + hooks + settings.json) lives in
 // claude-global.js; re-exported here so callers keep importing from installer.js.
 export {
-  getGlobalSkillsDir, getGlobalHooksDir, installHookGlobal,
-  mergeGlobalSettings, removeGlobalHooksFromSettings, installSkillGlobal,
+  getGlobalHooksDir, installHookGlobal,
+  mergeGlobalSettings, removeGlobalHooksFromSettings,
+  installSkillGlobalForAgent,
 } from './claude-global.js';
