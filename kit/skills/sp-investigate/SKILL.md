@@ -134,13 +134,33 @@ Invariant match: <INV/C id + status | invariant text | none | no registry found>
 
 If no spec or invariant registry exists, continue. Do not invent one during investigation; report the absence as a gap if it matters. If the bug confirms a repeated lifecycle/parity/cascade rule, end the report with `Invariant action needed: add/update invariant: ...`.
 
+### 1.55 — Core Function Mapping
+
+Run this before Sibling Discovery when the report touches an existing operation, provider/external contract, payment/auth/data mutation, optional input, stateful flow, or cross-surface inconsistency.
+
+Purpose: define the operation and seams being investigated so blast radius and root cause do not collapse to the first file that matched the symptom.
+
+Record the model in the investigation output:
+
+| Field | Evidence |
+|---|---|
+| Operation | core create/update/delete/send/read/validate/charge/auth operation |
+| Inputs | required / optional / absent inputs involved |
+| Entry points | UI/API/job/webhook/provider callback surfaces |
+| Internal seams | route -> service/helper -> provider/db/cache/read-model boundary; include test seam |
+| External contracts | provider/API semantics, IDs, lifecycle timing, retries, trial/deferred effects, or N/A |
+| Invariants | fail-closed / server revalidation / no-op unchanged / parity/cascade / no partial side effect |
+| Unknown semantics | open question or spec GAP; do not guess |
+
+For external providers, separate facts verified in code/docs from assumptions. Unknown provider semantics become investigation gaps.
+
 ### 1.6 — Sibling Discovery Pass (candidate only)
 
 Run this for lifecycle/parity/cascade bugs, existing-operation investigations, or any report whose symptom names one surface but the operation may exist on sibling entry-points.
 
 Purpose: diagnose blast radius before deciding root cause. This produces candidates, not requirements or fixes.
 
-1. Seed nouns/verbs from the raw symptom, touched component, related spec/BM context, and matching invariant entries.
+1. Seed nouns/verbs from the raw symptom, Core Function Mapping, touched component, related spec/BM context, and matching invariant entries.
 2. Find shared-anchor callers (`ga_callers` if GA is available; otherwise grep) for helpers/constants/schemas that define the operation.
 3. Fuzzy-search parallel names such as `create_from_*`, `*_from_<source>`, `send_*invite*`, `*_outcome*`, `reschedule*`, `book_next*`, `cancel*`, `delete*`, plus domain verbs from the symptom.
 4. Inspect recent git co-change around touched files (`git log --name-only -- <seed-file>`) for repeatedly paired files/functions.
@@ -613,6 +633,14 @@ HYPOTHESIS A (PRIMARY — <confidence>)
   Location:     <file:line>
   Mechanism:    <what is wrong>
   Chain:        <cause> → <step> → ... → <symptom>
+  Core Function Model:
+    Operation:          <core operation>
+    Inputs:             <required / optional / absent inputs involved>
+    Entry points:       <UI/API/job/webhook/provider callback surfaces>
+    Internal seams:     <route -> service/helper -> provider/db/cache/read-model>
+    External contracts: <provider/API semantics or N/A>
+    Invariants:         <fail-closed / server revalidation / no-op unchanged / parity/cascade / no partial side effect>
+    Unknown semantics:  <open question / GAP / none>
   Behavior Matrix:
     State/status: <state or transition>
     Viewer/role:  <viewer/relationship>

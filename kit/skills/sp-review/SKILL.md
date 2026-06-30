@@ -101,8 +101,12 @@ Spend 60% of analysis on the primary focus. Cover all categories, but proportion
 
 ### Behavior Matrix & Invariants (High)
 
-Use this section when the spec has `## Behavior Matrix`, `## Sibling Surface Map`, or project-local invariant logs match the diff.
+Use this section when the spec has `## Core Function Model`, `## Behavior Matrix`, `## Sibling Surface Map`, or project-local invariant logs match the diff.
 
+- **Core model trace:** For each changed operation, input, entry point, seam, provider contract, or external side effect, identify the corresponding `## Core Function Model` row. If the diff changes provider/payment/auth/data semantics and no AS/GAP/Constraint/BM/test covers it, flag High.
+- **Optional-input regression:** If the diff adds or changes an optional input, omitted-input/no-op behavior must be covered by AS/GAP or a test. Flag missing absent-input regression coverage.
+- **Provider contract drift:** For external providers, verify typed IDs, lifecycle timing, retries/trials/webhooks, fail-closed behavior, and deferred-effect semantics are covered by AS/GAP/Constraint. Unknown provider semantics should be GAPs, not guessed AS.
+- **Reference accuracy:** If the spec cites file:line/symbol/config and the diff/code contradicts it, flag High/Medium depending on release risk. Stale or fabricated references are review findings, not harmless prose.
 - **Cell-to-diff trace:** For each changed state transition, viewer rule, read surface, notification, queue, dashboard count, feed, calendar, or API projection, identify the corresponding `BM.AS-NNN.<surface>` row. If code changes behavior for a matrix cell but tests do not reference that AS ID or `BM.AS-NNN`, flag High.
 - **Surface parity:** If the diff updates one read surface for a state/viewer change, check matrix siblings for list/detail/worklist/dashboard/feed/API/email/calendar parity. Flag missing sibling updates unless the matrix marks them `N/A` with a concrete reason.
 - **Sibling candidate disposition:** If the spec has `## Sibling Surface Map`, every high/medium candidate must be `cover`, `GAP-NNN`, or `ignore(reason)`. Flag missing dispositions. If the diff changes a confirmed sibling surface but omits sibling tests/updates for the other confirmed surfaces, flag High unless a GAP/N/A covers it.

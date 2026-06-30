@@ -141,13 +141,30 @@ Also note the **project domain** from CLAUDE.md (payment, booking, content, heal
 
 ---
 
-## Phase 0.5 — Sibling Discovery Pass (candidate only)
+## Phase 0.5 — Core Function Discovery (candidate only)
 
-Run this after Phase 0 when the feature changes an existing operation, fixes a bug, or touches state/viewer/surface behavior. Purpose: find sibling entry-points that perform the same domain operation but may not be named in the ticket.
+Run this after Phase 0 when the feature changes an existing operation, fixes a bug, touches state/viewer/surface behavior, or integrates with an external provider. Purpose: model the core operation before asking or planning, so later AS/GAP/BM work is driven by the actual function, entry points, seams, and contracts.
 
-This pass produces candidates, not requirements. A candidate may become a confirmed surface only after the user/spec/code evidence supports it. Do not auto-promote noisy matches into acceptance scenarios.
+This pass produces candidates and evidence, not requirements. A candidate may become a confirmed surface/contract only after the user/spec/code evidence supports it. Do not auto-promote noisy matches into acceptance scenarios.
 
 **Inputs:** raw symptom text, feature nouns, touched component/module, existing code hits from Phase 0, matching project-local `docs/invariants/INV-*.md` entries, and any shared anchors/constants already found.
+
+### Core Function Model
+
+Record the model first:
+
+| Field | Evidence |
+|---|---|
+| Operation | `<create subscription / validate coupon / create appointment / send invite / etc.>` |
+| Inputs | required / optional / absent inputs; identify no-op/omitted-input behavior |
+| Entry points | UI/API/job/webhook/provider callback surfaces that can invoke the operation |
+| Internal seams | route -> service/helper -> provider/db/cache/read-model; include injected/test seams |
+| External contracts | provider/API semantics, IDs, lifecycle timing, retries, trial/deferred effects |
+| State/surface axes | lifecycle/viewer/surface axes if triggered; otherwise `N/A: stateless` |
+| Invariants | fail-closed, server revalidation, no-op unchanged, parity/cascade, no partial side effect |
+| Unknown semantics | must become open questions/GAPs; do not guess provider behavior |
+
+### Entry-point / sibling discovery
 
 **Deterministic recipe:**
 
@@ -157,7 +174,7 @@ This pass produces candidates, not requirements. A candidate may become a confir
 4. **Git change-coupling:** inspect recent co-change around seed files with `git log --name-only -- <seed-file>` and look for files/functions repeatedly changed with the seed. This is recall-oriented evidence, not proof.
 5. **GA blast radius if available:** use `ga_impact` for touched symbols/files to find connected blast radius, but do not treat importers-only output as complete sibling discovery. Siblings may be co-changed or share anchors without importing each other.
 
-Record every plausible sibling in a table:
+Record every plausible entry point / sibling in a table:
 
 | Candidate | Operation | Evidence | Confidence | Obligation |
 |---|---|---|---|---|
@@ -172,7 +189,7 @@ Rules:
 - `GAP`: candidate seems material but expected behavior/scope is unknown.
 - `ignore(reason)`: candidate is false positive or intentionally out of scope.
 
-Exit condition: every high/medium candidate has `cover`, `GAP`, or `ignore(reason)`. Low-confidence candidates can be listed as notes and do not block handoff.
+Exit condition: the Core Function Model is filled for every triggered field, and every high/medium entry-point candidate has `cover`, `GAP-NNN`, or `ignore(reason)`. Low-confidence candidates can be listed as notes and do not block handoff.
 
 ---
 
@@ -719,6 +736,18 @@ Timeout: [if role B does not act within X hours then...]
 
 **Behavior Matrix discovery axes:** _(required for stateful / role-sensitive / multi-surface features; consumed by `/sp-plan`)_
 
+Core Function Model: _(required when Phase 0.5 ran; consumed by `/sp-plan`)_
+| Field | Evidence |
+|---|---|
+| Operation | [core operation being changed] |
+| Inputs | [required / optional / absent inputs + no-op behavior] |
+| Entry points | [UI/API/job/webhook/provider callbacks] |
+| Internal seams | [route -> service/helper -> provider/db/cache/read-model; include test seam] |
+| External contracts | [provider semantics / lifecycle / retries / trial/deferred effects, or N/A] |
+| State/surface axes | [states/viewers/surfaces triggered, or N/A with reason] |
+| Invariants | [fail-closed / server revalidation / no-op unchanged / parity/cascade / no partial side effect] |
+| Unknown semantics | [open questions to become GAPs] |
+
 Sibling Candidate Table: _(required when Phase 0.5 ran; consumed by `/sp-plan`)_
 | Candidate | Operation | Evidence | Confidence | Obligation |
 |---|---|---|---|---|
@@ -817,6 +846,7 @@ Self-check before writing the output file:
 - [ ] Input validation is clear for every user-facing field
 - [ ] Permissions are clear for every relevant role
 - [ ] If multi-role: cross-role flow confirmed, including timeouts and conflicts
+- [ ] If Phase 0.5 ran: Core Function Model is filled with operation, inputs, entry points, seams, contracts, invariants, and unknown semantics
 - [ ] If stateful / role-sensitive / multi-surface: Behavior Matrix discovery axes are filled with States, Viewers, Surfaces, and CREATE/READ pair map
 - [ ] If existing-operation or bug-fix discovery ran: Sibling Candidate Table lists every high/medium candidate with cover / GAP / ignore(reason)
 - [ ] UI expectation confirmed — dev team has no room to improvise

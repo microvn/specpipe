@@ -30,6 +30,7 @@ Map the plan's attack surface:
 - Scope boundaries (in/out/suspiciously unmentioned)
 - Risk acknowledgments (mentioned vs. conspicuously absent)
 - Story↔AS consistency (stories without acceptance scenarios? contradictions?)
+- Core Function Model coverage if present: operation, inputs, entry points, seams, provider contracts, invariants, unknown semantics, and whether each confirmed item maps to AS/GAP/Constraint/BM
 - Behavior Matrix coverage if present: every state/viewer/surface cell, its AS/GAP/N/A coverage, suspicious N/A cells, weak AS cells, missing surfaces, and cascade/parity obligations
 
 Collect all file paths the reviewers will need to read.
@@ -43,9 +44,11 @@ Assess plan complexity and select which lenses to deploy:
 | Simple (1 spec section, <20 acceptance scenarios, no auth/data) | 2 | Assumptions + Scope |
 | Standard (multiple sections, auth or data involved) | 3 | + Security |
 | Complex (multiple integrations, concurrency, migrations, 6+ phases) | 4 | + Failure Modes |
+| Core Function Model present, or feature changes provider/payment/auth/data mutation/optional input | +1 reviewer, replacing the lowest-value generic lens if needed to stay capped at 4 | + Core Function & Contract |
 | Behavior Matrix present (`## Behavior Matrix`) | +1 reviewer, replacing the lowest-value generic lens if needed to stay capped at 4 | + Lifecycle & Parity |
 
 When in doubt, use 3 reviewers. 4 is for genuinely complex plans.
+If `## Core Function Model` exists, always include the Core Function & Contract lens. This lens is not optional: the model exists because the feature has operation/input/seam/provider risk.
 If `## Behavior Matrix` exists, always include the Lifecycle & Parity lens. This lens is not optional: the matrix exists because the feature has state/viewer/surface risk.
 
 ## Phase 3: Spawn Parallel Reviewers
@@ -111,6 +114,23 @@ Examine the plan for:
 - OWASP Top 10 (2021): Broken Access Control, Crypto Failures, Injection, Insecure Design, Security Misconfiguration, Vulnerable Components, Identity Failures, Integrity Failures, Logging Failures, SSRF
 ```
 
+**Core Function & Contract Reviewer:**
+```
+You are reviewing whether the spec models the operation deeply enough before code.
+
+Use ONLY stated requirements, related specs, verified code references, and explicit GAPs. Do not invent provider behavior or extra edge cases. Your job is to catch missing operation/input/seam/provider coverage.
+
+Examine the plan for:
+- Missing Core Function Model when the feature changes an operation, optional input, provider/external contract, payment/auth/data mutation, stateful flow, or bug-fix path.
+- Incomplete model rows: operation, inputs, entry points, internal seams, external contracts, invariants, or unknown semantics missing without reason.
+- Optional-input holes: omitted input/no-op regression absent when an optional input is added or changed.
+- Provider contract holes: typed IDs, plan applicability, duration/trial/deferred effects, retries/webhooks, rate limits, fail-closed behavior, or server revalidation stated in requirements/code but missing from AS/GAP/Constraint.
+- Code-seam weakness: public entry -> service/helper -> provider/db/cache boundary is not verified, or file:line/symbol/config claims look stale/fabricated.
+- Over-assertion: AS guesses provider semantics that should be GAP because requirements/code do not state it.
+
+For suggested fixes, update the spec: add/repair Core Function Model row, add AS/GAP/Constraint, or correct the code reference. Do not suggest implementation code.
+```
+
 **Failure Mode Analyst:**
 ```
 You believe Murphy's Law: everything that can go wrong, will — simultaneously, at 3 AM, during peak traffic.
@@ -162,6 +182,8 @@ You are the QA lead who historically found state/viewer/surface bugs on staging.
 Use ONLY the plan's stated states, viewers, surfaces, AS, GAP, N/A, constraints, linked fields, and impact map. Do not invent unrelated edge cases. Focus on whether the matrix faithfully covers the behavior the plan already triggered.
 
 Examine the plan for:
+- Missing Core Function Model: if the plan changes an operation, input, provider seam, payment/auth/data mutation, or external contract, check whether it has `## Core Function Model` or an explicit reason it is not applicable.
+- Weak provider contract: provider IDs, lifecycle timing, trial/deferred effects, retries/webhooks, and fail-closed behavior must be AS/GAP/Constraint, not only prose.
 - Missing axes: states/statuses, viewer roles/relationships, or surfaces named elsewhere in the spec but absent from `## Behavior Matrix`.
 - Missing sibling discovery: if the plan changes an existing operation or bug-fix path, check whether it has `## Sibling Surface Map` or an explicit reason discovery is not applicable. High/medium sibling candidates must be `cover`, `GAP-NNN`, or `ignore(reason)`; only `cover` candidates may feed Behavior Matrix surfaces.
 - Missing invariant context: if the plan touches a component named by project-local `docs/invariants/INV-*.md`, confirm the relevant invariant is represented in Constraints, GAPs, Behavior Matrix, or explicitly ignored with a reason. Use the invariant registry README/schema as base knowledge only; README examples are not runtime entries. Do not invent new invariant entries here.
@@ -199,10 +221,11 @@ After all reviewers complete:
 4. **Sort** by severity: Critical → High → Medium → Low
 5. **Cap** at 15 findings: keep all Critical, top High by specificity, note how many Medium were dropped
 6. **Cross-reference check** (you, not reviewers): Flag any stories without acceptance scenarios, and any AS that contradicts the story description
-7. **Behavior Matrix cross-check** (you, not reviewers, when present): Every matrix `Coverage = AS-NNN` must point to an AS that actually asserts the same state/viewer/surface outcome; every `GAP-NNN` must exist in `## Gaps`; every `N/A` must have a reason. Missing or mismatched cells are accepted findings unless another reviewer already caught them.
-8. **Suspicious N/A/GAP Review cross-check** (you, not reviewers, when present): If the plan has `## Behavior Matrix` and any `N/A` or `GAP` cell, the final challenge output MUST include a `Suspicious N/A/GAP Review` section. Omission is itself a Medium finding because it lets lifecycle/viewer/surface blind spots hide behind "not applicable" or unresolved gaps.
-9. **Sibling Surface Map cross-check** (you, not reviewers, when present): If `## Sibling Surface Map` exists, every high/medium candidate must have a disposition (`cover`, `GAP-NNN`, or `ignore(reason)`). If the plan touches an existing operation and has no map, flag missing discovery unless the plan states why sibling discovery is not applicable.
-10. **Invariant registry cross-check** (you, not reviewers, when present): If project-local `docs/invariants/INV-*.md` contains an entry matching the planned component, the plan must either carry it into Constraints/Behavior Matrix/GAPs or explicitly state why it does not apply. Missing invariant handling is a Medium/High finding depending on `status`.
+7. **Core Function Model cross-check** (you, not reviewers, when present): Every confirmed operation/input/entry-point/seam/provider contract/invariant row must map to AS/GAP/Constraint/BM. If provider/external semantics are unknown, there must be a GAP. If the plan changes an operation/provider/input but has no model, flag missing CFM unless it states why not applicable.
+8. **Behavior Matrix cross-check** (you, not reviewers, when present): Every matrix `Coverage = AS-NNN` must point to an AS that actually asserts the same state/viewer/surface outcome; every `GAP-NNN` must exist in `## Gaps`; every `N/A` must have a reason. Missing or mismatched cells are accepted findings unless another reviewer already caught them.
+9. **Suspicious N/A/GAP Review cross-check** (you, not reviewers, when present): If the plan has `## Behavior Matrix` and any `N/A` or `GAP` cell, the final challenge output MUST include a `Suspicious N/A/GAP Review` section. Omission is itself a Medium finding because it lets lifecycle/viewer/surface blind spots hide behind "not applicable" or unresolved gaps.
+10. **Sibling Surface Map cross-check** (you, not reviewers, when present): If `## Sibling Surface Map` exists, every high/medium candidate must have a disposition (`cover`, `GAP-NNN`, or `ignore(reason)`). If the plan touches an existing operation and has no map, flag missing discovery unless the plan states why sibling discovery is not applicable.
+11. **Invariant registry cross-check** (you, not reviewers, when present): If project-local `docs/invariants/INV-*.md` contains an entry matching the planned component, the plan must either carry it into Constraints/Behavior Matrix/GAPs or explicitly state why it does not apply. Missing invariant handling is a Medium/High finding depending on `status`.
 
 ## Phase 5: Adjudicate
 

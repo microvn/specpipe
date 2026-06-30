@@ -109,7 +109,8 @@ Before writing anything, run this checklist:
 | P0-2 | **Related specs** | List `docs/specs/` directories. Read the main spec of any related feature. Is there overlap? |
 | P0-2b | **Explore doc** | Derive feature name from `$ARGUMENTS` as kebab-case (same convention as `docs/specs/<feature>/`). Check `docs/explore/<feature-name>.md`. If no exact match, list `docs/explore/` and fuzzy-match by keywords. If found → read it. Log: "Explore findings found for '<feature>' — using as primary input. Skipping P0-3, P0-4 (already covered)." Continue with P0-5, P0-6. Full field-to-section mapping + Mode A/B/C scope: see **Explore → Spec mapping** subsection right after this table. |
 | P0-2c | **Invariant registry** | Use the invariant registry README/schema as base knowledge; README examples are not runtime entries. Then read matching project-local entries under `docs/invariants/INV-*.md` when their `component_keys`, `sibling_set`, `shared_anchor`, title, or origin bugs match the feature. Carry `confirmed`/`enforced` invariants into `## Constraints & Invariants`; treat `candidate` entries as risk notes or confirmation GAPs, not automatic requirements. |
-| P0-2d | **Sibling discovery** | If the feature changes an existing operation or fixes a bug, run the same candidate-only recipe as `/sp-explore` Phase 0.5 unless an explore doc already provides a Sibling Candidate Table. Sources: raw symptom/feature nouns, project-local invariants, shared anchors (`ga_callers` or grep), fuzzy sibling names (`create_from_*`, `*_from_*`, `send_*invite*`, `*_outcome*`, `reschedule*`, `book_next*`, etc.), and recent git co-change. Output feeds `## Sibling Candidate Table`; high/medium candidates must be `cover`, `GAP-NNN`, or `ignore(reason)`. Candidates do not become requirements until confirmed. |
+| P0-2d | **Core Function Model** | If the feature changes an operation, optional input, external/provider contract, payment/auth/data mutation, stateful flow, or bug-fix path, build or refresh `## Core Function Model` before stories. Use code evidence, related specs, explore handoff, project-local invariants, and provider semantics already present in repo/docs. Verify every file:line/symbol/config claim against code. Unknown provider semantics become `GAP-NNN`; do not guess. |
+| P0-2e | **Entry-point / sibling discovery** | If the Core Function Model shows multiple entry points, or the feature changes an existing operation/fix path, run the same candidate-only recipe as `/sp-explore` Phase 0.5 unless an explore doc already provides a Sibling Candidate Table. Sources: raw symptom/feature nouns, project-local invariants, shared anchors (`ga_callers` or grep), fuzzy sibling names (`create_from_*`, `*_from_*`, `send_*invite*`, `*_outcome*`, `reschedule*`, `book_next*`, etc.), and recent git co-change. Output feeds `## Sibling Candidate Table`; high/medium candidates must be `cover`, `GAP-NNN`, or `ignore(reason)`. Candidates do not become requirements until confirmed. |
 | P0-3 | **Dependency scan** | `ga_architecture` for the module map and `ga_importers` / `ga_callees` on touched symbols to see what this code reaches. Manual import-grep is a fallback. |
 | P0-4 | **Reusable utilities** | `ga_symbols` (fuzzy match) on names like `validate`, `format`, `parse`, `<domain>Helper` to find existing helpers; `ga_hubs` to surface the most-connected utilities worth reusing. |
 | P0-5 | **Project patterns** | Identify test framework, naming conventions, directory structure from existing code. |
@@ -412,8 +413,31 @@ point to a `GAP-NNN`. See Phase 1 §"Linked fields — pin cross-spec contracts 
 - `<field>` — consumed by `<sibling>:AS-NNN` on <surface> (<persisted+served | transient-in-response>).
   Produced by `<sibling>:AS-NNN` on <surface>. ✔ match. | ✘ <surface|lifecycle> mismatch → GAP-NNN.]
 
+## Core Function Model
+[OPTIONAL — required when P0-2d ran or the explore handoff includes a Core Function Model.
+
+Purpose: model the operation before AS/BM/GAP so code seams, optional inputs, and provider contracts
+are not lost while writing acceptance scenarios.
+
+| Field | Evidence |
+|---|---|
+| Operation | [core operation being changed] |
+| Inputs | [required / optional / absent inputs; no-op behavior] |
+| Entry points | [UI/API/job/webhook/provider callback surfaces] |
+| Internal seams | [route -> service/helper -> provider/db/cache/read-model; include injected/test seam] |
+| External contracts | [provider/API semantics, IDs, lifecycle timing, retries, trial/deferred effects, or N/A] |
+| State/surface axes | [states/viewers/surfaces triggered, or N/A with reason] |
+| Invariants | [fail-closed / server revalidation / no-op unchanged / parity/cascade / no partial side effect] |
+| Unknown semantics | [GAP-NNN links; do not guess] |
+
+Rules:
+- Every code reference in this model must be verified against the repo or marked unverified.
+- External/provider semantics that affect behavior must be AS if stated, or GAP if unknown.
+- Optional inputs must include the omitted-input regression behavior or a GAP.
+- This model is the source for Sibling Surface Map, Behavior Matrix, Constraints, provider-contract gaps, and code-seam test targets.]
+
 ## Sibling Surface Map
-[OPTIONAL — required when P0-2d or the explore handoff found sibling candidates.
+[OPTIONAL — required when P0-2e or the explore handoff found sibling candidates.
 
 Purpose: separate noisy discovery evidence from confirmed planning surfaces. The Candidate Table
 is evidence; the Confirmed Surface Map is what can feed `## Behavior Matrix`.
@@ -589,9 +613,11 @@ Two kinds of "missing", handled differently:
 - **Underspecified** — trigger present, outcome not stated → a **Gap** (`GAP-NNN`, see the Gaps section), not a guessed AS — and not an AS shell either: never write an AS whose Then is only "see GAP-NNN". If a minimal safe outcome IS assertable (e.g. "request refused, state unchanged"), write that as the AS and point to the Gap for the unspecified detail; if nothing concrete is assertable, it is a Gap alone. *Explore-doc case:* if a trigger appears in the description (Happy path / Edge cases / Permissions / Integration) but its outcome lives in the explore's `Open questions` or `Assumptions` rather than being stated, that is still Underspecified — emit `GAP-NNN (status: open)` with `Source:` quoting the explore phrase; do not invent an AS.
 - **Out of scope** — no trigger at all → emit nothing. Don't invent "what about concurrent edits?" when the text never mentions concurrency.
 
-**Cross-surface invariant pass (run after the atom list).** For every constraint stated as a system-wide rule (or carrying `scope:`/`surfaces:` in `## Constraints & Invariants`), enumerate EVERY story whose `When` can exercise it. Each such story binds it via `**Applies Constraints:**` and carries an AS asserting the invariant's OUTCOME at that surface. **For a stated cross-surface invariant the minimal-safe outcome (at-most-once: a repeat at this surface causes ≤1 effect) IS assertable** — it is the stated invariant applied to the surface, not a new requirement — so write the outcome AS; do NOT downgrade the whole surface to a bare Gap. If the surface's *mechanism* is unstated (e.g. a provider idempotency-key vs a server-side guard), attach a `GAP-NNN` from that AS for the mechanism detail — outcome asserted, mechanism deferred. A surface becomes a *bare* Gap (no AS) only when no minimal-safe outcome is assertable at all. This removes the AS-vs-Gap coin-flip: a money/effect surface under a stated invariant ALWAYS gets an outcome AS (+ a mechanism Gap if needed), never a bare Gap by default. This does NOT invent the invariant — it is already stated; it forces a stated invariant to be acknowledged at every surface it reaches, closing the "stated once, silently dropped at a second endpoint" hole (an idempotency rule that guarded one endpoint but not a second one — the class of bug this pass exists to kill). Still derive-or-Gap for any genuinely unstated outcome: never a guessed one.
+**Core Function Model pass (run before AS derivation when triggered).** If `## Core Function Model` exists or P0-2d triggers, derive AS/GAP/Constraints from each confirmed entry point, seam, external contract, invariant, optional/absent input, and unknown semantic. Provider/external features must include a verified seam from public entry to provider call/test seam. If the model names an optional input, include the absent-input regression or GAP. If provider semantics are unknown, write GAP — not AS. If a code reference cannot be verified, mark it unverified or remove it; do not leave fabricated file:line/symbol claims in the spec.
 
-**Sibling Surface Map pass (run before the Behavior Matrix pass).** If P0-2d or the explore handoff found sibling candidates, create `## Sibling Surface Map`. Treat discovery output as evidence, not a contract:
+**Cross-surface invariant pass (run after the atom list and Core Function Model pass).** For every constraint stated as a system-wide rule (or carrying `scope:`/`surfaces:` in `## Constraints & Invariants`), enumerate EVERY story whose `When` can exercise it. Each such story binds it via `**Applies Constraints:**` and carries an AS asserting the invariant's OUTCOME at that surface. **For a stated cross-surface invariant the minimal-safe outcome (at-most-once: a repeat at this surface causes ≤1 effect) IS assertable** — it is the stated invariant applied to the surface, not a new requirement — so write the outcome AS; do NOT downgrade the whole surface to a bare Gap. If the surface's *mechanism* is unstated (e.g. a provider idempotency-key vs a server-side guard), attach a `GAP-NNN` from that AS for the mechanism detail — outcome asserted, mechanism deferred. A surface becomes a *bare* Gap (no AS) only when no minimal-safe outcome is assertable at all. This removes the AS-vs-Gap coin-flip: a money/effect surface under a stated invariant ALWAYS gets an outcome AS (+ a mechanism Gap if needed), never a bare Gap by default. This does NOT invent the invariant — it is already stated; it forces a stated invariant to be acknowledged at every surface it reaches, closing the "stated once, silently dropped at a second endpoint" hole (an idempotency rule that guarded one endpoint but not a second one — the class of bug this pass exists to kill). Still derive-or-Gap for any genuinely unstated outcome: never a guessed one.
+
+**Sibling Surface Map pass (run before the Behavior Matrix pass).** If P0-2e or the explore handoff found sibling candidates, create `## Sibling Surface Map`. Treat discovery output as evidence, not a contract:
 - High/medium candidates require a disposition: `cover`, `GAP-NNN`, or `ignore(reason)`.
 - `cover` candidates become confirmed sibling surfaces and may feed Behavior Matrix surfaces.
 - `GAP-NNN` candidates do not become BM cells until clarified, but the gap must name what is unknown.
@@ -600,10 +626,10 @@ Two kinds of "missing", handled differently:
 
 This pass is the upstream discovery gate for sibling-drift bugs: first find plausible sibling entry-points, then deliberately confirm or park them. It must not manufacture requirements from fuzzy matches.
 
-**Behavior Matrix pass (run after the cross-surface invariant pass).** If the feature triggers any state/status/stage, viewer role, permission-dependent affordance, cross-module read/write path, or repeated read surface, create `## Behavior Matrix` before finalizing AS. Derive the axes only from the spec/explore/codebase scan:
+**Behavior Matrix pass (run after the Core Function Model and cross-surface invariant pass).** If the feature triggers any state/status/stage, viewer role, permission-dependent affordance, cross-module read/write path, or repeated read surface, create `## Behavior Matrix` before finalizing AS. Derive the axes only from the spec/explore/codebase scan:
 - States from the state machine or named lifecycle/status values.
 - Viewers from roles, owners/assignees, actor/recipient relationships, and permission rules.
-- Surfaces from confirmed sibling surfaces, Module Dependency Map style source/target pairs, UI pages, API read paths, notifications/email, calendar/provider surfaces, feeds, counts, and dashboards.
+- Surfaces from confirmed sibling surfaces, Core Function Model entry points/seams, Module Dependency Map style source/target pairs, UI pages, API read paths, notifications/email, calendar/provider surfaces, feeds, counts, and dashboards.
 
 For each material cell, either:
 - write an AS asserting the exact behavior for that state/viewer/surface, including label, visibility, allowed action, data source/timing, and cascade/parity obligations when applicable;
@@ -662,6 +688,7 @@ Include only sections that apply:
 | CC12 | If the feature triggers state/viewer/surface behavior, `## Behavior Matrix` exists and every material cell has `Coverage` = `AS-NNN`, `GAP-NNN`, or `N/A: <reason>`. No blank coverage cells. Every non-N/A cell maps to an existing AS/GAP; every `N/A` has a concrete reason. State-transition cells list cascade obligations or `none`; read-surface cells list source/timing/lifecycle | Add the matrix, fill the cells, bind each non-N/A cell to AS/GAP, or explain why the matrix is not applicable |
 | CC13 | Every matching `docs/invariants/INV-*.md` entry is handled according to status: `enforced` → referenced `test_ref` or equivalent regression is named in implementation guidance; `confirmed` → sibling/component coverage is represented by AS/GAP/N/A; `candidate` → confirmation GAP/risk note or explicit ignore reason; `retired` → ignored with reason if matched | Add invariant coverage, record a confirmation GAP/risk note, or explain why the invariant does not apply |
 | CC14 | If sibling discovery ran or the explore handoff includes a Sibling Candidate Table, every high/medium candidate has `cover`, `GAP-NNN`, or `ignore(reason)`. Only `cover` candidates feed `## Behavior Matrix`; `GAP`/`ignore` candidates do not create AS/BM requirements | Add the disposition, create the confirmation GAP, or remove the candidate with reason |
+| CC15 | If Core Function Model is required or present, it names operation, inputs, entry points, internal seams, external contracts or N/A, invariants, and unknown semantics. Every confirmed model item is represented by AS/GAP/Constraint/BM. Provider/external semantics that are unknown are GAPs; file:line/symbol/config claims are verified or marked unverified | Add/repair the model, verify references, or create the missing AS/GAP/Constraint/BM coverage |
 
 **CC5 enforcement procedure (mandatory, no exceptions):**
 1. Enumerate every `C-xxx` line in `## Constraints & Invariants`.
@@ -939,6 +966,7 @@ After updating, verify:
 | CC12 | If this run ADDS or MODIFIES state/viewer/surface behavior, the touched `## Behavior Matrix` cells exist and each has `Coverage` = `AS-NNN`, `GAP-NNN`, or `N/A: <reason>`. Untouched legacy matrix cells are not re-audited. If no matrix exists and this update introduces the trigger, add the matrix for the touched scope | Add/update the matrix cells and bind non-N/A cells to AS/GAP; do not ship a new state/viewer/surface path as prose only |
 | CC13 | If this run touches a component named by `docs/invariants/INV-*.md`, the matching invariant entry is handled by status (`enforced` test_ref/equivalent named; `confirmed` covered or GAP/N/A; `candidate` confirmation GAP/risk note; `retired` ignored with reason). Untouched unrelated invariants are not re-audited | Add/update invariant coverage or record the confirmation/risk disposition |
 | CC14 | If this Mode C update adds/modifies an existing operation or bug-fix path, sibling discovery has either run for the touched scope or a prior Sibling Surface Map is reused. High/medium candidates are disposed as `cover`, `GAP-NNN`, or `ignore(reason)`; only `cover` candidates feed new BM cells | Run sibling discovery for the touched scope, then update the Sibling Surface Map disposition |
+| CC15 | If this Mode C update changes an operation/input/provider seam/external contract, Core Function Model is updated for the touched scope and confirmed model entries are covered by AS/GAP/Constraint/BM. New or changed file:line/symbol/config claims are verified or marked unverified | Update the model, verify references, and add missing coverage or GAP |
 
 > **⛔ Consistency check is NOT optional.**
 > Run CC1-CC6 after EVERY update (Major and Minor).

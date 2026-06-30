@@ -83,6 +83,20 @@ Use the invariant registry README/schema as base knowledge; README examples are 
 - `candidate` → use as an investigation hint; do not treat it as a hard build requirement unless the bug confirms it.
 - `retired` → ignore unless this fix reintroduces the retired component.
 
+**Core Function Mapping (required before fix):** Map the bug to the operation it breaks before writing the failing test.
+
+| Field | Evidence |
+|---|---|
+| Operation | core create/update/delete/send/read/validate/charge/auth operation |
+| Inputs | required / optional / absent inputs involved in the bug |
+| Entry points | UI/API/job/webhook/provider callback surfaces that can invoke the operation |
+| Internal seams | route -> service/helper -> provider/db/cache/read-model boundary; include test seam |
+| External contracts | provider/API semantics, IDs, lifecycle timing, retries, trial/deferred effects, or N/A |
+| Invariants | fail-closed / server revalidation / no-op unchanged / parity/cascade / no partial side effect |
+| Unknown semantics | spec GAP or investigation question; do not guess |
+
+For provider/external/payment/auth/data mutation bugs, identify the public entry → service/helper → provider/db/cache boundary and decide what must be tested. Do not jump from symptom to one-line fix before this mapping.
+
 **Sibling Discovery Pass (candidate only):** Run this for lifecycle/parity/cascade bugs, existing-operation fixes, or any bug whose symptom names one surface but the operation may exist on sibling entry-points. This is the same recipe as `/sp-explore` Phase 0.5, scoped to the bug:
 
 1. Seed nouns/verbs from the raw symptom, failing test, touched component, and matching invariant entries.

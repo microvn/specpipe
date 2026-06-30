@@ -274,6 +274,7 @@ Derive a checklist from the spec — each "promise" in this build's scope become
 - Each open `GAP-NNN` (status not `resolved`) → one `[ ]` line tagged `GAP` (so a parked gap is visible, not silently dropped — see Spec Coverage Gate).
 - Each Not-in-Scope row → one `[N/A]` line (prevents accidental ticking).
 - Each matching project-local invariant entry under `docs/invariants/INV-*.md` with `status: enforced` and a `test_ref` → one `INV-###` checklist line carrying the invariant id and test ref. `candidate` and `confirmed` entries are visible risks/spec obligations but not build gates unless the spec turned them into AS/GAP/BM lines. Use the invariant registry README/schema as base knowledge; README examples are not runtime entries.
+- Each confirmed `## Core Function Model` entry point, seam, external contract, invariant, or optional/absent input is checked through AS/GAP/BM/Constraint coverage, not by a separate checklist line unless the spec names an `AS-NNN`/`C-NNN`. A model entry with no coverage is a Spec Signal.
 - Each `## Sibling Surface Map` confirmed surface is checked through its AS/GAP/BM coverage, not by a separate checklist line. Candidate rows with `GAP-NNN` or `ignore(reason)` are visible context only. A candidate row with missing disposition is a spec signal, not a build requirement to implement.
 
 **Completeness invariant (checked, not hoped):** every `AS-NNN` and `C-NNN` in the spec's `## Stories`/Constraints MUST appear on ≥1 checklist line. Every `Coverage = AS-NNN` Behavior Matrix cell MUST appear on exactly one `BM.AS-*` checklist line; every `Coverage = GAP-NNN` Behavior Matrix cell MUST appear on exactly one `GAP-* — BM cell unresolved` checklist line; every `Coverage = N/A` Behavior Matrix cell MUST appear on one `[N/A] BM.NA.*` checklist line. An AS with no line = the checklist is wrong (re-derive), not the spec. A Behavior Matrix cell with no line = QA coverage was dropped. Deriving from Then-nouns alone silently drops AS whose Then is verb-shaped ("retries", "must not send") or whose nouns collide with another AS — anchoring on the ID closes that.
@@ -389,6 +390,8 @@ Before writing tests, trace all paths and draw a diagram to see gaps upfront —
 - Cross-surface parity cell (list/detail/feed/API/dashboard/worklist) → integration/E2E over the real producer/consumer path.
 - External/provider surface (calendar/email/payment/identity) → contract/integration against the verified boundary or provider fake that is itself verified; never a pure mock of the boundary under test.
 - Timing/source cell (`realtime`, `refresh-required`, `persisted+served`, `transient`) → the test must assert that lifecycle point, not just the immediate action response.
+
+**Step 2c — Trace Core Function Model:** If the spec has `## Core Function Model`, copy confirmed entry points, internal seams, external contracts, invariants, optional/absent inputs, and unknown semantics into the Coverage Map. Each item must point to `AS-NNN`, `C-NNN`, `GAP-NNN`, or BM coverage. A model item without coverage is a Spec Signal, not permission to invent behavior. Provider/external semantics require a real boundary assertion at the named seam; do not mock the seam the test claims to verify.
 
 In the diagram, prefix these rows with `[BM]` and keep the AS id visible:
 
@@ -725,6 +728,17 @@ grep '^\\[x\\] BM\\.AS' "$CHECKLIST" | grep -vE '[[:alnum:]_./-]+:[[:alnum:]_ -]
 - **Any terminal lifecycle BM line without a named cascade test → treat as `[~]` or BLOCKED**, depending on release criticality.
 - **Any `GAP-NNN — BM cell unresolved` line → visible open gap, not a build test failure.** Do not implement or test that cell until `/sp-plan` resolves it.
 
+### Core Function Model Gate
+
+Run this when the spec contains `## Core Function Model`.
+
+- Confirmed entry points, seams, provider/external contracts, invariants, and optional/absent inputs must be represented by AS/GAP/BM/Constraint lines.
+- Optional/absent inputs named by the model need a regression AS or GAP.
+- External/provider semantics that affect behavior need AS if stated or GAP if unknown.
+- Any verified code seam claimed in the model must have test evidence at the correct boundary.
+- **No-vacuous-boundary rule:** do not mock the seam the test claims to verify. Mock outside dependencies only.
+- A model entry with no AS/GAP/BM/Constraint coverage means `/sp-plan` did not finish. Emit a Spec Signal and mark DONE_WITH_CONCERNS or BLOCKED depending on release criticality.
+
 ### Sibling Surface Map Gate
 
 Run this when the spec contains `## Sibling Surface Map`.
@@ -820,6 +834,7 @@ TDD evidence: [S-001: RED (paste 1st failing assertion raw) → GREEN ✓ | test
 Checklist: X/Y [x], A/Y [~] (destinations: <story-id list or Known-Gap refs>), B/Y [ ] (reasons), C/Y [N/A]
 Coverage gate (Phase 3.5): PASS — all AS/C carry a test | BLOCKED — uncovered: <AS/C ids>   (breadth)
 Behavior Matrix gate: PASS — all BM cells [x] | BLOCKED — uncovered: <BM lines> | CONCERNS — partial/mocked-boundary: <BM lines>
+Core Function Model gate: PASS — model entries covered at correct seam | CONCERNS/BLOCKED — missing coverage or vacuous boundary: <items> | N/A
 Sibling Surface Map gate: PASS — confirmed surfaces covered | CONCERNS — candidate disposition/spec signal: <candidate ids> | N/A
 Invariant gate: PASS — enforced invariants covered | BLOCKED — missing enforced invariant tests: <INV ids> | N/A — no enforced invariants touched
 Edge Case Compliance: [per-story table — every row ✓ or N/A+reason]   (depth)
