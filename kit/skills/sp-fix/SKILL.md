@@ -134,6 +134,8 @@ CODE PATH COVERAGE
 
 If the bug is in a view/template layer (UI render, layout, data binding, styling) — mark the view path `[→MANUAL]` and test the logic layer backing it (ViewModel, Presenter, helper) instead. If there is no logic layer to test, the fix is `[→MANUAL]` only — note what to visually verify.
 
+**Visual-fidelity bug → hand to `/sp-port-webui` instead of eyeball-patching.** When the bug is that a **web/DOM** surface *drifted from its canonical design source* (spec's `Prototype URL`, an HTML prototype, or a Figma node) — wrong spacing/colour/radius/type, a card lost a chip/footer, a grid went 3-col instead of 5 — this is a fidelity bug, not a logic bug. Don't tweak CSS by eye and call it fixed: hand it to `/sp-port-webui`, whose engine measures `getComputedStyle` node-by-node against the design and turns each gap into a concrete token fix, then loops to 100%. Conditions (all must hold): the surface must **match a design source 1:1**, the stack is web/DOM (not native mobile — Flutter/Kotlin/Swift have no `getComputedStyle`), and the defect is visual rather than behavioural. A bug in the **logic** behind the view (wrong data bound, missing state) stays here — test the logic layer as above. When you hand off, note it in the Phase 5 report (`VISUAL FIDELITY: <surface> → /sp-port-webui`) rather than marking the fix DONE; if the port reveals the drift is really a missing backend field (data-gap), route it through `/sp-plan` → `/sp-build`, not a patch here.
+
 If you cannot identify a specific `[GAP]` path → the hypothesis is not specific enough. Investigate further.
 
 If the bug is in a dependency/config/data (not project code), say so before proceeding.
