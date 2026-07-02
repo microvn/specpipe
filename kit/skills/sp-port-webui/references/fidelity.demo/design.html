@@ -1,0 +1,10 @@
+<!doctype html><meta charset="utf8"><style>*{margin:0;box-sizing:border-box}body{font-family:sans-serif}</style>
+<!-- DESIGN: a storage stat row — icon + label + progress bar (fill = primary blue) + percent. -->
+<div id="row" data-testid="row" style="display:flex;align-items:center;gap:12px;padding:12px;background:#fff;border:1px solid #e4e4e7;border-radius:12px;width:320px">
+  <span id="iconbox" data-testid="iconbox" style="width:32px;height:32px;border-radius:8px;display:grid;place-items:center;background:rgba(24,188,242,.13)">
+    <svg width="16" height="16"><rect width="16" height="16" fill="rgb(24,188,242)"></rect></svg></span>
+  <div style="flex:1">
+    <div style="font-size:13px;font-weight:600;color:#09090b">Storage</div>
+    <div id="track" style="width:100%;height:8px;background:#e4e4e7;border-radius:4px;margin-top:6px">
+      <div id="fill" style="width:70%;height:8px;background:rgb(24,188,242);border-radius:4px"></div></div></div>
+  <span style="font-size:12px;font-weight:600;color:#71717a">70%</span></div>

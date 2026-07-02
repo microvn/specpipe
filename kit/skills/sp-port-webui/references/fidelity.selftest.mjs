@@ -159,6 +159,61 @@ try {
   writeFileSync(path.join(tmp, 'inhDesign.html'), INH_DESIGN)
   writeFileSync(path.join(tmp, 'inhBuilt.html'), INH_BUILT)
   map['inherit'] = { source: 'prototype', prototype: { url: pathToFileURL(path.join(tmp, 'inhDesign.html')).href, selector: '#box' }, built: { url: pathToFileURL(path.join(tmp, 'inhBuilt.html')).href, selector: '#box' } }
+  // shallow self-anchor map: the design has a colored progress FILL nested inside a track, but the
+  // map pins only the outer row + icon as self anchors — the fill (wrong colour in the build) is
+  // never measured. Every MEASURED prop passes, yet coverage must catch that most of the surface
+  // (fill/track/label) went unmeasured and REFUSE to report a pass. This is the reported bug.
+  const SHALLOW = (fill) => `<!doctype html><meta charset="utf8"><style>*{margin:0;box-sizing:border-box}</style>
+    <div id="row" style="display:flex;gap:8px;padding:8px;background:#fff">
+      <span id="icon" style="width:16px;height:16px;background:rgb(24,188,242)"></span>
+      <div id="track" style="width:100px;height:6px;background:#e4e4e7;border-radius:3px">
+        <div id="fill" style="width:70px;height:6px;background:${fill};border-radius:3px"></div></div>
+      <span id="label" style="font-size:12px;color:#09090b">70%</span></div>`
+  writeFileSync(path.join(tmp, 'shallowDesign.html'), SHALLOW('rgb(24,188,242)'))
+  writeFileSync(path.join(tmp, 'shallowBuilt.html'), SHALLOW('rgb(34,197,94)')) // fill drifted green — but unmeasured
+  map['shallow-self'] = {
+    source: 'prototype',
+    prototype: { url: pathToFileURL(path.join(tmp, 'shallowDesign.html')).href, selector: '#row' },
+    built: { url: pathToFileURL(path.join(tmp, 'shallowBuilt.html')).href, selector: '#row' },
+    nodes: [
+      { name: 'row', refSel: '#row', builtSel: '#row', self: true },
+      { name: 'icon', refSel: '#icon', builtSel: '#icon', self: true },
+    ],
+  }
+  // SVG icon whose fill drifts (blue→gray). fill/stroke were absent from CAPTURE, so the icon
+  // colour passed. Now it must be measured and fail.
+  const SVGD = (fill) => `<!doctype html><meta charset="utf8"><style>*{margin:0}</style>
+    <div id="root"><svg id="ic" width="16" height="16"><rect id="r" width="16" height="16" fill="${fill}"></rect></svg></div>`
+  writeFileSync(path.join(tmp, 'svgDesign.html'), SVGD('rgb(24,188,242)'))
+  writeFileSync(path.join(tmp, 'svgBuilt.html'), SVGD('rgb(113,113,122)'))
+  map['svg-fill'] = { source: 'prototype', prototype: { url: pathToFileURL(path.join(tmp, 'svgDesign.html')).href, selector: '#root' }, built: { url: pathToFileURL(path.join(tmp, 'svgBuilt.html')).href, selector: '#root' } }
+  // native <progress> accent-color drift — absent from CAPTURE before, so a green-vs-blue bar passed.
+  const ACC = (a) => `<!doctype html><meta charset="utf8"><style>*{margin:0}</style>
+    <div id="root"><progress id="p" value="70" max="100" style="accent-color:${a}"></progress></div>`
+  writeFileSync(path.join(tmp, 'accDesign.html'), ACC('rgb(24,188,242)'))
+  writeFileSync(path.join(tmp, 'accBuilt.html'), ACC('rgb(113,113,122)'))
+  map['accent'] = { source: 'prototype', prototype: { url: pathToFileURL(path.join(tmp, 'accDesign.html')).href, selector: '#root' }, built: { url: pathToFileURL(path.join(tmp, 'accBuilt.html')).href, selector: '#root' } }
+  // keyword-vs-length: design pins the dot left:0 (flush-left); built uses right:0 → left computes
+  // `auto`. getComputedStyle returns "0px" vs "auto"; the old (b||0)-(a||0) coerced auto→0 → Δ0 pass.
+  // Now a length-vs-keyword mismatch must fail.
+  const POS = (css) => `<!doctype html><meta charset="utf8"><style>*{margin:0}</style>
+    <div id="root" style="position:relative;width:100px;height:20px"><div id="dot" style="position:absolute;top:0;${css};width:8px;height:8px;background:rgb(24,188,242)"></div></div>`
+  writeFileSync(path.join(tmp, 'posDesign.html'), POS('left:0'))
+  writeFileSync(path.join(tmp, 'posBuilt.html'), POS('right:0'))
+  map['keyword-pos'] = { source: 'prototype', prototype: { url: pathToFileURL(path.join(tmp, 'posDesign.html')).href, selector: '#root' }, built: { url: pathToFileURL(path.join(tmp, 'posBuilt.html')).href, selector: '#root' } }
+  // letter-spacing: `normal` IS 0 — design `normal` vs built `0px` must NOT be a false fail.
+  const LSD = (ls) => `<!doctype html><meta charset="utf8"><style>*{margin:0}body{font-family:sans-serif}</style>
+    <div id="root"><span id="t" style="letter-spacing:${ls};color:rgb(9,9,11)">Hi</span></div>`
+  writeFileSync(path.join(tmp, 'lsDesign.html'), LSD('normal'))
+  writeFileSync(path.join(tmp, 'lsBuilt.html'), LSD('0px'))
+  map['ls-normal'] = { source: 'prototype', prototype: { url: pathToFileURL(path.join(tmp, 'lsDesign.html')).href, selector: '#root' }, built: { url: pathToFileURL(path.join(tmp, 'lsBuilt.html')).href, selector: '#root' } }
+  // painting EXTRA: build renders an extra red bar (bg → paints) with no design counterpart, appended
+  // as the LAST child of #head so no sibling paths shift. Design is clean; the extra must block PASS.
+  const EXTRA_BUILT = DESIGN.replace('</div>\n  <div id="footer"', '<div id="rogue" style="width:20px;height:6px;background:#dc2626"></div></div>\n  <div id="footer"')
+  writeFileSync(path.join(tmp, 'extraBuilt.html'), EXTRA_BUILT)
+  map['extra-paint'] = { source: 'prototype', prototype: { url: dUrl, selector: '#card' }, built: { url: pathToFileURL(path.join(tmp, 'extraBuilt.html')).href, selector: '#card' } }
+  // empty reference tree → nothing measured must NOT read as a pass.
+  writeFileSync(path.join(tmp, 'empty.json'), '[]')
   map['err-sel'] = { source: 'prototype', prototype: { url: dUrl, selector: '#nope' }, built: { url: dUrl, selector: '#card' } }
   writeFileSync(path.join(tmp, 'scripts', 'fidelity.map.json'), JSON.stringify(map, null, 2))
 
@@ -264,6 +319,37 @@ try {
   check('tallies recurring RADIUS + FONT-SIZE', /RADIUS/.test(hv.out) && /FONT-SIZE/.test(hv.out))
   check('proposes a starter tokens.css (--radius-/--text-/--color-)', /--radius-/.test(hv.out) && /--text-/.test(hv.out) && /--color-1: #/.test(hv.out))
   check('harvest exits 0 (proposal, not a gate)', hv.code === 0, `code ${hv.code}`)
+
+  console.log('CASE shallow self-anchor map — coverage catches unmeasured surface (the reported bug)')
+  const sh = run('shallow-self')
+  check('emits a COVERAGE line', /COVERAGE/.test(sh.out))
+  check('warns "shallow map" with unmeasured count', /shallow map/.test(sh.out) && /unmeasured/.test(sh.out))
+  check('does NOT report a pass despite every measured prop passing', !/PASS — fidelity 100%/.test(sh.out))
+  check('fails on insufficient coverage → exit 1', sh.code === 1 && /insufficient coverage/.test(sh.out), `code ${sh.code}`)
+
+  console.log('CASE svg fill drift — fill now captured + diffed')
+  const sv = run('svg-fill')
+  check('fill drift flagged → exit 1', sv.code === 1 && /fill/.test(sv.out), `code ${sv.code}`)
+
+  console.log('CASE accent-color drift — native progress/checkbox colour now measured')
+  const ac = run('accent')
+  check('accent-color drift flagged → exit 1', ac.code === 1 && /accent-color/.test(ac.out), `code ${ac.code}`)
+
+  console.log('CASE keyword-vs-length — auto no longer coerced to 0')
+  const kp = run('keyword-pos')
+  check('left/right pinned-vs-auto flagged → exit 1', kp.code === 1 && /(left|right)/.test(kp.out), `code ${kp.code}`)
+
+  console.log('CASE letter-spacing normal == 0 — no false fail')
+  const ls = run('ls-normal')
+  check('normal vs 0px passes → exit 0', ls.code === 0 && /PASS — fidelity 100%/.test(ls.out), `code ${ls.code}`)
+
+  console.log('CASE painting extra node — blocks PASS (rule 7 keeps non-painting extras)')
+  const xp = run('extra-paint')
+  check('painting extra detected + blocks pass → exit 1', xp.code === 1 && /painting extra/.test(xp.out), `code ${xp.code}`)
+
+  console.log('CASE empty reference tree — nothing measured is not a pass')
+  const er = run('identical', ['--reference', path.join(tmp, 'empty.json')])
+  check('nothing measured → exit 1, no false pass', er.code === 1 && /nothing measured/.test(er.out) && !/PASS — fidelity 100%/.test(er.out), `code ${er.code}`)
 
   console.log('CASE errors')
   const ek = run('does-not-exist')

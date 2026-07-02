@@ -1,0 +1,20 @@
+{
+  "_readme": "Live demo map for fidelity.mjs (see README.md). Uses relative `file` paths (resolved against --project = this dir), so it is portable. Two keys: `shallow` = a self-anchor-only map (row + iconbox) that leaves the progress fill + icon unmeasured → the COVERAGE axis FAILs with 'insufficient coverage'. `full` = the same surface with no overrides → the engine auto-walks and catches the hidden fill/icon colour drift.",
+  "_config": { "tokensCss": "tokens.css" },
+
+  "shallow": {
+    "source": "prototype",
+    "prototype": { "file": "design.html", "selector": "#row" },
+    "built": { "file": "built.html", "selector": "#row" },
+    "nodes": [
+      { "name": "row", "refSel": "#row", "builtSel": "#row", "self": true },
+      { "name": "iconbox", "refSel": "#iconbox", "builtSel": "#iconbox", "self": true }
+    ]
+  },
+
+  "full": {
+    "source": "prototype",
+    "prototype": { "file": "design.html", "selector": "#row" },
+    "built": { "file": "built.html", "selector": "#row" }
+  }
+}

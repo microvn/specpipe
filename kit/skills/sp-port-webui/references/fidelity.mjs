@@ -97,7 +97,8 @@ const CAPTURE = [
   'border-top-left-radius', 'border-top-right-radius', 'border-bottom-right-radius', 'border-bottom-left-radius',
   'font-family', 'font-size', 'font-weight', 'font-style', 'line-height', 'letter-spacing',
   'text-transform', 'text-align', 'text-decoration-line', 'white-space', 'text-overflow', 'vertical-align',
-  'color', 'background-color', 'background-image', 'opacity', 'box-shadow',
+  'color', 'background-color', 'background-image', 'opacity', 'box-shadow', 'filter', 'accent-color',
+  'fill', 'stroke', 'stroke-width',
   'outline-width', 'outline-style', 'outline-color',
   'flex-direction', 'flex-wrap', 'justify-content', 'align-items', 'align-self', 'flex-grow', 'flex-shrink', 'flex-basis', 'order',
   'row-gap', 'column-gap', 'grid-template-columns', 'grid-template-rows',
@@ -105,12 +106,12 @@ const CAPTURE = [
 ]
 const ADVISORY = new Set(['width', 'height'])
 const LEN = new Set([
-  'width', 'height', 'padding', 'margin', 'gap', 'row-gap', 'column-gap',
+  'width', 'height', 'padding', 'margin', 'gap', 'row-gap', 'column-gap', 'stroke-width',
   'border-width', 'border-radius', 'font-size', 'letter-spacing', 'top', 'right', 'bottom', 'left',
   'padding-top', 'padding-right', 'padding-bottom', 'padding-left',
   'margin-top', 'margin-right', 'margin-bottom', 'margin-left',
 ])
-const COLOR = new Set(['color', 'background-color', 'border-color', 'outline-color',
+const COLOR = new Set(['color', 'background-color', 'border-color', 'outline-color', 'accent-color', 'fill', 'stroke',
   'border-top-color', 'border-right-color', 'border-bottom-color', 'border-left-color'])
 const CORNERS4 = ['top-left', 'top-right', 'bottom-right', 'bottom-left']
 // Volatile — skipped even under --all (logical aliases, non-visual, currentColor-derived).
@@ -290,11 +291,17 @@ async function runSetup(page, steps = []) {
   }
 }
 // Trigger an interactive state on `sel` so its (and descendants') :hover/:focus styles apply.
+// Returns true iff the state actually triggered. The old code swallowed hover/focus failures
+// silently, then measured the RESTING styles and labelled them `:hover` — reporting perfect
+// state fidelity for a state that never fired. Callers must skip (not measure) a state that
+// didn't apply, so a genuine hover/focus colour drift can't hide behind a phantom pass.
 async function applyState(page, sel, state) {
   await page.mouse.move(0, 0)
-  if (state === 'hover') await page.hover(sel, { timeout: 8000 }).catch(() => {})
-  else if (state === 'focus') await page.focus(sel, { timeout: 8000 }).catch(() => {})
+  let applied = true
+  if (state === 'hover') applied = await page.hover(sel, { timeout: 8000 }).then(() => true).catch(() => false)
+  else if (state === 'focus') applied = await page.focus(sel, { timeout: 8000 }).then(() => true).catch(() => false)
   await page.waitForTimeout(80)
+  return applied
 }
 async function clearState(page) { await page.mouse.move(0, 0).catch(() => {}); await page.evaluate(() => document.activeElement && document.activeElement.blur && document.activeElement.blur()).catch(() => {}) }
 async function snapshot(page, rootSel) {
@@ -329,9 +336,32 @@ async function resolveLiveTokens(page, palette) {
 // ---------------------------------------------------------------------------
 function labelFor(n) { const p = n && n.prefix ? `${n.prefix}·` : ''; return p + (n.testid ? `@${n.testid}` : n.role ? `${n.tag}[${n.role}]` : n.tag + (n.text ? ` “${n.text.slice(0, 12)}”` : '')) }
 
+// ---------------------------------------------------------------------------
+// Paint-bearing predicates — the COVERAGE denominator. A node "paints" when it
+// contributes ink to the picture: a filled/bordered/shadowed box, an image, or
+// an SVG/img tag. `isVisualNode` adds text-bearing nodes (a label IS visual).
+// Coverage counts these; a pure layout wrapper (flex div, no paint, no text) is
+// legitimately skippable and must NOT inflate the denominator (else every
+// self-anchor / re-anchored map false-fails on structural divs). Extra-node
+// gating uses `hasPaint` (stricter — excludes bare text so sr-only spans pass).
+// ---------------------------------------------------------------------------
+const SVG_TAG = /^(svg|path|rect|circle|polygon|polyline|line|use|g|ellipse|img|image)$/
+function hasPaint(n) {
+  const s = n.style || {}
+  const bg = normColor(s['background-color']); if (bg && bg !== 'transparent') return true
+  if (['top', 'right', 'bottom', 'left'].some((k) => (parseFloat(s['border-' + k + '-width']) || 0) > 0)) return true
+  const sh = normWs(s['box-shadow']); if (sh && sh !== 'none') return true
+  const bi = normWs(s['background-image']); if (bi && bi !== 'none') return true
+  if (SVG_TAG.test(n.tag)) return true
+  return false
+}
+const isVisualNode = (n) => hasPaint(n) || !!(n.text && n.text.trim())
+
 function normalize(prop, v) {
   if (COLOR.has(prop)) return normColor(v)
   if (prop === 'font-family') return normFont(v)
+  // `letter-spacing: normal` IS 0 — normalise so it doesn't read as a keyword mismatch vs `0px`.
+  if (prop === 'letter-spacing' && /normal/i.test(v || '')) return 0
   if (LEN.has(prop) || prop === 'line-height') { const n = parseFloat(v); return Number.isNaN(n) ? normWs(v) : n }
   return normWs(v)
 }
@@ -340,16 +370,24 @@ function row(label, prop, rv, bv, live, S) {
   const rn = normalize(prop, rv), bn = normalize(prop, bv)
   let pass, delta = ''
   if (typeof rn === 'number' || typeof bn === 'number') {
-    const a = typeof rn === 'number' ? rn : NaN, b = typeof bn === 'number' ? bn : NaN
-    if (Number.isNaN(a) && Number.isNaN(b)) return null
-    const d = (b || 0) - (a || 0)
-    delta = (d >= 0 ? '+' : '') + Math.round(d * 100) / 100 + 'px'
-    pass = Math.abs(d) <= OPTS.tol
+    const aNum = typeof rn === 'number', bNum = typeof bn === 'number'
+    if (aNum && bNum) {
+      const d = bn - rn
+      delta = (d >= 0 ? '+' : '') + Math.round(d * 100) / 100 + 'px'
+      pass = Math.abs(d) <= OPTS.tol
+    } else {
+      // one side is a length, the other a keyword (`auto`/`normal`/`max-content`…). These are
+      // NOT interchangeable: `margin-left: auto` (centred) vs `0px` (flush-left) renders very
+      // differently. The old code coerced NaN→0 and reported Δ0 → silent pass. Treat as a real
+      // mismatch unless both keywords happen to be equal (handled by the string branch below).
+      pass = String(rn) === String(bn)
+      delta = pass ? '0' : '≠'
+    }
   } else {
     pass = rn === bn
     if (rn === 'transparent' && bn === 'transparent') pass = true
   }
-  return { prop: label, ref: String(rv ?? '—').slice(0, 26), built: String(bv ?? '—').slice(0, 26), delta, fix: pass ? '' : suggest(prop, rv, live, S), advisory: ADVISORY.has(label), pass }
+  return { prop: label, ref: String(rv ?? '—').slice(0, 26), built: String(bv ?? '—').slice(0, 26), delta, fix: pass ? '' : suggest(prop, rv, live, S), advisory: ADVISORY.has(label) && !OPTS.strictSize, pass }
 }
 // Collapse a 4-side/4-corner family into ONE row when uniform on both sides; else per-side.
 function fam(label, keys, R, B, live, S) {
@@ -383,7 +421,18 @@ function diffNode(refN, builtN, live, S) {
   const INK = /^(svg|path|rect|circle|polygon|line|use|i|span|a|button|label|p|h[1-6]|td|th|li|em|strong|small|code|b)$/
   const showsInk = refN.text || builtN.text || INK.test(refN.tag) || refN.childCount === 0
   if (showsInk) plain(['font-family', 'font-size', 'font-weight', 'font-style', 'line-height', 'letter-spacing', 'text-transform', 'text-align', 'text-decoration-line', 'white-space', 'text-overflow', 'vertical-align', 'color'])
-  plain(['background-color', 'background-image', 'opacity', 'box-shadow'])
+  plain(['background-color', 'background-image', 'opacity', 'box-shadow', 'filter', 'accent-color'])
+  // SVG paint (fill/stroke) — icons hardcode fill/stroke, not `color`; a wrong icon colour hides
+  // here. accent-color above covers native <progress>/checkbox/range fills. Both are the exact
+  // "progress-bar / icon colour wrong" symptom class that slipped through when uncaptured.
+  if (SVG_TAG.test(refN.tag) || SVG_TAG.test(builtN.tag)) plain(['fill', 'stroke', 'stroke-width'])
+  // box-sizing changes the painted box even when width/height (advisory) match; outline is the
+  // focus ring the engine explicitly drives states for but never compared. Both were captured
+  // and silently dropped. Outline only when one side actually draws one.
+  push(row('box-sizing', 'box-sizing', R['box-sizing'], B['box-sizing'], live, S))
+  const anyOutline = (parseFloat(R['outline-width']) || 0) > 0 || (parseFloat(B['outline-width']) || 0) > 0 ||
+    (R['outline-style'] && R['outline-style'] !== 'none') || (B['outline-style'] && B['outline-style'] !== 'none')
+  if (anyOutline) plain(['outline-width', 'outline-style', 'outline-color'])
   push(row('display', 'display', R.display, B.display, live, S))
   if (isFlex) plain(['flex-direction', 'flex-wrap', 'justify-content', 'align-items', 'align-self', 'flex-grow', 'flex-shrink', 'flex-basis', 'order'])
   if (R['row-gap'] === R['column-gap'] && B['row-gap'] === B['column-gap']) push(row('gap', 'gap', R['row-gap'], B['row-gap'], live, S))
@@ -440,15 +489,28 @@ function report(key, groups, structural, coverage) {
     for (const n of structural.extra) console.log(' ' + c.yel('⚠ extra   ') + pad(n.path, 14) + ' ' + labelFor(n))
   }
 
-  const { totalProps, fail, nodesRef, nodesBuilt, paired } = coverage
-  const ok = fail === 0 && structural.missing.length === 0
-  const raw = totalProps ? ((totalProps - fail) / totalProps) * 100 : 100
-  const pct = ok ? '100' : Math.min(99.9, Math.floor(raw * 10) / 10).toFixed(1)  // never show 100 while failing
-  console.log('\n' + c.bold('SUMMARY') + `  ${nodesRef} design nodes · ${paired} measured · ${structural.missing.length} missing · ${structural.extra.length} extra`)
+  const { totalProps, fail, paired, designVisual, measured, covRatio, coverageOK, covThresh, extraPaint, unmeasuredLabels, ok, propPct, reasons } = coverage
+  const pct = ok ? '100' : Math.min(99.9, Math.floor(propPct * 10) / 10).toFixed(1)  // never show 100 while failing
+
+  // COVERAGE axis — how much of the real design surface we actually measured. This is the axis
+  // that makes a shallow / anchor-only map impossible to read as a pass. Warn loudly + name a few
+  // design nodes the map didn't cover when it's thin.
+  const covPct = Math.round(covRatio * 100)
+  const covLine = `COVERAGE  ${measured} / ${designVisual} visual design nodes measured (${covPct}%)`
+  console.log('\n' + (coverageOK ? c.grn(covLine) : c.red(covLine)))
+  if (!coverageOK && paired > 0) {
+    console.log(' ' + c.red(`⚠ shallow map: ${measured}/${designVisual} design descendants measured — ${designVisual - measured} unmeasured; add node pairs or remove self-only anchors`))
+    if (unmeasuredLabels.length) console.log(' ' + c.dim(`  e.g. ${unmeasuredLabels.join(' · ')}`))
+  } else if (paired === 0) {
+    console.log(' ' + c.red('⚠ nothing measured — reference/selector produced no paired nodes; this is NOT a pass'))
+  }
+  if (extraPaint) console.log(' ' + c.red(`⚠ ${extraPaint} painting extra node(s) in build with no design counterpart — verify intentional (blocks PASS)`))
+
+  console.log('\n' + c.bold('SUMMARY') + `  ${designVisual} visual design nodes · ${measured} measured · ${structural.missing.length} missing · ${structural.extra.length} extra`)
   console.log(`         ${totalProps} props checked · ${totalProps - fail} pass · ${fail} fail`)
   console.log('         ' + (ok
-    ? c.grn(`PASS — fidelity 100%  (all mapped props within ±${OPTS.tol}px / exact color+token, 0 missing nodes)`)
-    : c.red(`FAIL — fidelity ${pct}%  (gate: 100% within ±${OPTS.tol}px / exact color+token, 0 missing nodes)`)))
+    ? c.grn(`PASS — fidelity 100%  (all mapped props within ±${OPTS.tol}px / exact color+token, coverage ${covPct}%, 0 missing nodes)`)
+    : c.red(`FAIL — fidelity ${pct}% · coverage ${covPct}%  (${reasons.join('; ')})`)))
   console.log('         ' + c.dim(`re-run after edits:  node <skill>/references/fidelity.mjs ${key} --project ${path.relative(process.cwd(), PROJECT) || '.'} --watch`))
 }
 
@@ -558,18 +620,21 @@ async function runOnce(browser) {
       const label = ov.name || ov.refSel
       absorb(pairAndDiff(await grab(designPage, ov.refSel, ov.self), await grab(built, ov.builtSel, ov.self), live, S, label))
       for (const st of ov.states || []) {
-        await applyState(designPage, ov.refSel, st); await applyState(built, ov.builtSel, st)
+        const okD = await applyState(designPage, ov.refSel, st), okB = await applyState(built, ov.builtSel, st)
+        if (!okD || !okB) {
+          console.log(c.yel(`   ⚠ state '${st}' did not trigger on ${!okD ? ov.refSel : ov.builtSel} — NOT measured (fix the selector; don't trust a passing ${st})`))
+          await clearState(designPage); await clearState(built); continue
+        }
         absorb(pairAndDiff(await grab(designPage, ov.refSel, ov.self), await grab(built, ov.builtSel, ov.self), live, S, `${label}:${st}`))
         await clearState(designPage); await clearState(built)
       }
     }
   } else {
-    if (overrides.length && !designPage) console.log(c.yel(`   nodes[] overrides need the rendered design (not --reference/--cache) — ignoring; using root pairing`))
+    if (overrides.length && !designPage) console.log(c.yel(`   nodes[] overrides + states + self-anchors need the rendered design (not --reference/--cache) — SKIPPED; root pairing only (state/anchor coverage = 0 this run)`))
     agg = pairAndDiff(refNodes, builtNodes, live, S)
   }
 
   const structural = { missing: agg.missing, extra: agg.extra }
-  const coverage = { totalProps: agg.totalProps, fail: agg.fail, nodesRef: agg.nRef, nodesBuilt: builtNodes.length, paired: agg.paired }
   console.log(c.dim(`   matched ${agg.paired} / ${agg.nRef} design nodes · ${structural.missing.length} missing · ${structural.extra.length} extra` + (S.found ? '' : c.yel(`  (no token file found${tokensCss ? '' : ' — suggestions degrade to arbitrary'})`))))
 
   // Divergence detector — path-pairing is only trustworthy when the two trees share a shape.
@@ -580,18 +645,56 @@ async function runOnce(browser) {
   const unpaired = structural.missing.length + structural.extra.length
   const ratio = agg.paired + unpaired ? unpaired / (agg.paired + unpaired) : 0
   const dGap = maxDepth(builtNodes) - maxDepth(refNodes)
-  if (ratio > 0.30 || (!overrides.length && Math.abs(dGap) >= 2)) {
+  const divergent = ratio > 0.30 || (!overrides.length && Math.abs(dGap) >= 2)
+  if (divergent) {
     console.log(c.yel(`⚠ shapes diverge — design depth ${maxDepth(refNodes)} vs built depth ${maxDepth(builtNodes)}, ${unpaired} unpaired (${Math.round(ratio * 100)}%).`))
     console.log(c.yel(`  Path-pairing is UNRELIABLE here — the rows below may be phantom drift. Have the LLM map`))
     console.log(c.yel(`  nodes semantically (run --probe to see both trees) and pin them as explicit nodes[] pairs`))
     console.log(c.yel(`  with "self": true (element-to-element, ignores wrapper depth). See fidelity.map.example.json.`))
   }
 
+  // COVERAGE — the honesty axis. T = paint/text-bearing ("visual") nodes in the FULL design
+  // subtree from the mapped root; refNodes is always the whole design tree even when only
+  // anchors were measured. M = distinct visual design nodes we actually put a measurement on.
+  // A shallow map (self-only anchors, a too-deep root, a truncated/`nodes[]`-scoped walk) shows
+  // a low M/T no matter how green the measured props are — so "0 missing" on 2-of-24 nodes can
+  // never read as a match. Layout-only wrappers don't count (they aren't visual), so a legit
+  // re-anchored map isn't punished for skipping structural divs.
+  const designVisual = refNodes.filter(isVisualNode)
+  const measuredKeys = new Set()
+  for (const g of agg.groups) if (isVisualNode(g.ref)) measuredKeys.add(`${String(g.prefix || '').split(':')[0]}|${g.ref.path}`)
+  const T = designVisual.length, M = measuredKeys.size
+  const COV_THRESH = 0.7
+  const covRatio = T ? M / T : (agg.paired > 0 ? 1 : 0)
+  const coverageOK = covRatio >= COV_THRESH && agg.paired > 0
+  // A built node that PAINTS but has no design counterpart is real drift, not an sr-only/focus
+  // wrapper (those don't paint) — it must block a 100%/PASS. Non-painting extras stay advisory (rule 7).
+  const extraPaint = structural.extra.filter(hasPaint)
+  // Sample of design visual nodes to name in a shallow-coverage warning. In whole-tree mode we
+  // can point at the exact unmeasured ones; under anchor overrides paths are relative so we just
+  // list what the design HAS (verify you covered it).
+  const unmeasured = overrides.length ? designVisual : designVisual.filter((n) => !measuredKeys.has(`|${n.path}`))
+
+  const ok = agg.fail === 0 && structural.missing.length === 0 && extraPaint.length === 0 && coverageOK && !divergent
+  const propPct = agg.totalProps ? ((agg.totalProps - agg.fail) / agg.totalProps) * 100 : (agg.paired > 0 ? 100 : 0)
+  const reasons = []
+  if (agg.fail) reasons.push(`${agg.fail} prop fail`)
+  if (structural.missing.length) reasons.push(`${structural.missing.length} missing node${structural.missing.length > 1 ? 's' : ''}`)
+  if (extraPaint.length) reasons.push(`${extraPaint.length} painting extra node${extraPaint.length > 1 ? 's' : ''}`)
+  if (!coverageOK) reasons.push(agg.paired > 0 ? `insufficient coverage ${M}/${T} (${Math.round(covRatio * 100)}% < ${COV_THRESH * 100}%)` : 'nothing measured')
+  if (divergent) reasons.push('shapes diverge — pairing unreliable')
+
+  const coverage = {
+    totalProps: agg.totalProps, fail: agg.fail, nodesRef: agg.nRef, nodesBuilt: builtNodes.length, paired: agg.paired,
+    designVisual: T, measured: M, covRatio, coverageOK, covThresh: COV_THRESH,
+    extraPaint: extraPaint.length, unmeasuredLabels: unmeasured.slice(0, 6).map(labelFor), ok, propPct, reasons,
+  }
+
   if (OPTS.json) console.log(JSON.stringify({ key, groups: agg.groups, structural, coverage }, null, 2))
   else report(key, agg.groups, structural, coverage)
 
   await closeAll()
-  return agg.fail || structural.missing.length ? 1 : 0
+  return ok ? 0 : 1
 }
 
 // ---------------------------------------------------------------------------
