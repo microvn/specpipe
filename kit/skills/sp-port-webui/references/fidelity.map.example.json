@@ -1,0 +1,50 @@
+{
+  "_readme": "EXAMPLE selector map for fidelity.mjs. Copy the shape into <repo>/scripts/fidelity.map.json (project config — versioned with the code, NOT with the skill). One key per surface. The engine AUTO-WALKS the whole subtree from each root, so you only declare the ROOT selector + setup per side; `nodes[]` is optional and only pins tricky pairings. Reveal/verify selectors with `--probe`. Prefer a stable attribute over structural nth-child: a prototype runtime's data-* (e.g. DataChisel stamps data-dc-tpl on every templated node) on the design side, a data-testid you add to the component on the built side.",
+
+  "_config": {
+    "designRoot": "..",
+    "tokensCss": "src/styles/tokens.css",
+    "builtBaseUrl": "http://localhost:5566"
+  },
+
+  "_schema": {
+    "<key>": {
+      "source": "prototype | figma",
+      "prototype": {
+        "file": "path/to/prototype.html (relative to _config.designRoot)  — OR  url: http://...",
+        "selector": "root of the mapped subtree",
+        "setup": "[ {click|hover|waitFor|fill|evaluate} ] — steps to reach the POPULATED state"
+      },
+      "built": {
+        "url": "full URL  — OR  path: /route (appended to _config.builtBaseUrl)",
+        "selector": "root of the mapped subtree",
+        "setup": "[ steps ] to reach + seed the surface"
+      },
+      "figmaNote": "when source=figma there is no prototype block; extract the reference tree via MCP into a JSON (references/figma-extract.md) and pass --reference. `built` is still measured live.",
+      "nodes": "OPTIONAL overrides — [{ name, refSel, builtSel, self?, states? }]. Plain override re-anchors a SUBTREE (paths relative to the anchor) — good for a single wrapper. `self: true` measures ONLY the two matched elements (no child walk), depth-independent — use when the built markup nests the node many wrappers deeper than the design (the engine prints a ⚠ 'shapes diverge' warning telling you to switch to self pairs; have the LLM map the nodes, then pin them here). `states`: [\"hover\",\"focus\"] re-measures with the state triggered on the anchor. Overrides/states need the rendered design (prototype path)."
+    }
+  },
+
+  "datasets/card": {
+    "source": "prototype",
+    "prototype": {
+      "file": "Prototype/OkLabel.dc.html",
+      "selector": "[data-dc-tpl=\"1039\"]",
+      "setup": [
+        { "click": "aside [title=\"Datasets\"]" },
+        { "waitFor": "[data-dc-tpl=\"1039\"]" }
+      ]
+    },
+    "built": {
+      "path": "/datasets",
+      "selector": "[data-testid=\"dataset-card\"]:first-of-type",
+      "setup": [{ "waitFor": "[data-testid=\"dataset-card\"]" }]
+    },
+    "_verified": "Design values measured live from OkLabel.dc.html (chromium headless): card r=12px pad=16px · tile 34px r=9px bg rgba(24,188,242,.13) icon rgb(24,188,242) · name 13.5px/600 · subtitle 11px muted capitalize · stat mono 15px/600 · stat-label 10.5px · caps-label 10.5px/600 ls .04em · chip 11px r=20px bg-muted · footer-meta 11px · attach-link 12px/600 rgb(37,99,235). The prototype tile radius (9px) contradicts the adopted rounded-tile token (11px) — a Phase 9 baseline decision, not an arbitrary.",
+    "_nodesNote": "OPTIONAL. Omit for the normal case (engine auto-walks from the root). Add overrides ONLY when the built markup wraps differently from the design (e.g. shadcn inserts a <div>/Slot), which shifts structural paths and floods missing+extra. Each override re-anchors a subtree by selector on each side, paired by paths RELATIVE to that anchor — jumping over the wrapper. Requires the rendered design (prototype path), not --reference/--cache.",
+    "nodes": [
+      { "name": "head", "refSel": "#head", "builtSel": "#head > .wrapper" },
+      { "name": "attach-link", "refSel": "[data-dc-tpl=\"1065\"]", "builtSel": "[data-testid=\"attach-link\"]", "states": ["hover"] }
+    ]
+  }
+}

@@ -284,7 +284,7 @@ eq('hermes global path roots at .hermes/skills', emitSkillFileGlobal('hermes', R
 
 // ── skill selection (resolveSkills / skillAllowed) ──
 console.log('\n── skill selection ──');
-eq('ALL_SKILL_NAMES has 13 skills', ALL_SKILL_NAMES.length, 13);
+eq('ALL_SKILL_NAMES has 14 skills', ALL_SKILL_NAMES.length, 14);
 eq('resolveSkills("all") = null (all)', resolveSkills('all'), null);
 eq('resolveSkills(undefined) = null (all)', resolveSkills(undefined), null);
 const core = resolveSkills('core');

@@ -39,6 +39,13 @@ export const COMPONENTS = {
     'skills/sp-md-render/template.html',
     'skills/sp-md-render/components.md',
     'skills/sp-humanize/SKILL.md',
+    'skills/sp-port-webui/SKILL.md',
+    'skills/sp-port-webui/references/fidelity.mjs',
+    'skills/sp-port-webui/references/fidelity.selftest.mjs',
+    'skills/sp-port-webui/references/fidelity.map.example.json',
+    'skills/sp-port-webui/references/figma-extract.md',
+    'skills/sp-port-webui/references/codegen-seed.md',
+    'skills/sp-port-webui/references/port-lessons.md',
   ],
   // CLAUDE.md is no longer a static file — it's emitted from the single rules source
   // (kit/rules/specpipe-rules.md) as a marked section, like every other agent's rules.
@@ -51,7 +58,7 @@ export const COMPONENTS = {
 // ── Skill selection ─────────────────────────────────────────────────────────
 // Skills installed by default but safe to drop — standalone, not part of the
 // spec→build→review pipeline. Tagged "(optional)" in the interactive picker.
-export const OPTIONAL_SKILLS = ['sp-spec-render', 'sp-md-render', 'sp-humanize'];
+export const OPTIONAL_SKILLS = ['sp-spec-render', 'sp-md-render', 'sp-humanize', 'sp-port-webui'];
 
 /** Every skill name (sp-*), derived from the skill component list. */
 export const ALL_SKILL_NAMES = [...new Set(COMPONENTS.skills.map((p) => p.split('/')[1]))];

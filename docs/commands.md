@@ -424,6 +424,31 @@ Generic counterpart to `/sp-spec-render`. Same template/component architecture, 
 ---
 
 
+### /sp-port-webui — Pixel-Faithful Web-UI Port
+
+**Usage:**
+```
+/sp-port-webui <feature/component>       # e.g. datasets/card — port from the design source of truth
+```
+
+**When to use:** A canonical design exists — an HTML prototype OR a Figma frame — and the built UI must match it exactly. Instead of eyeballing, a committed engine (`references/fidelity.mjs`, run with the project's Playwright) renders both sides, walks the whole subtree, reads every node's computed style, and drives the build to a 100%-fidelity report. Web/DOM stacks only (React/Vue/Svelte/HTML) — native mobile has no `getComputedStyle` equivalent (separate skill). Optional/standalone — not part of the spec-first cycle.
+
+**How it works:**
+
+1. **Base preflight (gate)** — resolve the source; for Figma, probe the Figma MCP and STOP if absent (never guess). Ensure the project's Playwright + a seeded, populated build. Read prior lessons.
+2. **Establish the token baseline** — discover the project's design tokens; if none exist, bootstrap them (Figma variables via MCP, or `--harvest` recurring values from a raw prototype) rather than scattering arbitraries.
+3. **Map + measure** — pin the root selector per side (`--probe` to author selectors); the engine auto-walks and prints a `NODE | PROP | DESIGN | BUILT | Δ | TOKEN FIX` table + structural diff + coverage.
+4. **Patch to 100%** — apply the suggested token per failing row, add missing nodes with real data (data-gap → hand off to `/sp-plan` → `/sp-build`, never invent), loop under `--watch`. Reuse existing components on the Figma path (Code Connect) instead of hand-rolling.
+5. **Decision rules** — documented deviations win over the source; wrapper/depth divergence re-anchors via `nodes[]`/`self` pairs; near-token drift surfaces as a `~hint`; hover/focus states measured on demand.
+6. **Tests + report** — faithful-structure unit tests green; final fidelity table + coverage + data-gaps.
+
+**Requires:** the project's Playwright (`@playwright/test` + chromium); a Figma MCP for the Figma source. Engine has its own regression selftest (`references/fidelity.selftest.mjs`).
+
+**Token cost:** 10–30k + browser render loop.
+
+---
+
+
 ## Token Cost Guide
 
 | Activity | Tokens | Frequency |

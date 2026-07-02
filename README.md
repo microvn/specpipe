@@ -134,7 +134,7 @@ your-project/
 │   ├── CLAUDE.md             ← rules hub: spec-first cycle + guardrails + auto-detected stack
 │   ├── settings.json         ← hook wiring
 │   ├── hooks/                ← shell, read, comment, glob, file guards
-│   └── skills/sp-*/          ← the 13 skills
+│   └── skills/sp-*/          ← the 14 skills
 └── docs/specs/<feature>/     ← your specs + snapshots (created by the skills)
 ```
 
@@ -146,7 +146,7 @@ Other agents add their own dirs (`.agents/`, `.cursor/`, `.codex/`) and a shared
 
 ## Commands
 
-Thirteen slash commands. Full per-skill behaviour (phases, rules, outputs) lives in **[docs/commands.md](docs/commands.md)**.
+Fourteen slash commands. Full per-skill behaviour (phases, rules, outputs) lives in **[docs/commands.md](docs/commands.md)**.
 
 | Command | What it does | Tokens |
 |---------|--------------|--------|
@@ -163,6 +163,7 @@ Thirteen slash commands. Full per-skill behaviour (phases, rules, outputs) lives
 | [`/sp-spec-render`](docs/commands.md#sp-spec-render--render-spec-as-html-view) | Render a spec as a standalone HTML view | 3–8k |
 | [`/sp-md-render`](docs/commands.md#sp-md-render--render-any-markdown-as-html-view) | Render any long-form markdown as an HTML view | 3–8k |
 | [`/sp-humanize`](docs/commands.md#sp-humanize--rephrase-to-human-voice) | Rephrase a plan/draft into natural, send-ready text | 2–6k |
+| [`/sp-port-webui`](docs/commands.md#sp-port-webui--pixel-faithful-web-ui-port) | Pixel-faithful web-UI port from a prototype/Figma, verified by measured computed-style diff | 10–30k + browser |
 
 ---
 
@@ -181,7 +182,7 @@ The four-step loop above is the **new feature** flow. Variants:
 
 ```bash
 npx specpipe init . --agents cursor,codex   # install for specific agents (a list, or `all`)
-npx specpipe init . --skills core           # skip optional render/humanize skills (or a comma list)
+npx specpipe init . --skills core           # skip optional render/humanize/port-webui skills (or a comma list)
 npx specpipe init . --hooks none            # skills only, no guardrails (or --hooks shell,read)
 npx specpipe init --global --agents claude,codex   # install skills globally for chosen agents
 
