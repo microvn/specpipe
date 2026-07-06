@@ -396,11 +396,27 @@ Per CC5, such a constraint then needs an `AS-###` (or `GAP-###`) PER listed surf
 does NOT satisfy it. Omit both fields for an ordinary single-point constraint (CC5 then needs ≥1 AS, as before).
 OPTIONAL metadata: legacy specs and single-point constraints stay valid without it.
 
-C-001: <ordinary rule>. (AS-###)
+**One obligation per constraint (the G1 analogue — no multi-clause constraint).** A constraint states
+exactly one independently-falsifiable obligation, the same way an AS covers exactly one behaviour. A
+constraint whose text bundles several obligations (`X, verifies Y, refuses Z, atomically W` — each of
+which a test could pass or fail on its own) is the constraint-level version of a multi-case AS: split it
+into one `C-NNN` per obligation. This is what stops "C-010 named in one test → whole 5-clause constraint
+counted as covered" — because each obligation is now its own C-NNN with its own AS and its own test.
+
+**`clauses:` escape hatch — keep as one C-NNN only when the obligations form one atomic protocol** whose
+parts are not independently shippable (e.g. temp-write + fsync + atomic-rename that are one safe-write
+operation). Then keep the single `C-NNN` but carry a `clauses:` coverage map — one `AS-###`/`GAP-###`
+PER clause, exactly like `surfaces:`. One AS does NOT cover a multi-clause constraint. Prefer splitting;
+reach for `clauses:` only when splitting would fragment a genuinely atomic behaviour.
+
+C-001: <ordinary single-obligation rule>. (AS-###)
 C-002: <cross-surface rule — e.g. a repeated submit causes at most one charge>.
   - scope: S-003, S-007
   - surfaces: createIntent, pay
-  - coverage: createIntent → AS-014, pay → GAP-003]
+  - coverage: createIntent → AS-014, pay → GAP-003
+C-010: <atomic multi-clause protocol — e.g. safe object write>.
+  - clauses: temp-write → AS-030, verify-hash → AS-031, refuse-overwrite → AS-032,
+    atomic-rename → AS-033, temp-cleanup → AS-034]
 
 ## Linked Fields
 [OPTIONAL — include ONLY when this spec is one side of a producer/consumer split
@@ -607,6 +623,7 @@ Then cover a scenario class **only when its trigger appears in the text** — ne
 - **alternate valid path** — the text gives another trigger/event that also succeeds;
 - **state-dependence** — behaviour the text says differs by a named precondition/state;
 - **recovery / rollback** — the story writes or mutates data → what happens on failure or partial write. If the text does NOT state the partial-failure behaviour, that is a **Gap**, not an AS — do not assert atomicity, rollback, or "neither happens without the other" unless the text says so (that is an inference, not a stated outcome).
+- **reject → accept boundary pair** — whenever a rule/constraint/AS REJECTS or DENIES something ("reject X", "refuse if Y", "block Z"), write the matched ACCEPT AS too: the nearest *valid* input the rule must let through. This is NOT fabrication — the reject rule itself bounds what is rejected, so "the closest thing outside that bound is accepted" is the rule's own stated boundary, not an invented concept. A reject rule with only a reject AS cannot distinguish *correct* rejection from *over*-rejection (reject-everything passes a reject-only test). Example: "reject SVG XML entity-bombs" → AS-a: a bomb is rejected, AS-b: a benign SVG (even one with a legitimate `<!DOCTYPE>`) is accepted. If the valid-side behaviour is genuinely unstated, the accept side is a **Gap**, not a guess — but a reject rule may not ship with the accept side simply missing.
 
 A class with no trigger in the text → no AS. **Default is absent**: the burden is on *including* an AS (it must trace to a stated atom), never on excluding one. Looking thorough is not a reason to add a scenario.
 
@@ -679,8 +696,9 @@ Include only sections that apply:
 | CC2 | Every AS belongs to exactly 1 story | Assign orphan AS or delete |
 | CC3 | P0 stories have error path AS | Add error AS if missing |
 | CC4 | No 2 AS test the same behavior | Merge or delete duplicate |
-| CC5 | Every constraint AND every stated rule/outcome is covered by ≥1 AS — or, if unspecified, by a `GAP-NNN`. Coverage must be explicit: each `C-xxx` line ends with `(AS-###, ...)` or `(GAP-###)`. Story refs `(S-002)` are NOT coverage. `Execution.verify` lines NEVER count. **A constraint carrying `scope:`/`surfaces:` is covered PER listed surface — each surface needs its own `AS-###`/`GAP-###`; one global AS does NOT satisfy a cross-surface invariant.** Follow the CC5 enforcement procedure below | Add the AS (per surface), or record the Gap |
-| CC6 | Story count ≤7, AS count ≤20 — these are SOFT TARGETS for reviewability, not principles. Principle is "AS count tracks the atom count (rules + triggers + outcomes) — far more AS than atoms = bloat". **G1-driven overage up to 30 AS / 10 stories is allowed** when each excess AS comes from a G1 split (no AS gộp) and Phase 1 assessment carries the justification trail. Above 30 AS / 10 stories is a hard cap — must split regardless | Add the G1 justification (see Phase 1 §G1 vs T2/CC6 precedence), OR prune padded AS, OR split |
+| CC5 | Every constraint AND every stated rule/outcome is covered by ≥1 AS — or, if unspecified, by a `GAP-NNN`. Coverage must be explicit: each `C-xxx` line ends with `(AS-###, ...)` or `(GAP-###)`. Story refs `(S-002)` are NOT coverage. `Execution.verify` lines NEVER count. **A constraint carrying `scope:`/`surfaces:` is covered PER listed surface; a constraint carrying `clauses:` is covered PER clause — each surface/clause needs its own `AS-###`/`GAP-###`; one global AS does NOT satisfy a cross-surface OR multi-clause constraint. A constraint whose text bundles multiple independently-falsifiable obligations but is neither split into one `C-NNN` per obligation nor given a `clauses:` map = FAIL (under-decomposed — the C-010 trap).** Follow the CC5 enforcement procedure below | Split the constraint or add a `clauses:` map, then add the AS (per surface/clause), or record the Gap |
+| CC5b | Every reject/deny rule (a constraint or AS whose stated outcome is "refused / rejected / blocked / denied") has a matched **accept AS** asserting the nearest valid input is let through (the boundary pair) — or an explicit `GAP-NNN` when the valid-side behaviour is genuinely unstated. A reject-only rule cannot distinguish correct rejection from over-rejection | Add the accept-side AS (per Scenario Derivation §"reject → accept boundary pair"), or record the Gap |
+| CC6 | Story count ≤7, AS count ≤20 — these are SOFT TARGETS for reviewability, not principles. Principle is "AS count tracks the atom count (rules + triggers + outcomes) — far more AS than atoms = bloat". **G1-driven overage up to 30 AS / 10 stories is allowed** when each excess AS comes from a G1 split (no AS gộp) and Phase 1 assessment carries the justification trail. Above 30 AS / 10 stories is a hard cap — must split regardless. A per-clause or boundary-pair split is a G1 split — it tracks obligation count, so it never counts as bloat | Add the G1 justification (see Phase 1 §G1 vs T2/CC6 precedence), OR prune padded AS, OR split |
 | CC7 | Every story has an `**Execution:**` block; `parallel_safe: true` only if `files` is concrete (not `unknown`/dir-hint) AND disjoint from siblings AND `depends_on: none` | Fix the block — flip to `false` on any overlap/dependency/uncertainty |
 | CC8 | Every `depends_on` ID resolves to a story in this spec; the graph is a DAG (no cycles) | Fix the ref or break the cycle — `/sp-build` deadlocks on either |
 | CC9 | Every story has a `**Source:**` line anchoring it to a requirement clause (or ticket); no AS has a Then that is only "see GAP-NNN" | Add the Source; convert any gap-shell AS into a pure Gap |
@@ -696,6 +714,7 @@ Include only sections that apply:
 2. For EACH constraint, append explicit IDs at end of line: `(AS-###, AS-###)` for stated outcomes, OR `(GAP-###)` if unspecified. Story refs `(S-002)` are NOT coverage.
 2b. **If the constraint carries `scope:`/`surfaces:`** (cross-surface invariant) — require one `AS-###` (or `GAP-###`) PER listed surface, written `surface → AS-###`. A surface with neither AS nor Gap = FAIL (this is the cross-surface-invariant gate — the createIntent class). For every story in `scope`, confirm its `**Applies Constraints:**` lists this constraint. **An AS counts for a surface ONLY if it actually ASSERTS the invariant at that surface** — a story that binds the constraint but whose AS do not assert it there ⇒ that surface needs an AS or a `GAP-###`, NOT "covered" by binding alone. **Prefer the outcome AS:** for a stated cross-surface invariant the per-surface at-most-once outcome is a stated atom (the invariant applied to the surface), so it MUST be an AS; a *bare* Gap (no AS) at a surface is correct only when even the minimal-safe outcome is genuinely unassertable — otherwise write the outcome AS plus, if the mechanism is unstated, a Gap from it. (This makes the per-surface catch mechanical AND deterministic — no AS-vs-Gap coin-flip between runs.)
 2c. **If `## Behavior Matrix` exists** — require each row's `Coverage` cell to name an existing `AS-NNN`, existing `GAP-NNN`, or `N/A: <reason>`. A referenced AS/GAP counts only if it mentions the same state, viewer, surface, and concrete expected behavior (or the open question for that cell). Generic AS text like "shows correct status" does NOT cover a matrix cell.
+2d. **Multi-clause scan (the C-010 gate — run on EVERY constraint).** Read each constraint's text and list the independently-falsifiable obligations it states (a clause is an obligation a test could pass or fail on its own — split on `and`/commas joining verbs, enumerated behaviours, "also/then/must-not"). If it has >1 obligation, it MUST be either split into one `C-NNN` per obligation OR carry a `clauses:` map with one `AS-###`/`GAP-###` PER clause, written `clause → AS-###`. A clause with neither AS nor Gap = FAIL. **An AS counts for a clause ONLY if it actually ASSERTS that clause** (a test that names the constraint but exercises only one clause does NOT cover the others — this is exactly how C-010's verify-hash / C-002's random-material / C-017's reconciliation clauses slipped). If an obligation's outcome is genuinely unstated, it is a `GAP-###`, not a silent omission — a constraint is never "orphaned" (bundled clause with no AS and no Gap).
 3. If no AS exists yet:
    - Stated outcome → write a new AS (split if multi-case per Writing Instructions §"one specific behavior").
    - Trigger present, outcome unspecified → write `GAP-NNN (status: open)` and reference it.
@@ -828,7 +847,7 @@ Walk through table M1-M6. If ANY condition is true → Major.
 | M3 | Story priority changed | S-002 from P1 → P0 |
 | M4 | Story's main flow changed (Given or When changed) | AS-003 Given changes state, or When changes action |
 | M5 | Expected behavior changed (Then changed) for a P0 story | AS-001 Then changes result |
-| M6 | Constraint/invariant added or removed; or a constraint's `scope`/`surfaces` widened (it now must hold at a new surface → new coverage obligation) | Adding "balance must not be negative"; adding `pay` to C-002's `surfaces` |
+| M6 | Constraint/invariant added or removed; or a constraint's `scope`/`surfaces`/`clauses` widened (it now must hold at a new surface, or gains a new obligation → new coverage obligation) | Adding "balance must not be negative"; adding `pay` to C-002's `surfaces`; adding `verify-hash` to C-010's `clauses` |
 
 Minor = NONE of M1-M6 apply. Examples: typo fix, rewording without meaning change, adding/editing Data fields, formatting, adding Source ref.
 
@@ -958,7 +977,8 @@ After updating, verify:
 | CC2 | Every AS belongs to exactly 1 story | Assign orphan AS or delete |
 | CC3 | P0 stories have error path AS | Add error AS if missing |
 | CC4 | No 2 AS test the same behavior | Suggest merge or delete duplicate |
-| CC5 | Every constraint AND every stated rule/outcome is covered by ≥1 AS — or, if unspecified, by a `GAP-NNN`. Coverage must be explicit: each `C-xxx` line ends with `(AS-###, ...)` or `(GAP-###)`. Story refs `(S-002)` are NOT coverage. `Execution.verify` does NOT count. **Constraint with `scope:`/`surfaces:` → covered PER surface (each surface its own `AS-###`/`GAP-###`); one global AS is NOT enough.** Follow the CC5 enforcement procedure (Phase 2 §Consistency Checks above). | Add the AS (per surface), or record the Gap |
+| CC5 | Every constraint AND every stated rule/outcome is covered by ≥1 AS — or, if unspecified, by a `GAP-NNN`. Coverage must be explicit: each `C-xxx` line ends with `(AS-###, ...)` or `(GAP-###)`. Story refs `(S-002)` are NOT coverage. `Execution.verify` does NOT count. **Constraint with `scope:`/`surfaces:` → covered PER surface; constraint with `clauses:` → covered PER clause (each surface/clause its own `AS-###`/`GAP-###`); one global AS is NOT enough. A touched constraint whose text bundles multiple obligations must be split or given a `clauses:` map (the C-010 trap — see 2d).** Follow the CC5 enforcement procedure (Phase 2 §Consistency Checks above). Applies only to constraints ADDED or MODIFIED this run (untouched legacy constraints are not re-decomposed). | Split / add `clauses:`, then add the AS (per surface/clause), or record the Gap |
+| CC5b | Every reject/deny rule ADDED or MODIFIED this run has a matched accept AS (boundary pair) or an explicit `GAP-NNN`. Untouched legacy reject rules are not re-audited | Add the accept-side AS, or record the Gap |
 | CC6 | Story count ≤7, AS count ≤20 (soft target — G1-driven overage up to 30 AS / 10 stories allowed when documented; see G1 vs T2/CC6 precedence in Phase 1) | Add the G1 justification line in Phase 1 assessment, OR split spec |
 | CC7 | Touched stories have a valid `**Execution:**` block; `parallel_safe` consistent with `files`/`depends_on` | Fix the block (no mass-migration of untouched stories) |
 | CC8 | No `depends_on` anywhere in the spec points to a removed/missing story ID; graph stays a DAG | Fix dangling refs — **when removing a story, scan the WHOLE spec for `depends_on` pointing to its ID** (justified exception to "no mass-migration": a dangling ref deadlocks `/sp-build`) |
