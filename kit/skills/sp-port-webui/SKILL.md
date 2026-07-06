@@ -1,4 +1,5 @@
 ---
+name: sp-port-webui
 description: |
   Pixel-faithful web-UI port — rebuild a design surface (HTML prototype OR Figma) in the
   project's real components, then PROVE the match with measured computed-style diffs instead

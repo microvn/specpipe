@@ -1,4 +1,5 @@
 ---
+name: sp-review
 description: |
   Pre-merge code review — security, correctness, spec alignment. Reviews diff
   against the base branch with smart focus by blast radius.

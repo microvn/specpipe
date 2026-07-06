@@ -1,4 +1,5 @@
 ---
+name: sp-scaffold
 description: |
   Greenfield bootstrap — turn a decided app-type + tech stack into a RUNNABLE walking
   skeleton plus canonical docs (ARCHITECTURE.md, ADRs, optional DESIGN.md), before any

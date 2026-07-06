@@ -1,4 +1,5 @@
 ---
+name: sp-build
 description: |
   TDD delivery loop — write failing tests from spec, implement story by story,
   drive to GREEN. One story → red → green → next story. For a multi-story spec,

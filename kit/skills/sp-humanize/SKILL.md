@@ -1,4 +1,5 @@
 ---
+name: sp-humanize
 description: |
   Rephrase plan, notes, bullet points, or drafts into natural human-sounding text,
   ready to copy-paste and send. Strips AI tone before content goes out.

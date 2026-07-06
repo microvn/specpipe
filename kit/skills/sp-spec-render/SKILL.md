@@ -1,4 +1,5 @@
 ---
+name: sp-spec-render
 description: |
   Render spec markdown (single or multi-spec feature) into a self-contained,
   scannable HTML file: sidebar TOC with scroll-spy, story cards with P-badges,

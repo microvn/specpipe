@@ -1,4 +1,5 @@
 ---
+name: sp-plan
 description: |
   Generate spec with acceptance scenarios (Given/When/Then) from a description
   or update an existing spec. Outputs docs/specs/<feature>/<feature>.md ready for /sp-build.

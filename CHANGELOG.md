@@ -4,6 +4,20 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.3.0] — 2026-07-06
+
+### Added
+- **OpenCode as a supported agent** (`init --agents opencode`): emits native skills to
+  `.opencode/skills/<n>/` (project) and `~/.config/opencode/skills/<n>/` (global) with
+  `name` + `description` frontmatter. OpenCode has its own permission/plugin system and
+  reads rules from `AGENTS.md`/`CLAUDE.md`, so no hooks or owned rules file are emitted.
+
+### Fixed
+- **Canonical skills now declare an explicit `name:`** (matching the directory), as required
+  by Claude's skill spec. Claude's verbatim copy is unchanged in behavior, but tools that
+  piggyback on `~/.claude/skills/` — OpenCode and Cursor — **silently skip** any skill whose
+  frontmatter lacks `name:`. Adding it makes every `sp-*` skill discoverable across agents.
+
 ## [2.0.0] — 2026-06-30
 
 The first multi-agent release: specpipe authors one spec-first workflow and emits it

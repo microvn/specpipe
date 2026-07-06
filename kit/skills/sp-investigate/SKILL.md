@@ -1,4 +1,5 @@
 ---
+name: sp-investigate
 description: Read-only root-cause investigation — OPTIONAL branch before /sp-fix. Produces an investigation report with potential root cause hypotheses, evidence, blast radius — no code changes. Use when bug is complex, ambiguous, production-critical, or user explicitly wants to diagnose before fixing (outage, data corruption, regression, unclear stack trace, "it was working yesterday"). Skip for trivial bugs — go straight to /sp-fix. Writes docs/investigate/<slug>-YYYY-MM-DD.md and hands off to /sp-fix.
 allowed-tools: Read, Write, Bash, Glob, Grep, AskUserQuestion, mcp__graphatlas__*
 ---

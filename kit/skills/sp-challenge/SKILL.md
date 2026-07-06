@@ -1,4 +1,5 @@
 ---
+name: sp-challenge
 description: |
   Adversarial review — spawn hostile reviewers to break the plan before coding.
   Stress-tests assumptions, attacks decisions, finds blind spots in a spec.

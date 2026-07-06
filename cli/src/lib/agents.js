@@ -172,6 +172,24 @@ export const AGENTS = {
     capabilities: 'router-no-hooks',
     emitFrontmatter: fmNameDesc,
   },
+  opencode: {
+    label: 'OpenCode',
+    // Verified: opencode.ai/docs/skills — OpenCode has NATIVE skills at
+    // .opencode/skills/<name>/SKILL.md (it also reads .claude/skills & .agents/skills for
+    // compat, but those must carry a `name:` field or OpenCode silently skips them —
+    // which is why we emit a native copy with fmNameDesc rather than rely on the .claude one).
+    skillTarget: (name, inner) => `.opencode/skills/${name}/${inner}`,
+    // Global (user-level) skills dir. Verified: opencode.ai/docs/skills —
+    // ~/.config/opencode/skills/<name>/SKILL.md.
+    globalSkillRoot: '.config/opencode/skills',
+    skillFile: 'SKILL.md',
+    // OpenCode has its own permission/plugin system, not specpipe's bash PreToolUse guards,
+    // and reads rules from AGENTS.md/CLAUDE.md (shared with a co-installed Claude/Codex), so
+    // we emit neither hooks nor an owned rules file here — skills only.
+    hooks: 'none',
+    capabilities: 'router-no-hooks',
+    emitFrontmatter: fmNameDesc,
+  },
 };
 
 export const AGENT_IDS = Object.keys(AGENTS);

@@ -12,7 +12,7 @@
   <a href="https://specpipe.vercel.app"><b>Live demo&nbsp;→</b></a>
 </p>
 
-Specpipe installs a disciplined loop — **spec → code + tests → build pass** — as native skills, guard hooks, and project rules. You author it once; it lands in whichever agent you run (Claude Code, Codex, Cursor, Antigravity, OpenClaw, Hermes). Switch agents, keep the same `/sp-*` commands.
+Specpipe installs a disciplined loop — **spec → code + tests → build pass** — as native skills, guard hooks, and project rules. You author it once; it lands in whichever agent you run (Claude Code, Codex, Cursor, OpenCode, Antigravity, OpenClaw, Hermes). Switch agents, keep the same `/sp-*` commands.
 
 ```bash
 npx specpipe init        # interactive picker — choose agents, skills, guards
@@ -106,6 +106,7 @@ A skill is authored once and **emitted into each agent's native format** — the
 | **Claude Code** | `.claude/skills/` | `.claude/CLAUDE.md` | `.claude/settings.json` — all five |
 | **Codex CLI** | `.agents/skills/` | `AGENTS.md` | `.codex/hooks.json` — shell |
 | **Cursor** | `.cursor/skills/` | `.cursor/rules/*.mdc` | `.cursor/hooks.json` — shell + read + file |
+| **OpenCode** | `.opencode/skills/` | `AGENTS.md` / `CLAUDE.md` (read) | advisory rules |
 | **Antigravity** | `.agents/skills/` | `.agents/rules/` | `.agents/hooks.json` — shell |
 | **OpenClaw** | `skills/` | `SPECPIPE-RULES.md` | advisory rules |
 | **Hermes** | `~/.hermes/skills/` (global only) | `SPECPIPE-RULES.md` | advisory rules |
@@ -193,7 +194,7 @@ npx specpipe remove [--agents <list>] [--dry-run]   # uninstall (keeps your CLAU
 
 **Requirements:** a supported agent CLI, Git, Node.js 18+, Bash 4+, and your project's own toolchain. No dependencies are added to your project.
 
-**Global install** puts each agent's skills in its user-level dir (`~/.claude/skills/`, `~/.codex/skills/`, `~/.cursor/skills/`, `~/.gemini/antigravity-cli/skills/`, `~/.openclaw/skills/`, `~/.hermes/skills/`), so every project is covered. Per-project skills take precedence; Hermes is global-only; global hooks are Claude-only. The lifecycle remembers your skill selection — `upgrade` won't resurrect ones you deselected.
+**Global install** puts each agent's skills in its user-level dir (`~/.claude/skills/`, `~/.codex/skills/`, `~/.cursor/skills/`, `~/.config/opencode/skills/`, `~/.gemini/antigravity-cli/skills/`, `~/.openclaw/skills/`, `~/.hermes/skills/`), so every project is covered. Per-project skills take precedence; Hermes is global-only; global hooks are Claude-only. The lifecycle remembers your skill selection — `upgrade` won't resurrect ones you deselected.
 
 After install, check the **Project Info** in `.claude/CLAUDE.md` and fix anything auto-detection missed. Per-skill behavior is tunable via env vars — see [docs/customization.md](docs/customization.md).
 

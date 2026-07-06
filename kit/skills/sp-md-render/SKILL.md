@@ -1,4 +1,5 @@
 ---
+name: sp-md-render
 description: |
   Render any markdown file into a self-contained, scannable HTML view:
   sidebar TOC with scroll-spy, anchored headings, code copy buttons,

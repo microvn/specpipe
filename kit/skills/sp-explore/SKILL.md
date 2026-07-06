@@ -1,4 +1,5 @@
 ---
+name: sp-explore
 description: |
   Feature discovery as Client Technical Lead — clarify one feature deeply
   before writing spec. Asks targeted questions until requirements are concrete

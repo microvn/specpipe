@@ -1,4 +1,5 @@
 ---
+name: sp-commit
 description: |
   Stage changes, scan for secrets and debug code, generate conventional commit message.
   Use when asked to "commit", "commit changes", "tạo commit", "viết commit message",

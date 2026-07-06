@@ -63,6 +63,7 @@ const REL = 'skills/sp-plan/SKILL.md';
   eq('hermes path (global-only; bare relpath)', emitSkillFile('hermes', REL, SKILL).path, 'sp-plan/SKILL.md');
   eq('codex path', emitSkillFile('codex', REL, SKILL).path, '.agents/skills/sp-plan/SKILL.md');
   eq('cursor path -> native skills', emitSkillFile('cursor', REL, SKILL).path, '.cursor/skills/sp-plan/SKILL.md');
+  eq('opencode path -> native skills', emitSkillFile('opencode', REL, SKILL).path, '.opencode/skills/sp-plan/SKILL.md');
 }
 
 console.log('\n── emitSkillFile: frontmatter transforms ──');
@@ -88,6 +89,11 @@ console.log('\n── emitSkillFile: frontmatter transforms ──');
   has('cursor (native skill) adds name', cu, 'name: sp-plan');
   not('cursor drops allowed-tools', cu, 'allowed-tools');
   has('cursor keeps body', cu, 'Body content here.');
+
+  const op = emitSkillFile('opencode', REL, SKILL).content;
+  has('opencode adds name', op, 'name: sp-plan');
+  not('opencode drops allowed-tools', op, 'allowed-tools');
+  has('opencode keeps body', op, 'Body content here.');
 }
 
 console.log('\n── emitSkillFile: .agents/ family emits identical bytes ──');
@@ -128,7 +134,7 @@ console.log('\n── resolveAgents ──');
 console.log('\n── registry invariants ──');
 {
   eq('default agent exists', !!AGENTS[DEFAULT_AGENT], true);
-  eq('six agents', AGENT_IDS.length, 6);
+  eq('seven agents', AGENT_IDS.length, 7);
   let allHaveFields = true;
   for (const id of AGENT_IDS) {
     const a = AGENTS[id];
@@ -272,14 +278,21 @@ eq('openclaw globalSkillRoot', AGENTS.openclaw.globalSkillRoot, '.openclaw/skill
 eq('hermes globalSkillRoot', AGENTS.hermes.globalSkillRoot, '.hermes/skills');
 eq('hermes is global-only for skills', AGENTS.hermes.perProjectSkills, false);
 eq('cursor has a native global dir (~/.cursor/skills)', AGENTS.cursor.globalSkillRoot, '.cursor/skills');
+eq('opencode globalSkillRoot (~/.config/opencode/skills)', AGENTS.opencode.globalSkillRoot, '.config/opencode/skills');
 
 const gClaude = emitSkillFileGlobal('claude', REL, SKILL);
 eq('claude global path roots at .claude/skills', gClaude.path, '.claude/skills/sp-plan/SKILL.md');
-not('claude global skill keeps no name: field', gClaude.content, 'name: sp-plan');
+// Claude is identity: it never *injects* a name — it passes the source frontmatter
+// through verbatim. The fixture SKILL carries no name, so none appears. (Real kit skills
+// now declare their own `name:`, which flows through unchanged — see 'byte-identical' above.)
+not('claude identity injects no name (fixture has none)', gClaude.content, 'name: sp-plan');
 const gCodex = emitSkillFileGlobal('codex', REL, SKILL);
 eq('codex global path roots at .codex/skills (differs from project .agents)', gCodex.path, '.codex/skills/sp-plan/SKILL.md');
 has('codex global skill gets per-agent name: field', gCodex.content, 'name: sp-plan');
 eq('cursor global path roots at .cursor/skills', emitSkillFileGlobal('cursor', REL, SKILL).path, '.cursor/skills/sp-plan/SKILL.md');
+const gOpencode = emitSkillFileGlobal('opencode', REL, SKILL);
+eq('opencode global path roots at .config/opencode/skills', gOpencode.path, '.config/opencode/skills/sp-plan/SKILL.md');
+has('opencode global skill gets per-agent name: field', gOpencode.content, 'name: sp-plan');
 eq('hermes global path roots at .hermes/skills', emitSkillFileGlobal('hermes', REL, SKILL).path, '.hermes/skills/sp-plan/SKILL.md');
 
 // ── skill selection (resolveSkills / skillAllowed) ──

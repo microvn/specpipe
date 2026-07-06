@@ -1,4 +1,5 @@
 ---
+name: sp-fix
 description: |
   Test-first bug fix — write failing test, fix code, verify green.
   Iron Law: never fix without finding root cause first.

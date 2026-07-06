@@ -17,8 +17,8 @@ specpipe init --agents all                 # every supported agent
 Guards are emitted as native hook configs wherever the agent exposes a pre-tool-call
 hook, so they actually **block**: Claude (`.claude/settings.json`), Codex
 (`.codex/hooks.json`), Cursor (`.cursor/hooks.json`), and Antigravity
-(`.agents/hooks.json`). Agents without that mechanism (OpenClaw, Hermes) get the same
-guard intent as always-on advisory rules instead.
+(`.agents/hooks.json`). Agents without that mechanism (OpenClaw, Hermes, OpenCode) get the
+same guard intent as always-on advisory rules instead.
 
 ## Verified format matrix (2026-06-22)
 
@@ -27,14 +27,19 @@ guard intent as always-on advisory rules instead.
 | Claude Code | `.claude/skills/<n>/` | `SKILL.md` | canonical, verbatim | **enforced** hooks (`.claude/hooks` + settings.json) |
 | Codex CLI | `.agents/skills/<n>/` | `SKILL.md` | `name` + `description` | **enforced** `.codex/hooks.json` (PreToolUse, exit-2) + advisory `AGENTS.md` |
 | Cursor | `.cursor/skills/<n>/` | `SKILL.md` | `name` + `description` | **enforced** `.cursor/hooks.json` (`failClosed`) + advisory `.cursor/rules/*.mdc` |
+| OpenCode | `.opencode/skills/<n>/` | `SKILL.md` | `name` + `description` | advisory (own permission/plugin system; reads `AGENTS.md`/`CLAUDE.md` for rules) |
 | Antigravity | `.agents/skills/<n>/` | `SKILL.md` | `name` + `description` | **enforced** `.agents/hooks.json` (PreToolUse `run_command`, exit-non-zero) + advisory `.agents/rules/*.md` |
 | OpenClaw | `skills/<n>/` | `SKILL.md` | `name` + `description` + `metadata.openclaw` | advisory `SPECPIPE-RULES.md` (plugin hooks can block — planned) |
 | Hermes-Agent | global-only (`~/.hermes/skills/`) | `SKILL.md` | `name`+`description`+`version`+`metadata.hermes.tags` | advisory `SPECPIPE-RULES.md` |
 
 `allowed-tools` (Claude-specific) is stripped for every non-Claude agent.
-Cursor uses its **native skills** (`.cursor/skills/`), not always-on `.mdc` rules — it also
-reads `.claude/skills/` and `.agents/skills/` for interop. Reference files land under
-`.cursor/skills/<n>/`.
+The canonical `kit/skills/<n>/SKILL.md` declares an explicit `name:` (matching its directory),
+so Claude's verbatim copy carries it too. This is required by Claude's own skill spec, and it's
+what lets tools that piggyback on `~/.claude/skills/` (OpenCode, Cursor) discover the skill —
+OpenCode **silently skips** any skill whose frontmatter has no `name:`.
+Cursor and OpenCode use their **native skills** (`.cursor/skills/`, `.opencode/skills/`), not
+always-on rules — both also read `.claude/skills/` and `.agents/skills/` for interop. Reference
+files land under the skill dir.
 
 Hermes is **global-only for skills**: it discovers skills solely from `~/.hermes/skills/`
 (plus explicitly-configured `external_dirs`) and never scans the project, so a per-project
@@ -74,6 +79,7 @@ differs from the project path — it is NOT just the project path under `~`:
 | OpenClaw | `~/.openclaw/skills/` | docs.openclaw.ai/tools/skills |
 | Hermes-Agent | `~/.hermes/skills/` | NousResearch/hermes-agent |
 | Cursor | `~/.cursor/skills/` (also reads `~/.claude/skills/` + `~/.codex/skills/`) | cursor.com/docs/skills |
+| OpenCode | `~/.config/opencode/skills/` (also reads `~/.claude/skills/` + `~/.agents/skills/`) | opencode.ai/docs/skills |
 
 `--global` alone defaults to Claude. Skills are emitted per-agent (same frontmatter
 transforms as the project install). Global **hooks** stay Claude-only. `remove --global`
@@ -84,6 +90,7 @@ deletes only specpipe's `sp-*` dirs from each agent's global root — never the 
 - Claude Code skills/memory: https://code.claude.com/docs/en/skills , https://code.claude.com/docs/en/memory
 - **Hooks (verified 2026-06-28):** Codex https://developers.openai.com/codex/hooks (enabled by default; `.codex/hooks.json`; exit 2) · Cursor https://cursor.com/docs/hooks (`.cursor/hooks.json` `version:1`, `failClosed`) · Antigravity https://antigravity.google/docs/hooks + codelab `secure-agentic-coding` (`.agents/hooks.json`, matcher `run_command`, payload `tool_args.CommandLine`, exit-non-zero)
 - Cursor rules: https://cursor.com/docs/rules
+- OpenCode skills: https://opencode.ai/docs/skills (native `.opencode/skills/`; also reads `.claude/skills`, `.agents/skills`; requires a `name:` field — skills without it are skipped)
 - Codex skills/AGENTS.md: https://developers.openai.com/codex/skills , /concepts/customization , /guides/agents-md — skills live in `.agents/skills/` (NOT `.codex/skills/`, a non-working path per openai/codex#15136)
 - Antigravity skills: https://codelabs.developers.google.com/getting-started-with-antigravity-skills (`.agents/skills/`); rules dir moved to `.agents/rules/` (plural) as of v1.19.5, `.agent/rules/` is backward-compat only — https://discuss.ai.google.dev/t/new-folder-for-rules/126165
 - OpenClaw: https://github.com/openclaw/openclaw (skills/<n>/SKILL.md, `metadata.openclaw` block)

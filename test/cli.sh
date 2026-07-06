@@ -807,7 +807,7 @@ assert_exists "global: codex skill at ~/.codex/skills"    "$TEST_HOME/.codex/ski
 CODEX_FM=$(awk '/^---$/{c++; if(c==2) exit} {print}' "$TEST_HOME/.codex/skills/sp-plan/SKILL.md")
 assert_contains "global: codex skill emitted with name: frontmatter" "name: sp-plan" "$CODEX_FM"
 CLAUDE_FM=$(awk '/^---$/{c++; if(c==2) exit} {print}' "$TEST_HOME/.claude/skills/sp-plan/SKILL.md")
-assert_not_contains "global: claude skill keeps no name: field" "name: sp-plan" "$CLAUDE_FM"
+assert_contains "global: claude skill carries name: field (spec-compliant; lets opencode discover it via ~/.claude/skills)" "name: sp-plan" "$CLAUDE_FM"
 M=$(cat "$TEST_HOME/.claude/.devkit-manifest.json")
 assert_contains "global manifest records both agents" "codex" "$M"
 

@@ -1,4 +1,5 @@
 ---
+name: sp-voices
 description: |
   Multi-voice review — orchestrate multiple LLMs (Claude + Codex + others) to
   independently evaluate any input, synthesize consensus and disagreements
