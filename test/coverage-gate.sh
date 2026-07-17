@@ -12,7 +12,9 @@
 
 set -euo pipefail
 
-SKILL="$(cd "$(dirname "$0")/.." && pwd)/kit/skills/sp-build/SKILL.md"
+# The Spec Coverage Gate lives in gates.md (sp-build was split into navigator +
+# core-loop/gates/orchestration/port). The drift-guards below assert against it.
+GATES="$(cd "$(dirname "$0")/.." && pwd)/kit/skills/sp-build/gates.md"
 PASSED=0
 FAILED=0
 
@@ -31,7 +33,9 @@ assert_eq() { # name, got, want
 # assert the skill still uses these flags.
 gate_uncovered() { # spec_file, test_dir → prints uncovered ids, space-separated
   local spec="$1" testdir="$2"
-  grep -owE '(AS|C)-[0-9]+' "$spec" | sort -u > "$WORK/sp.txt"
+  # Mirror production: strip **Execution:** metadata first so verify-hint substrings
+  # (e.g. -t "AS-0") don't become phantom obligations.
+  grep -vE '\*\*Execution:\*\*' "$spec" | grep -owE '(AS|C)-[0-9]+' | sort -u > "$WORK/sp.txt"
   grep -rowhE '(AS|C)-[0-9]+' "$testdir" 2>/dev/null | sort -u > "$WORK/cv.txt"
   comm -23 "$WORK/sp.txt" "$WORK/cv.txt" | tr '\n' ' '
 }
@@ -60,6 +64,20 @@ section "Spec ID extraction (no phantom from leading-zero IDs)"
 SP="$(grep -owE '(AS|C)-[0-9]+' "$WORK/spec.md" | sort -u | tr '\n' ' ')"
 assert_eq "spec yields exactly its 8 ids, no phantom AS-01" "$SP" "$ALL_IDS"
 
+# Bug guard: **Execution:** verify hints carry AS-id-shaped substrings (e.g. -t "AS-0")
+# that are NOT acceptance scenarios — stripping the metadata line prevents a phantom
+# obligation that would false-BLOCK a complete build.
+cat > "$WORK/spec-exec.md" <<'EOF'
+## Stories
+### S-001 (P0)
+**Execution:** depends_on: none · verify: npx vitest run -t "AS-0"
+AS-001: happy path
+## Constraints
+- C-001: x
+EOF
+SP_EXEC="$(grep -vE '\*\*Execution:\*\*' "$WORK/spec-exec.md" | grep -owE '(AS|C)-[0-9]+' | sort -u | tr '\n' ' ')"
+assert_eq "Execution/verify metadata does not create a phantom AS-0" "$SP_EXEC" "AS-001 C-001 "
+
 section "Coverage gate behaviour"
 
 rm -f "$WORK"/tests/*
@@ -87,12 +105,15 @@ assert_eq "untagged test (no AS id in name) → ids still reported uncovered (fa
   "$(printf '%s' "$UNC" | grep -owE 'AS-001' | head -1)" "AS-001"
 
 section "Skill-text guards (the exact flags that broke before)"
-grep -q "grep -owE '(AS|C)-\[0-9\]+' \"\$SPEC\"" "$SKILL" \
-  && pass "spec grep uses -owE (portable, no \\b)" || fail "spec grep flags drifted in SKILL.md"
-grep -q "grep -rowhE '(AS|C)-\[0-9\]+' \"\$TESTDIR\"" "$SKILL" \
-  && pass "covered grep uses -rowhE (has -h, no \\b)" || fail "covered grep flags drifted in SKILL.md"
-if grep -nE "grep .*\\\\b\(AS\|C\)" "$SKILL" >/dev/null 2>&1; then
-  fail "SKILL.md still uses \\b in a coverage grep (GNU-ism → phantom ids on BSD)"
+grep -q "grep -vE '\\\\\*\\\\\*Execution:\\\\\*\\\\\*' \"\$SPEC\"" "$GATES" \
+  && pass "spec grep strips **Execution:** metadata first (no phantom-id false-block)" \
+  || fail "spec grep Execution filter drifted in gates.md"
+grep -q "grep -owE '(AS|C)-\[0-9\]+'" "$GATES" \
+  && pass "spec grep uses -owE (portable, no \\b)" || fail "spec grep flags drifted in gates.md"
+grep -q "grep -rowhE '(AS|C)-\[0-9\]+' \"\$TESTDIR\"" "$GATES" \
+  && pass "covered grep uses -rowhE (has -h, no \\b)" || fail "covered grep flags drifted in gates.md"
+if grep -nE "grep .*\\\\b\(AS\|C\)" "$GATES" >/dev/null 2>&1; then
+  fail "gates.md still uses \\b in a coverage grep (GNU-ism → phantom ids on BSD)"
 else
   pass "no \\b in coverage greps"
 fi
