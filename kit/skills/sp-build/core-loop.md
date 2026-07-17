@@ -2,7 +2,7 @@
 
 **Who reads this:** an **inline builder** (loops over every in-scope story, owns `.build-progress`/`.build-checklist`, runs Phase 3/3.5/4.5/5 from `gates.md`), OR a **dispatched Auto-Mode subagent** (builds EXACTLY its one assigned story under the contract pasted into its prompt — Phase 2 loop runs once; does NOT derive/write `.build-progress`/`.build-checklist`; skips Phase 3/3.5/4.5/5; returns spec signals in its report).
 
-**Do NOT read `orchestration.md` (controller-only) or `gates.md` (verification — inline reads it after Phase 2; a dispatched subagent never does).** Read `port.md` only if your story is a visual pixel-port (see Phase 0.5). Wherever a step says "derive/store `.build-checklist`", "mark done in `.build-progress`", "tick `.build-checklist`", "run full suite", or "Phase 5" — a dispatched subagent skips it and works against the pasted checklist lines, reporting ticks back to the controller.
+**Also read `test-command.md`** (shared — how to resolve `TEST_CMD`/`E2E_CMD` and verify filter patterns) before your first RED run. **Inline builder also reads `controller-prep.md`** once (Foundation Gate + checklist derivation) before Phase 0.5. **Do NOT read `orchestration.md` (controller-only) or `gates.md` (verification — inline reads it after Phase 2; a dispatched subagent never does).** Read `port.md` only if your story is a visual pixel-port (see Phase 0.5). Wherever a step says "derive/store `.build-checklist`", "mark done in `.build-progress`", "tick `.build-checklist`", "run full suite", or "Phase 5" — a dispatched subagent skips it and works against the pasted checklist lines, reporting ticks back to the controller.
 
 ---
 
@@ -78,27 +78,9 @@ Before Phase 0:
 
 ---
 
-## Phase 0b: Foundation Gate (a runnable harness must exist)
+## Phase 0b: Foundation Gate → moved to `controller-prep.md`
 
-Runs once, after Phase 0, before any test work (Phase 0.5 onward). This is a **precondition, not a build step**: it refuses to enter the TDD loop on a repo with no runnable harness, where Phase 2's RED would error — or worse, report a **false green** (a filtered run matching 0 tests exits 0 on many frameworks; see Test Command §"Filter pattern verification"). sp-build does **NOT** scaffold; that is `/sp-scaffold`'s job. This gate only checks, and points there.
-
-**Check (cheap — NOT the full suite, that's Phase 3):**
-1. **`TEST_CMD` resolves** from a project marker (per the Test Command section). No marker at all → fail.
-2. **The runner is invocable** — its list/collect command runs without "command not found" / "no config" (reuse the per-framework list commands from Test Command §"Filter pattern verification"). A runner that can't even list tests is not a harness.
-3. **Dependencies are present / installable** — the project's deps are installed, or `install` succeeds.
-
-A fresh build from a spec legitimately has no diff yet — that's fine (Phase 0 already handles it). This gate is about the **harness**, not about whether code changed.
-
-**Outcomes:**
-- **Pass** (markers present, runner invocable) → proceed to Phase 0.5. For an existing project this is a fast no-op — nothing changes (backward compatible).
-- **Fail** (no markers / runner not invocable / empty repo) → **STOP, report BLOCKED:**
-  > "No runnable harness — the TDD loop can't start. Run `/sp-scaffold` first to stand up a runnable skeleton (brand-new project: `/sp-explore` greenfield → `/sp-scaffold`), then re-run `/sp-build`."
-
-  Do NOT scaffold here, and do NOT proceed into Phase 2 — proceeding would produce false greens on an empty repo, which is exactly the failure this gate exists to stop.
-
-**Recorded `TEST_CMD`:** if `/sp-scaffold` ran, it recorded the resolved `TEST_CMD` + run command (handoff / ARCHITECTURE §13). Use that as the expected marker — a mismatch (scaffold said `vitest`, the repo has none) is a fail, not something to paper over.
-
-**Auto-Mode:** the controller runs this gate ONCE in A1 (before the first dispatch); dispatched per-story subagents assume the harness exists and skip it.
+The Foundation Gate (runnable-harness precondition) is owned by the controller (Auto-Mode A1.0) and run once by the inline builder before the loop. It lives in `controller-prep.md` now so the controller reads it without pulling these build steps. A **dispatched subagent skips it** — by the time it runs, the harness is guaranteed. (Inline builder: read `controller-prep.md` once before Phase 0.5.)
 
 ---
 
@@ -122,64 +104,9 @@ Output: 2-3 line summary. Feeds into Phase 1.5 Coverage Map.
 
 ---
 
-## Phase 0.6: Spec Checklist
+## Phase 0.6: Spec Checklist → moved to `controller-prep.md`
 
-**Who runs this:** the **inline builder**, and the **controller** (Auto-Mode A1.3 routes here to derive `.build-checklist` before the first dispatch — this is the one build-phase section the controller reads). **Dispatched subagent: skip derivation** — the controller already derived `.build-checklist` and pasted this story's lines into your prompt; work against those line IDs, report ticks back, do NOT write `.build-checklist`.
-
-Derive a checklist from the spec — each "promise" in this build's scope becomes one line. The checklist mirrors the spec; it does not invent new requirements.
-
-**Sources (all in `docs/specs/<feature>/<feature>.md`) — anchor on IDENTITY, not nouns:**
-- **Each `AS-NNN` → at least one line carrying that ID** (`AS-NNN`, or `AS-NNN.Tk` when one AS needs several assertions). This is the primary anchor: the checklist is keyed on the spec's case IDs, not on text it happens to mention. A Then with several fields/effects becomes several `AS-NNN.Tk` lines — but they all carry the same AS-NNN, so the AS is never lost.
-- **Each Constraint → one line per obligation, keyed on the constraint ID.** A single-obligation constraint → one `C-NNN` line (unchanged — most constraints stay one line, so this does not bloat the common case). A constraint that carries a `clauses:` coverage map → one `C-NNN.<clause>` line per clause (like `AS-NNN.Tk`), each carrying the clause's mapped `AS-###`. A constraint whose *text* bundles several independently-falsifiable obligations (`writes X, verifies Y, refuses Z, atomically W`) but carries NO `clauses:` map and was NOT split upstream → still derive one `C-NNN.<clause>` line per obligation AND raise it as a spec signal (see the under-decomposition rule below): this is the C-010 trap — one line hiding four unbuilt clauses. Ticking one clause must never tick the constraint.
-- Each `## Behavior Matrix` cell with `Coverage = AS-NNN` → one `BM.<AS-NNN>.<surface>` line carrying the referenced `AS-NNN`. This is a stricter obligation than the generic AS line: it preserves the exact state/viewer/surface cell that QA will test.
-- Each `## Behavior Matrix` cell with `Coverage = GAP-NNN` → a normal `GAP-NNN` checklist line annotated `BM cell unresolved: <state>/<viewer>/<surface>`. It is visible, but it is NOT a BM test obligation.
-- Each `## Behavior Matrix` cell with `Coverage = N/A: <reason>` → one `[N/A] BM.NA.<surface>` line with the reason.
-- Each open `GAP-NNN` (status not `resolved`) → one `[ ]` line tagged `GAP` (so a parked gap is visible, not silently dropped — see Spec Coverage Gate).
-- Each Not-in-Scope row → one `[N/A]` line (prevents accidental ticking).
-- Each matching project-local invariant entry under `docs/invariants/INV-*.md` with `status: enforced` and a `test_ref` → one `INV-###` checklist line carrying the invariant id and test ref. `candidate` and `confirmed` entries are visible risks/spec obligations but not build gates unless the spec turned them into AS/GAP/BM lines. Use the invariant registry README/schema as base knowledge; README examples are not runtime entries.
-- Each confirmed `## Core Function Model` entry point, seam, external contract, invariant, or optional/absent input is checked through AS/GAP/BM/Constraint coverage, not by a separate checklist line unless the spec names an `AS-NNN`/`C-NNN`. A model entry with no coverage is a Spec Signal.
-- Each `## Sibling Surface Map` confirmed surface is checked through its AS/GAP/BM coverage, not by a separate checklist line. Candidate rows with `GAP-NNN` or `ignore(reason)` are visible context only. A candidate row with missing disposition is a spec signal, not a build requirement to implement.
-
-**Completeness invariant (checked, not hoped):** every `AS-NNN` and `C-NNN` in the spec's `## Stories`/Constraints MUST appear on ≥1 checklist line. **Every clause of a `clauses:`-mapped or multi-obligation constraint MUST appear on its own `C-NNN.<clause>` line** — a single `C-NNN` line for a multi-clause constraint = the checklist is wrong (re-derive), because that is the exact line that let C-010's four unbuilt clauses pass. Every `Coverage = AS-NNN` Behavior Matrix cell MUST appear on exactly one `BM.AS-*` checklist line; every `Coverage = GAP-NNN` Behavior Matrix cell MUST appear on exactly one `GAP-* — BM cell unresolved` checklist line; every `Coverage = N/A` Behavior Matrix cell MUST appear on one `[N/A] BM.NA.*` checklist line. An AS with no line = the checklist is wrong (re-derive), not the spec. A Behavior Matrix cell with no line = QA coverage was dropped. Deriving from Then-nouns alone silently drops AS whose Then is verb-shaped ("retries", "must not send") or whose nouns collide with another AS — anchoring on the ID closes that.
-
-**Under-decomposition signal (the C-010 backstop — routes the fix upstream where TDD can act on it).** While deriving constraint lines, read each constraint's text and count its independently-falsifiable obligations. If a constraint states >1 obligation but the spec gave it only one coverage `AS` (or a bare `(S-NNN)` story ref, or nothing) and no `clauses:`/split — the clauses that lack their own AS are unbuildable by TDD (no failing test forces them into code, which is precisely how C-013 boot-validation, C-002 random-material, and C-017 reconciliation were omitted). Derive the per-clause lines anyway (so the gap is visible), mark each clause with no backing AS `[ ]`, and **raise a spec signal S1** — the constraint needs per-clause AS from `/sp-plan`. A constraint is never "orphaned": no clause may sit with no AS, no GAP, and no signal. (Inline: surface S1 and stop per the S1 rule in `gates.md` § Phase 5. Auto-Mode subagent: return it in the `Spec signal` field; controller stops the run per A4 Gate 2.)
-
-**Granularity rule (so two devs produce the same checklist):**
-- 1 line per **observable output field** (appears in Then result, independently assertable)
-- 1 line per **side effect** (write to DB, emit event, external call)
-- 1 line per **error path** declared in a Then clause
-- Do NOT split adjectives (sorted/deduped/trimmed) into separate lines — roll them into the field line
-
-Example: Then "returns sorted list of {file, confidence, edges}" → 3 lines (one per field), not 4.
-
-**Stored at:** `docs/specs/<feature>/.build-checklist` (alongside `.build-progress`)
-
-**Format** (owner column resolves multi-story AS):
-```
-[ ] AS-012.T1 — affected_tests includes convention-matched files     | owner: S-003
-[ ] AS-012.T2 — affected_tests includes TESTED_BY edges              | owner: S-003
-[ ] AS-012.T3 — output sorted by confidence                          | owner: S-004
-[ ] C-003     — query completes under 50ms                           | owner: S-005
-[ ] C-010.verify-hash   — reads back written bytes, compares hash, fails on mismatch | owner: S-005
-[ ] C-010.refuse-overwrite — write to an existing key is refused, not silently clobbered | owner: S-005
-[ ] BM.AS-012.appointment-list — Confirmed/trainer/list row parity    | owner: S-003
-[ ] GAP-004   — BM cell unresolved: Requested/booker/reschedule action | owner: GAP
-[N/A] BM.NA.cancelled-client-calendar — terminal state has no invite  | owner: —
-[N/A] AS-015  — out of scope (M3)                                    | owner: —
-```
-
-Owner = the story in this build planned to cover that line. If an AS spans multiple stories, each line gets its own owner. Use `owner: ?` when unknown upfront, resolve when reaching that story.
-
-**Three checkbox states:**
-- `[x]` — done: there is a test assertion AND production code emitting the behavior
-- `[~]` — partial: carve-out with a concrete destination (story ID that exists in the plan, OR Known-Gap row in the spec). References like "future work", "later", "TODO.md", "Phase X (does not exist)" are NOT accepted
-- `[ ]` — untouched: will be covered by a later story in this build, or out-of-scope already declared
-
-**If checklist already exists** (resume build):
-- Re-derive from the current spec. Diff against the old checklist.
-- New line in spec, missing from checklist → append `[ ]`
-- Line in checklist, no longer in spec → mark `[STALE]` (do not delete — keep audit trail)
-- Line present in both BUT Then clause text has changed → reset to `[ ]` with note `RESET: spec text changed <date>`, re-verify. The old `[x]` may be stale — the previous assertion may no longer match.
+Checklist derivation is owned by the controller (Auto-Mode A1.3) and the inline builder — it lives in `controller-prep.md` now. A **dispatched subagent skips derivation**: the controller already derived `.build-checklist` and pasted this story's lines into your prompt; work against those line IDs and report ticks back. (Inline builder: read `controller-prep.md` § Phase 0.6 once before Phase 1.)
 
 ---
 
@@ -321,7 +248,7 @@ GAPS: 4 paths need tests (1 need E2E, 1 need eval)
 | Mocking hides real failures (API→queue→worker→DB) | Internal helper, no side effects |
 | Auth / payment / data destruction | Single-function edge case (null, empty) |
 
-**E2E is AUTHORED, not just flagged.** A `[→E2E]` path is NOT a TODO you list and move on. For **critical flows — auth, payment, data-destruction, and each story's primary cross-component happy path** — you WRITE the E2E test and drive it RED→GREEN on `E2E_CMD` (see Test Command), exactly like a unit test. Modern E2E is cheap and scriptable (Playwright/Cypress/Detox) — "it spans components" is a reason to write the E2E, not skip it. Only a **non-critical** `[→E2E]` flow may be DEFERRED to Phase 5 "E2E" with a one-line reason (budget/env). A **critical** `[→E2E]` left unwritten makes the build **DONE_WITH_CONCERNS**, never DONE. (Mocking a critical cross-component flow at unit level is the vacuous-test trap — the decision matrix routed it to E2E precisely because mocks hide its failures. The same applies to a Linked-Field seam: real E2E/integration, never mocked.)
+**E2E is AUTHORED, not just flagged.** A `[→E2E]` path is NOT a TODO you list and move on. For **critical flows — auth, payment, data-destruction, and each story's primary cross-component happy path** — you WRITE the E2E test and drive it RED→GREEN on `E2E_CMD` (see `test-command.md`), exactly like a unit test. Modern E2E is cheap and scriptable (Playwright/Cypress/Detox) — "it spans components" is a reason to write the E2E, not skip it. Only a **non-critical** `[→E2E]` flow may be DEFERRED to Phase 5 "E2E" with a one-line reason (budget/env). A **critical** `[→E2E]` left unwritten makes the build **DONE_WITH_CONCERNS**, never DONE. (Mocking a critical cross-component flow at unit level is the vacuous-test trap — the decision matrix routed it to E2E precisely because mocks hide its failures. The same applies to a Linked-Field seam: real E2E/integration, never mocked.)
 
 **Testability Classification — classify by what the code does, not what framework it uses:**
 
@@ -360,38 +287,9 @@ Do not satisfy this rule with a unit test that only checks `is_done`, status tex
 
 ---
 
-## Test Command
+## Test Command → see `test-command.md`
 
-Resolve once before running tests. Auto-detect from project markers:
-
-| Marker | Run all | Run filtered |
-|--------|---------|-------------|
-| vitest config / vitest in package.json | `npx vitest run` | `npx vitest run -t "<pattern>"` |
-| jest config / jest in package.json | `npx jest --no-cache` | `npx jest --no-cache -t "<pattern>"` |
-| pyproject.toml / pytest.ini | `python3 -m pytest -x` | `python3 -m pytest -x -k "<pattern>"` |
-| Cargo.toml | `cargo test` | `cargo test "<pattern>"` |
-| go.mod | `go test ./...` | `go test ./... -run "<pattern>"` |
-| build.gradle | `./gradlew test` | `./gradlew test --tests "<pattern>"` |
-| *.sln | `dotnet test` | `dotnet test --filter "<pattern>"` |
-| Package.swift | `swift test` | `swift test --filter "<pattern>"` |
-| Gemfile | `bundle exec rspec` | `bundle exec rspec -e "<pattern>"` |
-
-All test commands use `TEST_CMD` to mean the resolved command. For filtered runs, use the framework's native filter flag from the table above.
-
-**E2E runner (separate from the unit/integration `TEST_CMD`).** A flow tagged `[→E2E]` runs on the project's E2E harness, NOT the unit runner — resolve it from project markers and call it `E2E_CMD`: Playwright (`playwright.config.*` → `npx playwright test`), Cypress (`cypress.config.*` → `npx cypress run`), Detox / Maestro (mobile), or the e2e package's own script (`pnpm --filter e2e test`). E2E lives in its own package/dir with its own config (per the test-layout rule). If a critical flow needs E2E and no E2E harness exists, that's a scaffold gap → report it (`/sp-scaffold` sets up the e2e package); do NOT silently downgrade a payment/auth/data-destruction flow to a mocked unit test.
-
-**Filter pattern verification (MANDATORY before trusting a filtered run):**
-
-A filtered run that matches zero tests will exit 0 on many frameworks — that is a false green. Before trusting any `TEST_CMD --filter "<pattern>"` result, confirm the pattern matched ≥1 test case:
-
-- vitest: `npx vitest list -t "<pattern>"` → output must list ≥1 test
-- jest: add `--passWithNoTests=false` → exits 1 if no tests match
-- pytest: `-k "<pattern>" --collect-only -q` → output must list ≥1 test
-- cargo: `cargo test "<pattern>" -- --list` → output must list ≥1 test
-- go: `go test -run "<pattern>" -list ".*" ./...` → output must list ≥1 test
-- gradle / dotnet / swift / rspec / other: if no equivalent listing command is known, fall back to verifying by `grep -r "<test name>" <test-dir>` — the test string must exist in source. Log `FILTER_VERIFY: fallback-grep` in the summary.
-
-If the verification shows 0 matches → the test you just wrote did not register (wrong name, wrong file location, framework did not pick it up). Fix before proceeding. Do NOT interpret 0-match as "PASSES". **Max 3 retry attempts** on filter-match failure; if still 0 after 3, stop and report BLOCKED (test infrastructure issue, not a TDD issue).
+`TEST_CMD`/`E2E_CMD` resolution and the mandatory **Filter pattern verification** (a filtered run matching 0 tests exits 0 = false green) live in `test-command.md` — shared, single copy. Read it before your first RED run so your filtered runs are trustworthy.
 
 ---
 
@@ -405,7 +303,7 @@ Work through stories one at a time from the spec's `## Stories` section (a dispa
 
 Write tests for the story's acceptance scenarios. Compose the whole test file and `Write` it once — do not add tests one Edit at a time.
 
-First, verify the filter pattern matches the new test (see "Filter pattern verification"). Then run once:
+First, verify the filter pattern matches the new test (see `test-command.md` § Filter pattern verification). Then run once:
 ```
 TEST_CMD --filter "<story test name>"
 ```

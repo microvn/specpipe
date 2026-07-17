@@ -57,9 +57,9 @@ Files live beside this one in the skill directory. Resolve the skill dir from wh
 
 | You are… | Read | Then, only if triggered |
 |----------|------|-------------------------|
-| **Inline builder** (no/1 story, or user chose Inline) | `core-loop.md`, then `gates.md` — Phase 3/3.5/4.5/5 are **mandatory** after Phase 2, not optional | `port.md` if a story is a visual pixel-port; individual gate sub-sections inside `gates.md` fire only per their triggers below |
-| **Controller** (Auto-Mode) | `orchestration.md` — A1–A7 dispatch/gate/route | `gates.md` for the gates you run at A4/A7; and `core-loop.md` **only** for §Phase 0a/0b/0.6 + §Test Command (the probe, foundation gate, and checklist derivation you own in A1). Do NOT read its build steps (Phase 1/1.5/2/4) — those are the subagent's. |
-| **Dispatched subagent** (one story) | `core-loop.md` ONLY — build your one story RED→GREEN | `port.md` if your story is a visual pixel-port. **Never** read `orchestration.md` or `gates.md` — the controller runs those. |
+| **Inline builder** (no/1 story, or user chose Inline) | `controller-prep.md` (Foundation Gate + checklist derivation), then `core-loop.md` + `test-command.md`, then `gates.md` — Phase 3/3.5/4.5/5 are **mandatory** after Phase 2, not optional | `port.md` if a story is a visual pixel-port; individual gate sub-sections inside `gates.md` fire only per their triggers below |
+| **Controller** (Auto-Mode) | `orchestration.md` — A1–A7 dispatch/gate/route; `controller-prep.md` for the Foundation Gate + checklist derivation you own in A1; `test-command.md` for `TEST_CMD`; `gates.md` for the gates you run at A4/A7 | **Never** read `core-loop.md` — its build steps (Phase 0/0.5/1/1.5/2/4) are the subagent's; reading it drags ~450 unused lines into your context all run. |
+| **Dispatched subagent** (one story) | `core-loop.md` + `test-command.md` — build your one story RED→GREEN | `port.md` if your story is a visual pixel-port. **Never** read `orchestration.md`, `controller-prep.md`, or `gates.md` — the controller runs those. |
 
 **Conditional triggers — read the extra file/section ONLY when the trigger is present:**
 

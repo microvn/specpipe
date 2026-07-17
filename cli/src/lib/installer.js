@@ -25,6 +25,8 @@ export const COMPONENTS = {
     'skills/sp-plan/SKILL.md',
     'skills/sp-build/SKILL.md',
     'skills/sp-build/core-loop.md',
+    'skills/sp-build/controller-prep.md',
+    'skills/sp-build/test-command.md',
     'skills/sp-build/gates.md',
     'skills/sp-build/orchestration.md',
     'skills/sp-build/port.md',

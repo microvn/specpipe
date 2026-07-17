@@ -4,6 +4,24 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.4.1] — 2026-07-17
+
+### Changed
+- **`sp-build` split into role-scoped files so each run loads only what it needs.** The single
+  ~900-line skill made every dispatched subagent and the controller carry procedure they never
+  execute, resident in context for the whole run — a measured token sink in agentic build loops.
+  The build steps now live in `core-loop.md` (Phase 0a/0/0.5/1/1.5/2/4); the controller-owned
+  Foundation Gate + checklist derivation in `controller-prep.md`; shared `TEST_CMD`/filter-verify
+  in `test-command.md`; verification gates in `gates.md`; orchestration (A1–A7) in
+  `orchestration.md`; the visual-port hand-off in `port.md`. `SKILL.md` is now a navigator with a
+  READ MAP routing each role (controller / dispatched subagent / inline builder) to exactly its
+  files — the controller no longer reads `core-loop.md` at all. Behavior-preserving: every gate
+  and rule (coverage, falsifiability, boundary-pair, no-vacuous-mock, terminal cascade) carried
+  over verbatim.
+- Added a **Token Discipline** block (batch tool calls, write-once, one RED + one GREEN per story,
+  no re-reads) and an **A1.6 story-size guard** (a story >~4 AS routes to `/sp-plan` for a split
+  before dispatch) to cut per-build turn count.
+
 ## [2.3.1] — 2026-07-06
 
 ### Fixed
