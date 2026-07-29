@@ -4,6 +4,55 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.5.0] — 2026-07-29
+
+### Added
+- **Session Isolation Gate (`sp-build` Phase 0a) — several `/sp-build` sessions can now run at
+  once on one repository.** Every run used to build in the session's own working tree, so a
+  second session fought the first over one git index, one `HEAD`, and one checked-out branch:
+  session A's commit could sweep up session B's half-written files, and A2's `EXPECTED_BASE`
+  moved under both. Story-level isolation (A2) never covered this — it isolates subagents
+  *within* a run, not runs from each other. Phase 0a now moves each run into its own worktree
+  and branch before any test or edit: `EnterWorktree name: sp-build-<feature>` →
+  `.claude/worktrees/sp-build-<feature>` on `worktree-sp-build-<feature>`. The deterministic
+  name **is** the mutual exclusion (no lock file, no pid registry), and reopening an existing
+  name is the resume path since `.build-progress`/`.build-checklist` live inside it.
+- **A8 — hand the work back.** After the final gates the run merges the base branch into its own
+  branch, **re-runs the full suite**, and only then asks whether to merge or leave the branch for
+  a PR. A7's green predates absorbing whatever other sessions landed while this run was building,
+  so it is not yet "green together"; re-verifying in the worktree is what stops N parallel
+  sessions from pushing untested merges onto a shared branch. The same merge carries the S1/S2
+  loop: `/sp-plan` edits the spec in the main checkout, the run picks it up on resume.
+
+### Changed
+- **Phase 0a asserts its own outcome instead of hoping.** `EnterWorktree` only acts when a
+  worktree was requested by the user or by **project instructions in `CLAUDE.md` / memory** — a
+  skill file is not an authorized source, so a compliant controller correctly declines and the
+  run silently lands on the current branch. Step 5 now checks `--git-dir` against
+  `--git-common-dir` and always emits one of three outcomes: isolated → proceed; not isolated but
+  the project authorized it → `🛑 BLOCKED`; not isolated and not authorized → `⚠️ WARN` naming the
+  branch, then build in place (unchanged pre-2.5.0 behaviour) and skip A8.
+- **A2 documents what a subagent worktree does not inherit.** Subagent worktrees use the same
+  `worktree.baseRef` as `--worktree`, whose default `"fresh"` branches from
+  `origin/<default-branch>` rather than local `HEAD` — so the `EXPECTED_BASE` +
+  `git reset --hard` pair in the dispatch contract is what makes a parallel wave correct under
+  the default setting, not belt-and-braces. Gitignored config and dependencies are not inherited
+  either.
+- `core-loop.md` Phase 0 now scopes the spec read (in-scope stories + Overview + referenced
+  Constraints, grep the rest on demand) instead of reading the whole file, which stayed resident
+  and was re-billed every turn on large specs.
+
+### Project setup
+To get isolated runs, a project needs three one-time additions — without the first, Phase 0a
+warns and falls back to building in place:
+
+- `CLAUDE.md`: `` `/sp-build` runs each build in its own git worktree (sp-build Phase 0a). ``
+- `.worktreeinclude` listing gitignored files to carry into worktrees (`.env`, `.env.local`, …) —
+  a worktree checks out tracked files only, so without this `.env` is simply absent and tests can
+  report a false green against empty config.
+- `.claude/settings.json`: `{"worktree": {"baseRef": "head"}}` so worktrees branch from local
+  `HEAD` instead of the remote default branch.
+
 ## [2.4.1] — 2026-07-17
 
 ### Changed

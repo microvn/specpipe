@@ -58,7 +58,7 @@ Before Phase 0:
 
    Do not skip this classification silently. If unsure whether a change is behavior-changing, treat it as behavior-changing.
 
-2. **Read the spec** at `docs/specs/<feature>/<feature>.md` — the `## Stories` section with acceptance scenarios is your roadmap. The `## Overview` and `## Constraints` sections tell you the INTENT behind the code. (Dispatched subagent: your story text + AS + relevant Constraints + your checklist lines were pasted into your prompt — do not re-read the whole spec; grep it only for a specific section you're missing.)
+2. **Read the spec** at `docs/specs/<feature>/<feature>.md` — but **scope the read to what you build, do not slurp the whole file.** The spec stays resident and is re-billed every turn, so for a large spec (say >200 lines) read only your in-scope `## Stories` block(s) + their AS, the `## Overview`, and the `## Constraints` referenced by those stories; `grep` for other sections on demand. Read the whole file only when it is small or you genuinely build every story. The `## Stories` AS are your roadmap; `## Overview`/`## Constraints` carry the INTENT. (Dispatched subagent: your story text + AS + relevant Constraints + checklist lines were pasted into your prompt — do not re-read the whole spec; grep it only for a specific section you're missing.)
 
 3. **Check build progress:** Look for `docs/specs/<feature>/.build-progress`.
    - If found → read it, find the first line marked `pending` → resume from that story.

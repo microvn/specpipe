@@ -6,7 +6,7 @@
 
 ### A1 — Plan the run (read spec ONCE)
 
-**0. Foundation Gate + context check (before any dispatch).** Run the Phase 0b Foundation Gate once (`controller-prep.md` § Phase 0b; resolve `TEST_CMD` per `test-command.md`): if there is no runnable harness (no project markers / runner not invocable), STOP and report BLOCKED pointing to `/sp-scaffold` — never dispatch stories onto an empty repo. Also **sanity-check the harness's context management**, but do not misdiagnose it: on a large-context model (e.g. GLM-5.2 at 1M) a normal build sits far below the window, so auto-compaction correctly will NOT fire — that is not a bug, and there is no "compaction threshold %" to set (mainline opencode has no such key; auto-compaction is on by default and triggers only near window-full). The per-turn cost of a long build comes from **stale tool outputs riding along in the prefix every turn**, not from missing compaction. The real lever, if the harness offers it, is pruning those outputs (opencode: `compaction.prune: true` in `opencode.json`). Recommend enabling it for long builds; don't chase a threshold knob. Then:
+**0. Session Isolation Gate → Foundation Gate → context check (before any dispatch).** Run the Phase 0a Session Isolation Gate **first** (`controller-prep.md` § Phase 0a): move the run into its own worktree + branch `sp-build/<feature>`, assert the base, make the worktree runnable. Everything after this point — dispatch, gates, integration, the full suite — happens inside that worktree, so a second sp-build session on another feature never touches this run's index, `HEAD`, or current branch. Then run the Phase 0b Foundation Gate once (`controller-prep.md` § Phase 0b; resolve `TEST_CMD` per `test-command.md`): if there is no runnable harness (no project markers / runner not invocable), STOP and report BLOCKED pointing to `/sp-scaffold` — never dispatch stories onto an empty repo. Also **sanity-check the harness's context management**, but do not misdiagnose it: on a large-context model (e.g. GLM-5.2 at 1M) a normal build sits far below the window, so auto-compaction correctly will NOT fire — that is not a bug, and there is no "compaction threshold %" to set (mainline opencode has no such key; auto-compaction is on by default and triggers only near window-full). The per-turn cost of a long build comes from **stale tool outputs riding along in the prefix every turn**, not from missing compaction. The real lever, if the harness offers it, is pruning those outputs (opencode: `compaction.prune: true` in `opencode.json`). Recommend enabling it for long builds; don't chase a threshold knob. Then:
 
 1. Read the spec once. Extract for every story: ID, priority, full text + its AS, and the `**Execution:**` block (`depends_on`, `parallel_safe`, `files`, `autonomous`, `verify`). Missing block → treat as `depends_on: none, parallel_safe: false, autonomous: true, files: unknown`.
 2. Read `.build-progress` if present. In Auto-Mode it uses **three** states: `done`, `building`, `pending`. The controller flips a story to `building` right before dispatch (A2) and to `done` only after its gates clear (A4/A4b) — so a story interrupted mid-build is left as `building`, never silently `done`. **On resume:**
@@ -36,6 +36,10 @@ Before dispatching, check the story's `autonomous` field: if it is `checkpoint`,
 **Dispatch shape:**
 - **Sequential story** → dispatch one **general-purpose subagent** via the Agent tool, working in the current tree.
 - **Parallel-eligible group** (from A1.5) → first capture the wave base: `EXPECTED_BASE=$(git rev-parse HEAD)`. Then dispatch each member subagent with `isolation="worktree"` so each gets its own worktree + branch off HEAD — **at most the A1.5 concurrency cap (≤3) at a time**; if the group is larger, do it in batches, integrating each batch (A4b) before dispatching the next. They run concurrently within a batch; the controller integrates their branches afterward (A4b).
+
+  **Two things a subagent worktree does NOT inherit — both are load-bearing:**
+  - **The base.** Subagent worktrees use the same `worktree.baseRef` as `--worktree`, which defaults to `"fresh"` = `origin/<default-branch>`, **not** your `HEAD`. So unless `baseRef` is `"head"`, every member branches off the remote default and silently drops the wave base. This is why pasting `EXPECTED_BASE` and the `git reset --hard` assert in the subagent contract below is mandatory, not belt-and-braces — it is the only thing making a parallel wave correct under the default setting.
+  - **Gitignored config and deps.** A worktree checks out tracked files only. `.worktreeinclude` covers `.env`-style files if the project has one (Phase 0a step 4 warns when it doesn't), but dependencies are not installed — instruct the member to install before its first test run, or its RED will error on a missing module rather than a missing assertion.
 
 **Keep the dispatch prompt lean.** The prompt is stored in YOUR history for the rest of the run — every line you paste is a recurring cost. Point to files on disk; paste only what the subagent cannot derive. The prompt MUST contain:
 
@@ -117,3 +121,28 @@ Run continuously. Do **not** ask "continue?" or print progress summaries between
 ### A7 — Finish
 
 When all stories `done`: read `gates.md`, run the full suite once (respecting the red-suite Fix-Loop guardrails there), **run the Linked-Field Seam Gate if this or a sibling spec has a `## Linked Fields` block** (cross-spec seam tests against the real producer on the integrated tree — the controller owns this; a single-side subagent could not), **then run the Spec Coverage Gate over the whole spec** — any uncovered AS/C → not DONE, reopen the owning story. Then the Phase 5 summary (aggregate: stories built, coverage-gate result, open gaps, S3 signals, deferred items). Delete `.build-progress`/`.build-checklist` only if the gate passed AND checklist is 100% `[x]`/`[N/A]`.
+
+### A8 — Hand the work back (only if Phase 0a created this run's worktree)
+
+Skip entirely if the session was already in a worktree when it started (Phase 0a step 1) — that worktree is the user's, not this run's, so leave it alone. Skip too when Phase 0a step 5 fell through to the un-isolated fallback: there is no run branch to hand back.
+
+The run branch is **`worktree-sp-build-<feature>`** (Claude Code prefixes `worktree-` to the `EnterWorktree` name). Use that full name in every command you run or print — a `sp-build-<feature>` without the prefix does not exist.
+
+**Order matters and must not be swapped** — A7 ran the suite before absorbing what other sessions merged while this run was building, so that GREEN does not yet mean "green together":
+
+1. `git merge <base-branch>` into `worktree-sp-build-<feature>` — pull in whatever landed on the base while this run was in flight. Conflicts are resolved **here, in this worktree**, never on the base branch.
+2. **Re-run the full suite.** This is the run's real verdict. RED → fix it here; the base branch stays untouched and other sessions stay unblocked.
+3. Only then ask the user via `AskUserQuestion`: merge `worktree-sp-build-<feature>` into `<base-branch>`, or leave the branch for a PR. **Never merge without an answer.**
+4. `ExitWorktree action: "keep"` (a merged branch can be deleted afterwards; an unmerged one must survive). Report the branch name, the commit count, and the suggested merge/PR command.
+
+   **If the user chose to merge**, the worktree has served its purpose — say so and give the exact cleanup, because `keep` leaves behind a directory *and* a `git worktree lock` held under this session's name, which blocks ordinary cleanup until the periodic sweep releases it:
+
+   ```bash
+   git worktree remove .claude/worktrees/sp-build-<feature>
+   git branch -d worktree-sp-build-<feature>   # -d: only succeeds once merged
+   git worktree prune
+   ```
+
+Steps 1–2 are what let N sessions merge back safely: whoever finishes later absorbs the earlier work and re-verifies, instead of pushing an untested merge onto the shared branch.
+
+**Same mechanism covers the S1/S2 resume loop** (A4 Gate 2): the spec is fixed with `/sp-plan` in the **main checkout** (the canonical copy — a worktree never authors spec changes), then this run resumes with `git merge <base-branch>` to pick the new spec up. No extra machinery.

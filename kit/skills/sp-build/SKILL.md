@@ -28,6 +28,11 @@ This SKILL.md is a **navigator only** — it decides the mode and points you at 
 
 1. Resolve the target spec at `docs/specs/<feature>/<feature>.md` (from `$ARGUMENTS` or the changed feature). Count the **in-scope** stories: those in `## Stories`, minus any already `done` in `.build-progress`, intersected with any `$ARGUMENTS` story filter. (So a resume with one story left counts as 1.)
 2. Decide:
+   - **0 stories in scope** — every in-scope story is already `done` in `.build-progress` (a re-run over shipped work, or `$ARGUMENTS` scopes to an atom/story whose owning story is already `done`) → **Verify-only. Do NOT read `core-loop.md`, `gates.md`, `controller-prep.md`, or the full spec.** This is not a build; there is nothing to build. Instead:
+     1. Read `test-command.md` only, resolve `TEST_CMD` (+ `E2E_CMD` if the scope is a critical flow).
+     2. If `$ARGUMENTS` names a specific atom/behavior, `grep` the spec for just that atom's test IDs / test-name hints (e.g. the Change Log or AS block) — a few lines, never the whole file — to learn which test files/names to filter on. If the scope is a bare story that is `done`, filter by that story's known test names.
+     3. Run `TEST_CMD` with a filter narrowed to those tests. Report GREEN/RED with the count. If GREEN → done, stop. If RED → the shipped work regressed: report it as a 🚩 `SPEC-SIGNAL:` / regression and stop for the user; do NOT silently re-enter the build loop.
+     This path costs one `test-command.md` read + one grep + one test run — it must not pull the build manual or the full spec into context, since both stay resident and are re-billed every turn.
    - **No spec / no `## Stories` section** (e.g. ad-hoc build, bug-fix-style work, `$ARGUMENTS` is a bare file) → **Inline.** Run the Execution Procedure directly. No mode question.
    - **1 story in scope** (single-story spec, or `$ARGUMENTS` scopes to one `S-NNN`) → **Inline.** Run the procedure for that one story. No subagents (inline threshold = 1).
    - **≥2 stories in scope** → ask the user **once** via AskUserQuestion:
@@ -49,6 +54,8 @@ This SKILL.md is a **navigator only** — it decides the mode and points you at 
    - **Auto** → you are the **controller**: read `orchestration.md` and follow it. Do NOT read `core-loop.md` yourself — your dispatched subagents do.
    - **Inline** → read `core-loop.md` and run it, looping over the in-scope stories (resume from first `pending` in `.build-progress`).
 
+3. **Any mode that actually builds** (Inline or Controller — not Verify-only) runs the **Session Isolation Gate first** (`controller-prep.md` § Phase 0a): the run moves into its own worktree + branch `sp-build/<feature>` before any test or edit. This is what lets several sp-build sessions run at once on one repo — without it they share a working tree, an index, and a current branch, and block each other. A **dispatched subagent never runs it** (it already has its own worktree from A2; running it would nest one inside another).
+
 ---
 
 ## READ MAP (read exactly what your role + spec need)
@@ -57,8 +64,9 @@ Files live beside this one in the skill directory. Resolve the skill dir from wh
 
 | You are… | Read | Then, only if triggered |
 |----------|------|-------------------------|
-| **Inline builder** (no/1 story, or user chose Inline) | `controller-prep.md` (Foundation Gate + checklist derivation), then `core-loop.md` + `test-command.md`, then `gates.md` — Phase 3/3.5/4.5/5 are **mandatory** after Phase 2, not optional | `port.md` if a story is a visual pixel-port; individual gate sub-sections inside `gates.md` fire only per their triggers below |
-| **Controller** (Auto-Mode) | `orchestration.md` — A1–A7 dispatch/gate/route; `controller-prep.md` for the Foundation Gate + checklist derivation you own in A1; `test-command.md` for `TEST_CMD`; `gates.md` for the gates you run at A4/A7 | **Never** read `core-loop.md` — its build steps (Phase 0/0.5/1/1.5/2/4) are the subagent's; reading it drags ~450 unused lines into your context all run. |
+| **Verify-only** (0 stories in scope — everything already `done`) | `test-command.md` **only** — resolve `TEST_CMD`, run the scoped tests, report GREEN/RED | Nothing. **Never** read `core-loop.md`, `gates.md`, `controller-prep.md`, or the full spec — grep the spec for at most the scoped atom's test-name hints. |
+| **Inline builder** (no `## Stories` / ad-hoc, 1 story in scope, or user chose Inline) | `controller-prep.md` (Session Isolation Gate + Foundation Gate + checklist derivation), then `core-loop.md` + `test-command.md`, then `gates.md` — Phase 3/3.5/4.5/5 are **mandatory** after Phase 2, not optional | `port.md` if a story is a visual pixel-port; individual gate sub-sections inside `gates.md` fire only per their triggers below |
+| **Controller** (Auto-Mode) | `orchestration.md` — A1–A8 isolate/dispatch/gate/route/hand-back; `controller-prep.md` for the Session Isolation Gate + Foundation Gate + checklist derivation you own in A1; `test-command.md` for `TEST_CMD`; `gates.md` for the gates you run at A4/A7 | **Never** read `core-loop.md` — its build steps (Phase 0/0.5/1/1.5/2/4) are the subagent's; reading it drags ~450 unused lines into your context all run. |
 | **Dispatched subagent** (one story) | `core-loop.md` + `test-command.md` — build your one story RED→GREEN | `port.md` if your story is a visual pixel-port. **Never** read `orchestration.md`, `controller-prep.md`, or `gates.md` — the controller runs those. |
 
 **Conditional triggers — read the extra file/section ONLY when the trigger is present:**
